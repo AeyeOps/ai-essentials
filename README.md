@@ -2,8 +2,8 @@ AI Essentials
 
 A public, general-purpose collection of scripts, docs, and utilities that support modern AI-based development: local tooling, cloud workflows, model evaluation, data handling, ops, and best practices. This repository is intended to be practical, lightweight, and framework-agnostic.
 
-- Home: https://github.com/IOPs/AI-essentials
-- Maintainer: steve.antonakakis (steve.antonakakis@gmail.com)
+- Home: https://github.com/AeyeOps/ai-essentials
+- Maintainer: AeyeOps Support (support@aeyeops.com)
 
 Contents
 - `scripts/`: CLI helpers and setup scripts for common environments.

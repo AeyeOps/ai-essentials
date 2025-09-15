@@ -24,7 +24,7 @@ Scope
 This Code of Conduct applies within project spaces and in public spaces when an individual is representing the project.
 
 Enforcement
-Report issues to the maintainer at steve.antonakakis@gmail.com. All complaints will be reviewed and investigated and will result in a response that is deemed necessary and appropriate to the circumstances.
+Report issues to the maintainers at support@aeyeops.com. All complaints will be reviewed and investigated and will result in a response that is deemed necessary and appropriate to the circumstances.
 
 Attribution
 This Code of Conduct is adapted from widely used community guidelines.
