@@ -1,0 +1,28 @@
+# General
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+*.swo
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Python build
+build/
+dist/
+*.egg-info/
+
+# Local overrides (not tracked)
+.gitignore.local
+
+# OS / tooling
+.idea/
+.vscode/
+.history/
