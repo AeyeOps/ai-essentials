@@ -1,33 +1,19 @@
-Agents Guide
+# Repository Guidelines
 
-Scope
-This file applies to the entire repository. It provides conventions and guidance for agentic tooling and AI assistants that contribute to or operate within this project.
+## Project Structure & Module Organization
+The repository is intentionally lean: documentation lives in `docs/`, executable helpers live in `scripts/`, and top-level Markdown files describe community, contribution, and agent operations. When adding new material, align with this split—reference guides belong under `docs/`, automation should land in `scripts/`, and include a short pointer from `README.md` if the entry point changes.
 
-Principles
-- Be precise and minimal: implement exactly what is requested without overreach.
-- Prefer clarity over cleverness: choose explicit, auditable implementations.
-- Keep portability in mind: default to POSIX shell and Python 3 standard library when possible.
-- Document assumptions and side effects in the same change.
+## Build, Test, and Development Commands
+There is no monolithic build; validate contributions with targeted commands. Use `bash scripts/update_cli_ubuntu.sh -h` to review script behaviour before running `bash scripts/update_cli_ubuntu.sh` on Ubuntu hosts. Lint shell changes locally via `shellcheck scripts/update_cli_ubuntu.sh` and dry-run new scripts with `bash -n path/to/script.sh`. Keep examples reproducible across POSIX shells.
 
-Repository Conventions
-- Scripts live in `scripts/` and should be executable, with `set -euo pipefail` and `-x` only when troubleshooting.
-- Every script must support `-h|--help` and exit with non-zero on error.
-- Do not hardcode secrets. Accept configuration via flags or environment variables.
-- Keep external dependencies optional; detect and guide users to install when needed.
+## Coding Style & Naming Conventions
+Shell scripts must start with `#!/usr/bin/env bash` and `set -euo pipefail`. Favour two-space indentation, uppercase constants (e.g., `Q_DEB_URL`), and descriptive function names such as `install_q_from_deb`. New Markdown content should use sentence-case headings and concise bullets; keep tables and diagrams in plain Markdown so they render well on GitHub.
 
-Git and Change Hygiene
-- Small, focused commits with imperative messages.
-- Update `README.md`, `docs/`, and script help text together with behavior changes.
-- Avoid unrelated refactors in functional changes.
+## Testing Guidelines
+Automated tests are not yet bundled, so treat every change as opt-in QA. Run `shellcheck` on every modified script, execute scripts with `--help` to confirm messaging, and manually verify network-dependent flows in a disposable environment. For documentation, build confidence through copyediting and, when relevant, capture short command transcripts to confirm accuracy.
 
-Assistant Behavior
-- Before running commands that mutate state, describe intent succinctly.
-- Prefer reading to writing; propose patches for review when unsure.
-- Respect `.gitignore` and avoid generating untracked binaries.
+## Commit & Pull Request Guidelines
+Follow the repository norm of small, imperative commits (e.g., `Add agent quick-start section`). Document behavioural changes in the same review—update `README.md`, relevant files under `docs/`, and script help text together. Pull requests should link to any open Archon tasks, describe impact, list verification steps, and include screenshots or logs when tooling output changes.
 
-Testing and Verification
-- Provide a simple example or smoke test path for new utilities.
-- When adding Python, prefer `python -m venv` and keep requirements pinned if needed.
-
-Licensing
-All contributions are MIT-licensed under `LICENSE`.
+## Security & Configuration Tips
+Never commit secrets or machine-specific paths. Prefer environment variables for API keys, and scrub transcripts before sharing. Review scripts for elevated privilege calls like `sudo` and call them out in pull requests so reviewers can assess operational risk.
