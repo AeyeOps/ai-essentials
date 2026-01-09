@@ -15,13 +15,13 @@ Tools managed
 - Claude Code (Anthropic)
 - Crush (Charmbracelet, Go)
 - Gemini CLI (Google)
-- AWS Q CLI (Amazon)
+- Kiro CLI (Amazon)
 - Codex CLI (OpenAI)
 
 Notes
 - Script requires curl, bash, and package managers for the respective tools.
 - It may perform network operations and install system packages.
-- Q CLI updates attempt the built-in updater first, then fall back to the package if needed.
+- Kiro CLI updates attempt the built-in updater first, then fall back to the package if needed.
 
 Usage
   bash scripts/update_cli_ubuntu.sh
@@ -39,14 +39,14 @@ CYAN='\033[1;36m'
 MAGENTA='\033[1;35m'
 NC='\033[0m' # No Color
 
-Q_DEB_URL="https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q.deb"
-: "${Q_UPDATE_TIMEOUT:=180}"
-: "${Q_UPDATE_HELP_TIMEOUT:=10}"
+KIRO_DEB_URL="https://desktop-release.q.us-east-1.amazonaws.com/latest/kiro-cli.deb"
+: "${KIRO_UPDATE_TIMEOUT:=180}"
+: "${KIRO_UPDATE_HELP_TIMEOUT:=10}"
 
-declare -a Q_UPDATE_CMD
-Q_SELF_UPDATE_VERSION=""
-Q_SELF_UPDATE_REASON=""
-Q_SELF_UPDATE_RESULT=""
+declare -a KIRO_UPDATE_CMD
+KIRO_SELF_UPDATE_VERSION=""
+KIRO_SELF_UPDATE_REASON=""
+KIRO_SELF_UPDATE_RESULT=""
 
 declare -a SUMMARY
 
@@ -70,29 +70,29 @@ record_summary() {
   SUMMARY+=("$tool: $result")
 }
 
-# Download and install the Amazon Q .deb package. Retries dependency fixes if needed.
-install_q_from_deb() {
+# Download and install the Kiro CLI .deb package. Retries dependency fixes if needed.
+install_kiro_from_deb() {
   local debfile
   debfile=$(mktemp --suffix=.deb)
 
-  echo -e "${BLUE}Downloading latest Amazon Q package...${NC}"
-  if ! curl -fLo "$debfile" "$Q_DEB_URL"; then
-    echo -e "${YELLOW}Failed to download Amazon Q package.${NC}"
+  echo -e "${BLUE}Downloading latest Kiro CLI package...${NC}"
+  if ! curl -fLo "$debfile" "$KIRO_DEB_URL"; then
+    echo -e "${YELLOW}Failed to download Kiro CLI package.${NC}"
     rm -f "$debfile"
     return 1
   fi
 
-  echo -e "${BLUE}Installing Amazon Q package via dpkg...${NC}"
+  echo -e "${BLUE}Installing Kiro CLI package via dpkg...${NC}"
   if ! run_as_root dpkg -i "$debfile"; then
     echo -e "${YELLOW}dpkg reported issues; attempting to fix dependencies via apt-get -f.${NC}"
     if run_as_root apt-get install -f -y; then
       if ! run_as_root dpkg -i "$debfile"; then
-        echo -e "${YELLOW}Amazon Q package install still failing after dependency fix.${NC}"
+        echo -e "${YELLOW}Kiro CLI package install still failing after dependency fix.${NC}"
         rm -f "$debfile"
         return 1
       fi
     else
-      echo -e "${YELLOW}Unable to fix dependencies for Amazon Q package.${NC}"
+      echo -e "${YELLOW}Unable to fix dependencies for Kiro CLI package.${NC}"
       rm -f "$debfile"
       return 1
     fi
@@ -102,103 +102,103 @@ install_q_from_deb() {
   return 0
 }
 
-build_q_update_command() {
+build_kiro_update_command() {
   local help_output status
 
-  if ! command -v q &>/dev/null; then
-    Q_UPDATE_CMD=(q update)
+  if ! command -v kiro-cli &>/dev/null; then
+    KIRO_UPDATE_CMD=(kiro-cli update)
     return
   fi
 
   if command -v timeout &>/dev/null; then
-    help_output=$(timeout "$Q_UPDATE_HELP_TIMEOUT" q update --help 2>&1)
+    help_output=$(timeout "$KIRO_UPDATE_HELP_TIMEOUT" kiro-cli update --help 2>&1)
     status=$?
   else
-    help_output=$(q update --help 2>&1)
+    help_output=$(kiro-cli update --help 2>&1)
     status=$?
   fi
 
   if [[ $status -eq 0 ]] && grep -q -- '--yes' <<<"$help_output"; then
-    Q_UPDATE_CMD=(q update --yes)
+    KIRO_UPDATE_CMD=(kiro-cli update --yes)
     return
   fi
 
-  Q_UPDATE_CMD=(q update)
+  KIRO_UPDATE_CMD=(kiro-cli update)
 }
 
-run_q_self_update() {
+run_kiro_self_update() {
   local local_version="$1"
   local update_output status joined_cmd hinted_version normalized_output
 
-  Q_SELF_UPDATE_VERSION=""
-  Q_SELF_UPDATE_REASON=""
-  Q_SELF_UPDATE_RESULT=""
+  KIRO_SELF_UPDATE_VERSION=""
+  KIRO_SELF_UPDATE_REASON=""
+  KIRO_SELF_UPDATE_RESULT=""
 
-  build_q_update_command
-  joined_cmd="${Q_UPDATE_CMD[*]}"
-  echo -e "${BLUE}Attempting in-place update via ${joined_cmd} (timeout ${Q_UPDATE_TIMEOUT}s if available)...${NC}"
+  build_kiro_update_command
+  joined_cmd="${KIRO_UPDATE_CMD[*]}"
+  echo -e "${BLUE}Attempting in-place update via ${joined_cmd} (timeout ${KIRO_UPDATE_TIMEOUT}s if available)...${NC}"
 
   if command -v timeout &>/dev/null; then
-    update_output=$(timeout "$Q_UPDATE_TIMEOUT" "${Q_UPDATE_CMD[@]}" 2>&1)
+    update_output=$(timeout "$KIRO_UPDATE_TIMEOUT" "${KIRO_UPDATE_CMD[@]}" 2>&1)
     status=$?
   else
-    update_output=$("${Q_UPDATE_CMD[@]}" 2>&1)
+    update_output=$("${KIRO_UPDATE_CMD[@]}" 2>&1)
     status=$?
   fi
 
   if [[ $status -eq 124 ]]; then
-    Q_SELF_UPDATE_RESULT="timeout"
-    Q_SELF_UPDATE_REASON="Self-update timed out after ${Q_UPDATE_TIMEOUT}s."
-    echo -e "${YELLOW}${Q_SELF_UPDATE_REASON}${NC}"
+    KIRO_SELF_UPDATE_RESULT="timeout"
+    KIRO_SELF_UPDATE_REASON="Self-update timed out after ${KIRO_UPDATE_TIMEOUT}s."
+    echo -e "${YELLOW}${KIRO_SELF_UPDATE_REASON}${NC}"
     return 1
   fi
 
   if [[ $status -ne 0 ]]; then
-    Q_SELF_UPDATE_RESULT="failed"
-    Q_SELF_UPDATE_REASON="Self-update failed: $(echo "$update_output" | tail -n1)"
-    echo -e "${YELLOW}${Q_SELF_UPDATE_REASON}${NC}"
+    KIRO_SELF_UPDATE_RESULT="failed"
+    KIRO_SELF_UPDATE_REASON="Self-update failed: $(echo "$update_output" | tail -n1)"
+    echo -e "${YELLOW}${KIRO_SELF_UPDATE_REASON}${NC}"
     return 1
   fi
 
-  Q_SELF_UPDATE_VERSION=$(get_q_local_version || true)
+  KIRO_SELF_UPDATE_VERSION=$(get_kiro_local_version || true)
   hinted_version=$(echo "$update_output" | grep -m1 -Eo '[0-9]+(\.[0-9]+)+(-[[:alnum:].]+)?' || true)
 
   normalized_output=$(echo "$update_output" | tr '\n' ' ')
 
-  if [[ -z "$Q_SELF_UPDATE_VERSION" && -n "$hinted_version" ]]; then
-    Q_SELF_UPDATE_VERSION="$hinted_version"
+  if [[ -z "$KIRO_SELF_UPDATE_VERSION" && -n "$hinted_version" ]]; then
+    KIRO_SELF_UPDATE_VERSION="$hinted_version"
   fi
 
   if grep -qiE 'no updates available|already up|latest version' <<<"$update_output"; then
-    Q_SELF_UPDATE_RESULT="up_to_date"
-    Q_SELF_UPDATE_REASON="${normalized_output:-Self-update reports current version.}"
-    Q_SELF_UPDATE_VERSION=${Q_SELF_UPDATE_VERSION:-$local_version}
+    KIRO_SELF_UPDATE_RESULT="up_to_date"
+    KIRO_SELF_UPDATE_REASON="${normalized_output:-Self-update reports current version.}"
+    KIRO_SELF_UPDATE_VERSION=${KIRO_SELF_UPDATE_VERSION:-$local_version}
     return 0
   fi
 
-  if [[ -n "$Q_SELF_UPDATE_VERSION" && -n "$local_version" && "$Q_SELF_UPDATE_VERSION" != "$local_version" ]]; then
-    Q_SELF_UPDATE_RESULT="updated"
-    Q_SELF_UPDATE_REASON="Updated from $local_version to $Q_SELF_UPDATE_VERSION"
+  if [[ -n "$KIRO_SELF_UPDATE_VERSION" && -n "$local_version" && "$KIRO_SELF_UPDATE_VERSION" != "$local_version" ]]; then
+    KIRO_SELF_UPDATE_RESULT="updated"
+    KIRO_SELF_UPDATE_REASON="Updated from $local_version to $KIRO_SELF_UPDATE_VERSION"
     return 0
   fi
 
-  Q_SELF_UPDATE_RESULT="unknown"
-  Q_SELF_UPDATE_REASON="Self-update completed but status unclear"
+  KIRO_SELF_UPDATE_RESULT="unknown"
+  KIRO_SELF_UPDATE_REASON="Self-update completed but status unclear"
   return 0
 }
 
-get_q_local_version() {
+get_kiro_local_version() {
   local output version
 
-  if ! command -v q &>/dev/null; then
+  if ! command -v kiro-cli &>/dev/null; then
     return 1
   fi
 
-  output=$(q --version 2>/dev/null || true)
+  output=$(kiro-cli --version 2>/dev/null || true)
   version=$(echo "$output" | grep -m1 -Eo '[0-9]+(\.[0-9]+)+(-[[:alnum:].]+)?')
 
   if [[ -z "$version" ]]; then
-    output=$(q version 2>/dev/null || true)
+    output=$(kiro-cli version 2>/dev/null || true)
     version=$(echo "$output" | grep -m1 -Eo '[0-9]+(\.[0-9]+)+(-[[:alnum:].]+)?')
   fi
 
@@ -308,9 +308,13 @@ handle_gemini() {
     return
   fi
   if command -v gemini &>/dev/null; then
-    local_version=$(gemini --version 2>/dev/null | awk '{print $NF}')
+    local_version=$(gemini --version 2>/dev/null | awk '{print $NF}' || true)
     old_version="$local_version"
-    echo -e "${GREEN}Detected Gemini version: $local_version${NC}"
+    if [[ -n "$local_version" ]]; then
+      echo -e "${GREEN}Detected Gemini version: $local_version${NC}"
+    else
+      echo -e "${YELLOW}Gemini CLI found but version check failed (config issue?).${NC}"
+    fi
   else
     echo -e "${YELLOW}Gemini CLI is not installed.${NC}"
     local_version="none"
@@ -328,78 +332,78 @@ handle_gemini() {
     record_summary "Gemini CLI" "Already up to date ($local_version)"
   else
     if out=$(npm install -g @google/gemini-cli@nightly --verbose 2>&1); then
-      new_version=$(gemini --version 2>/dev/null | awk '{print $NF}')
-      record_summary "Gemini CLI" "Updated from $old_version to $new_version"
+      new_version=$(gemini --version 2>/dev/null | awk '{print $NF}' || true)
+      record_summary "Gemini CLI" "Updated from $old_version to ${new_version:-unknown}"
     else
       record_summary "Gemini CLI" "Update failed: $(echo "$out" | tail -20)"
     fi
   fi
 }
 
-### ========== Q CLI ==========
-handle_q() {
-  echo -e "\n${CYAN}=== AWS Q CLI (Amazon) ===${NC}"
+### ========== KIRO CLI ==========
+handle_kiro() {
+  echo -e "\n${CYAN}=== Kiro CLI (Amazon) ===${NC}"
   local local_version="" new_version install_status installed=0
   set +e
 
-  if command -v q &>/dev/null; then
+  if command -v kiro-cli &>/dev/null; then
     installed=1
-    if local_version=$(get_q_local_version); then
-      echo -e "${GREEN}Detected Q CLI version: $local_version${NC}"
+    if local_version=$(get_kiro_local_version); then
+      echo -e "${GREEN}Detected Kiro CLI version: $local_version${NC}"
     else
       local_version="unknown"
-      echo -e "${YELLOW}Detected Q CLI installation but unable to parse version.${NC}"
+      echo -e "${YELLOW}Detected Kiro CLI installation but unable to parse version.${NC}"
     fi
   fi
 
   if (( ! installed )); then
-    echo -e "${YELLOW}Q CLI is not installed.${NC}"
-    install_q_from_deb
+    echo -e "${YELLOW}Kiro CLI is not installed.${NC}"
+    install_kiro_from_deb
     install_status=$?
-    new_version=$(get_q_local_version || true)
+    new_version=$(get_kiro_local_version || true)
     if [[ $install_status -ne 0 ]]; then
-      record_summary "Q CLI" "Installation failed"
+      record_summary "Kiro CLI" "Installation failed"
     elif [[ -n "$new_version" ]]; then
-      record_summary "Q CLI" "Installed new version $new_version"
+      record_summary "Kiro CLI" "Installed new version $new_version"
     else
-      record_summary "Q CLI" "Installed new version (unable to detect version)"
+      record_summary "Kiro CLI" "Installed new version (unable to detect version)"
     fi
     set -e
     return
   fi
 
-  if run_q_self_update "$local_version"; then
-    case "$Q_SELF_UPDATE_RESULT" in
+  if run_kiro_self_update "$local_version"; then
+    case "$KIRO_SELF_UPDATE_RESULT" in
       up_to_date)
-        record_summary "Q CLI" "Already up to date (${Q_SELF_UPDATE_VERSION:-$local_version})"
+        record_summary "Kiro CLI" "Already up to date (${KIRO_SELF_UPDATE_VERSION:-$local_version})"
         set -e
         return
         ;;
       updated)
-        record_summary "Q CLI" "Updated via q update from $local_version to ${Q_SELF_UPDATE_VERSION:-unknown}"
+        record_summary "Kiro CLI" "Updated via kiro-cli update from $local_version to ${KIRO_SELF_UPDATE_VERSION:-unknown}"
         set -e
         return
         ;;
       unknown)
-        echo -e "${YELLOW}${Q_SELF_UPDATE_REASON}${NC}"
+        echo -e "${YELLOW}${KIRO_SELF_UPDATE_REASON}${NC}"
         ;;
     esac
   else
-    echo -e "${YELLOW}${Q_SELF_UPDATE_REASON}${NC}"
+    echo -e "${YELLOW}${KIRO_SELF_UPDATE_REASON}${NC}"
   fi
 
-  echo -e "${BLUE}Falling back to Amazon Q package reinstall...${NC}"
-  install_q_from_deb
+  echo -e "${BLUE}Falling back to Kiro CLI package reinstall...${NC}"
+  install_kiro_from_deb
   install_status=$?
-  new_version=$(get_q_local_version || true)
+  new_version=$(get_kiro_local_version || true)
   if [[ $install_status -ne 0 ]]; then
-    record_summary "Q CLI" "Package reinstall failed after q update (${Q_SELF_UPDATE_REASON:-unknown reason})"
+    record_summary "Kiro CLI" "Package reinstall failed after kiro-cli update (${KIRO_SELF_UPDATE_REASON:-unknown reason})"
   elif [[ -z "$new_version" ]]; then
-    record_summary "Q CLI" "Package reinstall completed but version unknown"
+    record_summary "Kiro CLI" "Package reinstall completed but version unknown"
   elif [[ "$new_version" == "$local_version" ]]; then
-    record_summary "Q CLI" "Package reinstall completed but version unchanged ($local_version)"
+    record_summary "Kiro CLI" "Package reinstall completed but version unchanged ($local_version)"
   else
-    record_summary "Q CLI" "Updated from $local_version to $new_version via package"
+    record_summary "Kiro CLI" "Updated from $local_version to $new_version via package"
   fi
   set -e
 }
@@ -415,9 +419,13 @@ handle_codex() {
     return
   fi
   if command -v codex &>/dev/null; then
-    local_version=$(codex --version 2>/dev/null | awk '{print $NF}')
+    local_version=$(codex --version 2>/dev/null | awk '{print $NF}' || true)
     old_version="$local_version"
-    echo -e "${GREEN}Detected Codex version: $local_version${NC}"
+    if [[ -n "$local_version" ]]; then
+      echo -e "${GREEN}Detected Codex version: $local_version${NC}"
+    else
+      echo -e "${YELLOW}Codex CLI found but version check failed.${NC}"
+    fi
   else
     echo -e "${YELLOW}Codex CLI is not installed.${NC}"
     local_version="none"
@@ -437,8 +445,8 @@ handle_codex() {
   fi
 
   if out=$(npm install -g @openai/codex --verbose 2>&1); then
-    new_version=$(codex --version 2>/dev/null | awk '{print $NF}')
-    record_summary "Codex CLI" "Updated from $old_version to $new_version"
+    new_version=$(codex --version 2>/dev/null | awk '{print $NF}' || true)
+    record_summary "Codex CLI" "Updated from $old_version to ${new_version:-unknown}"
     return
   fi
 
@@ -455,8 +463,8 @@ handle_codex() {
       fi
       if [[ $cleanup_status -eq 0 ]]; then
         if tmp_out=$(npm install -g @openai/codex --verbose 2>&1); then
-          new_version=$(codex --version 2>/dev/null | awk '{print $NF}')
-          record_summary "Codex CLI" "Updated from $old_version to $new_version after cleanup"
+          new_version=$(codex --version 2>/dev/null | awk '{print $NF}' || true)
+          record_summary "Codex CLI" "Updated from $old_version to ${new_version:-unknown} after cleanup"
           return
         fi
         out="$tmp_out"
@@ -477,7 +485,7 @@ main() {
   handle_claude_code
   handle_crush
   handle_gemini
-  handle_q
+  handle_kiro
   handle_codex
 
   echo -e "\n${MAGENTA}======= SUMMARY ========${NC}"
