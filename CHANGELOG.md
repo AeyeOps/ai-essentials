@@ -5,15 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2025-09-28
+## [0.0.5] - 2026-01-10
 
 ### Added
-- Chrome WSL2 launcher script (`scripts/google-chrome-wsl2.sh`) for reliable browser automation in WSL2 environments
-  - Addresses common D-Bus session management issues in WSL2
-  - Automatic display platform detection (X11, Wayland, headless)
-  - Optimized Chrome flags for WSL2 compatibility
-  - GPU acceleration workarounds for WSL2 limitations
-  - Support for browser automation tools (Playwright, Puppeteer, DevTools Protocol)
+- AI Developer Stack setup script (`scripts/setup-ai-dev-stack.sh`) for complete development environment
+  - Idempotent installation - safe to run multiple times
+  - Multi-architecture support (amd64/arm64)
+  - Terminal: Kitty with auto-copy on select and right-click paste
+  - Shell: Zsh + Oh-My-Zsh + Powerlevel10k + MesloLGS Nerd Font
+  - Plugins: zsh-autosuggestions, zsh-syntax-highlighting
+  - File Manager: Yazi (Rust-based TUI with previews)
+  - Multiplexer: Zellij
+  - CLI Tools: ripgrep, fd, fzf, bat, eza, delta
+  - Runtimes: NVM + Node.js 22 LTS, Mamba + Python dev environment, Bun
+  - Utilities: direnv for per-project environment variables
 
 ## [0.0.4] - 2025-09-25
 
