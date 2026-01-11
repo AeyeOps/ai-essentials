@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.5] - 2026-01-10
+## [0.0.8] - 2026-01-10
 
 ### Added
 - AI Developer Stack setup script (`scripts/setup-ai-dev-stack.sh`) for complete development environment
@@ -19,6 +19,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - CLI Tools: ripgrep, fd, fzf, bat, eza, delta
   - Runtimes: NVM + Node.js 22 LTS, Mamba + Python dev environment, Bun
   - Utilities: direnv for per-project environment variables
+
+## [0.0.7] - 2026-01-09
+
+### Changed
+- Replaced AWS Q CLI with Kiro CLI in update script
+  - Updated deb package URL from amazon-q.deb to kiro-cli.deb
+  - Renamed all Q_* variables to KIRO_* equivalents
+  - Updated command detection from 'q' to 'kiro-cli'
+  - Updated all user-facing messages to reference Kiro CLI
+
+## [0.0.6] - 2025-10-09
+
+### Added
+- Windows Chrome launcher script (`scripts/chrome-wsl2-win.sh`) for WSL2-to-Windows browser automation
+  - Launches Chrome on Windows host from WSL2 environment
+  - Complements the Linux-native WSL2 Chrome launcher
+
+## [0.0.5] - 2025-09-28
+
+### Added
+- Chrome WSL2 launcher script (`scripts/google-chrome-wsl2.sh`) for reliable browser automation in WSL2 environments
+  - Addresses common D-Bus session management issues in WSL2
+  - Automatic display platform detection (X11, Wayland, headless)
+  - Optimized Chrome flags for WSL2 compatibility
+  - GPU acceleration workarounds for WSL2 limitations
+  - Support for browser automation tools (Playwright, Puppeteer, DevTools Protocol)
 
 ## [0.0.4] - 2025-09-25
 
