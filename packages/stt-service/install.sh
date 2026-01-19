@@ -75,7 +75,7 @@ read_char() {
     else
         REPLY=""
     fi
-    echo
+    echo >&2
 }
 
 # Prompt with default (respects NONINTERACTIVE)
