@@ -27,7 +27,7 @@ show_help() {
     cat << 'EOF'
 STT Service Test Sandbox
 
-Creates a CUDA 12.6 Ubuntu 22.04 container with GPU access for testing the installer.
+Creates a CUDA 12.6 Ubuntu 24.04 container with GPU access for testing the installer.
 The container is disposable - delete it anytime with --clean.
 
 USAGE:
@@ -64,9 +64,9 @@ build_image() {
         return
     fi
 
-    info "Building test image (CUDA 12.6 Ubuntu 22.04 + basics)..."
+    info "Building test image (CUDA 12.6 Ubuntu 24.04 + basics)..."
     docker build -t "$IMAGE_NAME" - << 'DOCKERFILE'
-FROM nvidia/cuda:12.6.0-runtime-ubuntu22.04
+FROM nvidia/cuda:12.6.0-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
