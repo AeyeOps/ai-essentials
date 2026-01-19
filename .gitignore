@@ -34,3 +34,7 @@ packages/*/models/*
 .idea/
 .vscode/
 .history/
+
+# Claude Code plugins
+commands/
+hooks/
