@@ -32,14 +32,19 @@ PACKAGE_SUBDIR="ai-essentials-main/packages/stt-service"
 # ARM64 onnxruntime wheel (not on PyPI)
 ONNX_WHEEL="https://github.com/ultralytics/assets/releases/download/v0.0.0/onnxruntime_gpu-1.24.0-cp312-cp312-linux_aarch64.whl"
 
-# CUDA 12 library path for GB10
-CUDA_LIB="/usr/local/cuda-12.6/targets/sbsa-linux/lib"
+# CUDA library paths to search (in order of preference)
+# GB10 with full CUDA toolkit uses /usr/local/cuda-*/targets/sbsa-linux/lib
+# apt-installed packages use /usr/lib/aarch64-linux-gnu
+CUDA_LIB=""  # Will be detected dynamically
 
 # Minimum disk space required (GB)
 MIN_DISK_GB=3
 
 # Track if CUDA upgrade is recommended
 CUDA_NEEDS_UPGRADE=0
+
+# Track if apt-get update has been run this session
+APT_UPDATED=0
 
 # ═══════════════════════════════════════════════════════════════════
 # Helper functions
@@ -117,6 +122,34 @@ has_cmd() {
     command -v "$1" &> /dev/null
 }
 
+# Find CUDA library directory (searches common locations)
+find_cuda_lib() {
+    local search_paths=(
+        "/usr/local/cuda/targets/sbsa-linux/lib"
+        "/usr/local/cuda-13.0/targets/sbsa-linux/lib"
+        "/usr/local/cuda-12.6/targets/sbsa-linux/lib"
+        "/usr/local/cuda-12/targets/sbsa-linux/lib"
+        "/usr/local/cuda/lib64"
+        "/usr/lib/aarch64-linux-gnu"
+    )
+    for p in "${search_paths[@]}"; do
+        # Check for CUDA 12 libs (needed by onnxruntime)
+        if [[ -f "$p/libcublas.so.12" ]] || [[ -f "$p/libcublas.so" ]]; then
+            echo "$p"
+            return 0
+        fi
+    done
+    # Fallback: search for libcublas
+    local found
+    found=$(find /usr -name "libcublas.so.12*" -type f 2>/dev/null | head -1)
+    if [[ -n "$found" ]]; then
+        dirname "$found"
+        return 0
+    fi
+    echo ""
+    return 1
+}
+
 # Download helper (uses curl or wget)
 download() {
     local url="$1"
@@ -192,9 +225,10 @@ preflight_checks() {
             gpu_name=$(nvidia-smi -L | head -1 | sed 's/GPU 0: //' | cut -d'(' -f1)
             success "GPU: $gpu_name"
 
-            # Check CUDA version
+            # Check CUDA version (using sed for portability - grep -oP requires PCRE)
             local cuda_version
-            cuda_version=$(nvidia-smi 2>/dev/null | grep -oP "CUDA Version: \K[0-9]+\.[0-9]+" || echo "unknown")
+            cuda_version=$(nvidia-smi 2>/dev/null | sed -n 's/.*CUDA Version: \([0-9]*\.[0-9]*\).*/\1/p' | head -1)
+            [[ -z "$cuda_version" ]] && cuda_version="unknown"
             if [[ "$cuda_version" != "unknown" ]]; then
                 local cuda_major="${cuda_version%%.*}"
                 success "CUDA Version: $cuda_version"
@@ -251,10 +285,11 @@ preflight_checks() {
     fi
 
     # CUDA libraries (informational)
-    if [[ -d "$CUDA_LIB" ]]; then
-        success "CUDA 12.6 libraries: Found"
+    CUDA_LIB=$(find_cuda_lib)
+    if [[ -n "$CUDA_LIB" ]]; then
+        success "CUDA libraries: Found at $CUDA_LIB"
     else
-        warn "CUDA 12.6 libraries not found at $CUDA_LIB"
+        warn "CUDA libraries not found"
         info "Will attempt to install via apt"
     fi
 
@@ -337,11 +372,15 @@ cuda_repo_configured() {
 
 # Check if CUDA toolkit is installed
 cuda_installed() {
-    # Check for CUDA 13 or any recent CUDA installation
+    # Check multiple indicators of CUDA installation
+    # 1. nvcc compiler available
+    # 2. /usr/local/cuda symlink exists (created by CUDA installer)
+    # 3. Any /usr/local/cuda-* directory exists
+    # 4. CUDA toolkit package installed via apt
     has_cmd nvcc || \
     [[ -d /usr/local/cuda ]] || \
-    dpkg -l | grep -q "cuda-toolkit-13" || \
-    dpkg -l | grep -q "cuda-runtime-13"
+    ls -d /usr/local/cuda-* &>/dev/null || \
+    dpkg -l 2>/dev/null | grep -qE "cuda-toolkit-1[23]|cuda-runtime-1[23]"
 }
 
 # Set up NVIDIA CUDA repository
@@ -365,17 +404,20 @@ setup_cuda_repo() {
     sudo dpkg -i "$keyring_file" || die "Failed to install CUDA keyring"
     rm -f "$keyring_file"
     sudo apt-get update -qq
+    APT_UPDATED=1
 
     success "NVIDIA CUDA repository configured"
 }
 
 # Install CUDA toolkit
 install_cuda_toolkit() {
-    info "Installing CUDA 13 toolkit..."
+    info "Installing CUDA toolkit..."
     info "This may take several minutes..."
 
-    sudo apt-get install -y -qq cuda-toolkit-13-0
-    success "CUDA 13 toolkit installed"
+    # Install the latest CUDA 13 toolkit (version-locked to 13.x series)
+    # cuda-toolkit-13 is a meta-package that gets the latest 13.x release
+    sudo apt-get install -y -qq cuda-toolkit-13
+    success "CUDA toolkit installed"
 
     # Add CUDA to PATH for this session
     export PATH="/usr/local/cuda/bin:$PATH"
@@ -482,7 +524,11 @@ install_system_deps() {
         info "Installing: ${packages[*]}"
         info "This requires sudo access..."
 
-        sudo apt-get update -qq
+        # Only run apt-get update if not already done this session
+        if [[ "$APT_UPDATED" != "1" ]]; then
+            sudo apt-get update -qq
+            APT_UPDATED=1
+        fi
         sudo apt-get install -y -qq "${packages[@]}"
         success "System dependencies installed"
     else
@@ -628,8 +674,9 @@ verify_gpu() {
 
     cd "$INSTALL_DIR"
 
-    # Set CUDA library path
-    if [[ -d "$CUDA_LIB" ]]; then
+    # Find and set CUDA library path
+    CUDA_LIB=$(find_cuda_lib)
+    if [[ -n "$CUDA_LIB" ]]; then
         export LD_LIBRARY_PATH="$CUDA_LIB:${LD_LIBRARY_PATH:-}"
     fi
 
@@ -692,7 +739,8 @@ download_model() {
         info "Downloading model (this may take a few minutes)..."
 
         cd "$INSTALL_DIR"
-        if [[ -d "$CUDA_LIB" ]]; then
+        CUDA_LIB=$(find_cuda_lib)
+        if [[ -n "$CUDA_LIB" ]]; then
             export LD_LIBRARY_PATH="$CUDA_LIB:${LD_LIBRARY_PATH:-}"
         fi
 
@@ -739,6 +787,9 @@ setup_service() {
 
     info "Installing systemd service..."
 
+    # Find CUDA libs for service environment
+    CUDA_LIB=$(find_cuda_lib)
+
     # Generate service file
     cat > /tmp/stt-service.service << EOF
 [Unit]
@@ -749,7 +800,7 @@ After=network.target
 Type=simple
 User=$(whoami)
 WorkingDirectory=$INSTALL_DIR
-Environment="LD_LIBRARY_PATH=$CUDA_LIB"
+Environment="LD_LIBRARY_PATH=${CUDA_LIB:-/usr/lib/aarch64-linux-gnu}"
 Environment="PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
 ExecStart=$HOME/.local/bin/uv run stt-server
 Restart=on-failure

@@ -23,12 +23,25 @@ NC='\033[0m'
 info() { echo -e "${GREEN}▶${NC} $1"; }
 warn() { echo -e "${YELLOW}!${NC} $1"; }
 
+check_prerequisites() {
+    # Check for nvidia-container-toolkit
+    if ! docker info 2>/dev/null | grep -q "nvidia"; then
+        warn "nvidia-container-toolkit may not be installed or configured"
+        echo "  Install with: sudo apt install nvidia-container-toolkit"
+        echo "  Then restart docker: sudo systemctl restart docker"
+        echo ""
+        read -p "Continue anyway? [y/N] " -n 1 -r
+        echo
+        [[ ! $REPLY =~ ^[Yy]$ ]] && exit 1
+    fi
+}
+
 show_help() {
     cat << 'EOF'
 STT Service Test Sandbox
 
-Creates a minimal Ubuntu 24.04 container with GPU access for testing the installer.
-The installer handles all CUDA setup - this tests the full installation flow.
+Creates a CUDA 13 Ubuntu 24.04 container with GPU access for testing the installer.
+Base image provides CUDA runtime; installer adds CUDA 12 compat libs for onnxruntime.
 The container is disposable - delete it anytime with --clean.
 
 USAGE:
@@ -55,7 +68,7 @@ NOTES:
     - Container mounts this project at /mnt (read-only)
     - Install goes to ~/stt-service inside container
     - GPU is passed through via --gpus all
-    - Container persists between runs (use --clean to remove)
+    - Container is removed on exit (--rm flag) for clean testing
 EOF
 }
 
@@ -65,13 +78,14 @@ build_image() {
         return
     fi
 
-    info "Building test image (Ubuntu 24.04 - minimal, no CUDA)..."
+    info "Building test image (CUDA 13 Ubuntu 24.04 with runtime)..."
     docker build -t "$IMAGE_NAME" - << 'DOCKERFILE'
-FROM ubuntu:24.04
+FROM nvidia/cuda:13.0.0-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Truly minimal - installer handles CUDA, PortAudio, everything
+# Minimal packages - CUDA runtime provided by base image
+# Installer will add CUDA 12 compat libs for onnxruntime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
@@ -91,6 +105,7 @@ DOCKERFILE
 }
 
 run_interactive() {
+    check_prerequisites
     build_image
 
     info "Starting interactive sandbox..."
@@ -112,6 +127,7 @@ run_interactive() {
 }
 
 run_auto() {
+    check_prerequisites
     build_image
 
     info "Running non-interactive install test..."
