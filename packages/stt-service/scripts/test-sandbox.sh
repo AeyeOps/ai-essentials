@@ -58,19 +58,15 @@ TESTING THE CURL INSTALLER:
     # Test the service
     cd ~/stt-service
     ./scripts/stt-server.sh &
-    ./scripts/stt-client.sh --ptt
+    ./scripts/stt-client.sh --ptt -v
 
     # In another terminal (optional)
     ./test-sandbox.sh --attach
 
-TESTING LOCAL CHANGES (before push):
-    # Inside container:
-    bash /mnt/install.sh
-
 NOTES:
-    - Container mounts this project at /mnt (read-only)
     - GPU passed through via --gpus all
     - Audio passed through via PulseAudio
+    - PTT uses spacebar in terminal mode (hold to record, release to transcribe)
 EOF
 }
 
@@ -113,7 +109,6 @@ run_interactive() {
     build_image
 
     info "Starting interactive sandbox..."
-    info "Project mounted at /mnt (read-only)"
     echo ""
     warn "Run inside container:"
     echo "  curl -fsSL https://cdn.jsdelivr.net/gh/AeyeOps/ai-essentials@main/packages/stt-service/install.sh | bash"
