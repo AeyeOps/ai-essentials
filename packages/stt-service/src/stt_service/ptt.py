@@ -195,9 +195,10 @@ class TerminalHotkeyListener:
         - stop() -> None
     """
 
-    # Key release detection timeout - if no key repeat within this time, key was released
-    # Typical key repeat interval is ~30-50ms, so 150ms is safe
-    KEY_RELEASE_TIMEOUT = 0.15
+    # Key release detection timeouts
+    # Initial repeat delay is ~250-500ms (OS/user configurable), then ~30-50ms intervals
+    INITIAL_REPEAT_TIMEOUT = 0.6  # Wait for first repeat (longer than initial delay)
+    REPEAT_INTERVAL_TIMEOUT = 0.15  # Subsequent repeats come faster
 
     def __init__(
         self,
@@ -253,23 +254,53 @@ class TerminalHotkeyListener:
                     logger.debug("Terminal hotkey activated")
                     self.on_activate()
 
-                    # Wait for key release (detected via key repeat timeout)
-                    while self._running:
-                        ready, _, _ = select.select([sys.stdin], [], [], self.KEY_RELEASE_TIMEOUT)
+                    # Two-phase key release detection:
+                    # Phase 1: Wait for FIRST repeat (initial delay is ~250-500ms)
+                    # Phase 2: Once repeats start, use shorter timeout
+                    first_repeat_received = False
+                    timeout = self.INITIAL_REPEAT_TIMEOUT
 
-                        if ready:
-                            # Key still held (repeat char received)
-                            next_char = sys.stdin.read(1)
-                            if next_char != self.hotkey_char:
-                                # Different key pressed, treat as release
-                                break
-                        else:
-                            # Timeout - key was released
+                    while self._running:
+                        # Yield to event loop so start_recording() can run
+                        await asyncio.sleep(0.01)
+
+                        # Check for key repeat with current timeout
+                        # Use multiple short checks to allow event loop yielding
+                        elapsed = 0.0
+                        key_received = False
+                        while elapsed < timeout and self._running:
+                            ready, _, _ = select.select([sys.stdin], [], [], 0.05)
+                            if ready:
+                                next_char = sys.stdin.read(1)
+                                if next_char == self.hotkey_char:
+                                    key_received = True
+                                    first_repeat_received = True
+                                    break
+                                else:
+                                    # Different key - treat as release
+                                    break
+                            elapsed += 0.05
+                            await asyncio.sleep(0.01)  # Yield between checks
+
+                        if not key_received:
+                            # Timeout with no repeat - key was released
                             break
+
+                        # Switch to shorter timeout after first repeat
+                        if first_repeat_received:
+                            timeout = self.REPEAT_INTERVAL_TIMEOUT
 
                     # Key up - deactivate
                     logger.debug("Terminal hotkey deactivated")
                     self.on_deactivate()
+
+                    # Drain any remaining key repeats from buffer
+                    while True:
+                        ready, _, _ = select.select([sys.stdin], [], [], 0.05)
+                        if ready:
+                            sys.stdin.read(1)  # Discard
+                        else:
+                            break
 
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, self._old_settings)
@@ -309,6 +340,37 @@ class TerminalHotkeyListener:
 class PTTController:
     """Push-to-Talk controller managing state and audio feedback."""
 
+    # Pre-generated sounds (class-level, generated once)
+    _sounds: Optional[dict] = None
+    _sample_rate: int = 44100
+
+    @classmethod
+    def _init_sounds(cls) -> None:
+        """Pre-generate click sounds at class load time."""
+        if cls._sounds is not None:
+            return
+
+        try:
+            import numpy as np
+
+            duration = 0.08  # 80ms
+            t = np.linspace(0, duration, int(cls._sample_rate * duration), False)
+
+            # Click sound - higher pitch rising tone
+            freq = 880
+            envelope = np.exp(-t * 15) * (1 - np.exp(-t * 100))
+            click = (np.sin(2 * np.pi * freq * t) * envelope * 0.25).astype(np.float32)
+
+            # Unclick sound - lower pitch falling tone
+            freq = 440
+            envelope = np.exp(-t * 20) * (1 - np.exp(-t * 100))
+            unclick = (np.sin(2 * np.pi * freq * t) * envelope * 0.25).astype(np.float32)
+
+            cls._sounds = {"click": click, "unclick": unclick}
+        except Exception as e:
+            logger.debug(f"Could not initialize sounds: {e}")
+            cls._sounds = {}
+
     def __init__(self, listener=None):
         """Initialize PTT controller.
 
@@ -325,8 +387,60 @@ class PTTController:
         self._max_duration = settings.ptt.max_duration_seconds
         self._duration_check_task: Optional[asyncio.Task] = None
 
+        # Initialize sounds on first instance
+        self._init_sounds()
+
+    # Cached output device (None = not checked, -1 = no valid device found)
+    _output_device: Optional[int] = None
+
+    @classmethod
+    def _find_output_device(cls) -> Optional[int]:
+        """Find a device with output capability."""
+        if cls._output_device is not None:
+            return None if cls._output_device == -1 else cls._output_device
+
+        try:
+            import sounddevice as sd
+            devices = sd.query_devices()
+
+            # First try default output
+            try:
+                default = sd.query_devices(kind='output')
+                if default['max_output_channels'] > 0:
+                    cls._output_device = default['index']
+                    return cls._output_device
+            except Exception:
+                pass
+
+            # Search for any device with output channels
+            for i, dev in enumerate(devices):
+                if dev['max_output_channels'] > 0:
+                    cls._output_device = i
+                    logger.debug(f"Using audio output device: {dev['name']}")
+                    return cls._output_device
+
+            cls._output_device = -1  # No valid device
+            return None
+        except Exception as e:
+            logger.debug(f"Could not query audio devices: {e}")
+            cls._output_device = -1
+            return None
+
+    def _play_sound_sync(self, sound_type: str) -> None:
+        """Synchronous sound playback (called from executor)."""
+        try:
+            import sounddevice as sd
+            device = self._find_output_device()
+            if device is not None and self._sounds and sound_type in self._sounds:
+                logger.debug(f"Playing {sound_type} sound on device {device}")
+                sd.play(self._sounds[sound_type], self._sample_rate, device=device)
+            else:
+                logger.debug(f"Cannot play {sound_type}: device={device}, sounds={bool(self._sounds)}")
+        except Exception as e:
+            logger.debug(f"Could not play {sound_type} sound: {e}")
+
     def _play_sound(self, sound_type: str) -> None:
-        """Play audio feedback sound.
+        """Play pre-generated audio feedback sound (fully async, zero blocking).
 
         Args:
             sound_type: 'click' for PTT activate, 'unclick' for deactivate
@@ -334,32 +448,15 @@ class PTTController:
         if not settings.ptt.click_sound:
             return
 
+        if not self._sounds or sound_type not in self._sounds:
+            return
+
+        # Fire and forget in thread pool - no await, no blocking
         try:
-            import numpy as np
-            import sounddevice as sd
-
-            sample_rate = 44100
-            duration = 0.08  # 80ms - subtle but audible
-
-            t = np.linspace(0, duration, int(sample_rate * duration), False)
-
-            if sound_type == "click":
-                # Higher pitch rising tone - "on air"
-                freq = 880  # A5
-                envelope = np.exp(-t * 15) * (1 - np.exp(-t * 100))  # Quick attack, decay
-                sound = np.sin(2 * np.pi * freq * t) * envelope
-            else:
-                # Lower pitch falling tone - "off air"
-                freq = 440  # A4
-                envelope = np.exp(-t * 20) * (1 - np.exp(-t * 100))
-                sound = np.sin(2 * np.pi * freq * t) * envelope
-
-            sound = (sound * 0.25).astype(np.float32)  # Subtle volume
-
-            # Play non-blocking
-            sd.play(sound, sample_rate)
-        except Exception as e:
-            logger.debug(f"Could not play {sound_type} sound: {e}")
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(None, self._play_sound_sync, sound_type)
+        except Exception:
+            pass  # Ignore if no event loop
 
     def _on_hotkey_activate(self) -> None:
         """Called when PTT hotkey is pressed."""

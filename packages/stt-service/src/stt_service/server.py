@@ -274,12 +274,37 @@ class STTServer:
 
 
 def setup_logging(verbose: bool = False) -> None:
-    """Configure logging."""
+    """Configure logging to file (INFO level by default).
+
+    Args:
+        verbose: If True, use DEBUG level. All logs go to file only.
+
+    Log locations:
+        - Interactive: ~/.local/state/stt-service/server.log
+        - Override: STT_LOG_DIR environment variable
+        - systemd: use journalctl -u stt-service
+    """
+    import os
+    from pathlib import Path
+
     level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+
+    # XDG state directory
+    xdg_state = os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state"))
+    log_dir = Path(os.environ.get("STT_LOG_DIR", f"{xdg_state}/stt-service"))
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "server.log"
+
+    # File handler only - no console spam
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(level)
+    file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    ))
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    root_logger.addHandler(file_handler)
 
 
 def main() -> None:
