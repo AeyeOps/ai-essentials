@@ -6,12 +6,13 @@
 # Components:
 #   - NVM + Node.js 22 LTS
 #   - Mamba/Miniforge + 'dev' environment with AI packages
-#   - Kitty terminal
+#   - Kitty terminal (GPU-optimized for high-DPI/OLED)
 #   - Yazi file manager
 #   - CLI tools: fd, fzf, bat, eza, delta, ripgrep
 #   - Zellij terminal multiplexer
 #   - bun (JS runtime) + direnv
 #   - Zsh + Oh-My-Zsh + Powerlevel10k
+#   - Pop Shell (GNOME tiling extension)
 #
 # Usage: ./setup-ai-dev-stack.sh
 #
@@ -231,52 +232,93 @@ if ! command_exists kitty; then
     sudo apt-get install -qq -y kitty
     success "Kitty installed"
 
-    # Configure Kitty for auto-copy and right-click paste
+    # Configure Kitty (GPU-optimized for high-DPI/OLED displays)
     mkdir -p ~/.config/kitty
     if [[ ! -f ~/.config/kitty/kitty.conf ]]; then
-        info "Configuring Kitty..."
+        info "Configuring Kitty (GPU-optimized)..."
         cat > ~/.config/kitty/kitty.conf << 'EOF'
 # ─── Kitty Configuration ───────────────────────────────────────────────────
+# Optimized for high-performance GPU systems (RTX 3090 / GB10)
 
-# Copy on select
-copy_on_select clipboard
+# ─── Window Size (4K 2x3 grid: 1280x1080 per cell) ─────────────────────────
+remember_window_size no
+initial_window_width 1260
+initial_window_height 1040
 
-# Mouse bindings
-mouse_map right press ungrabbed paste_from_clipboard
-
-# Font - MesloLGS NF for Powerlevel10k compatibility
+# ─── Font - MesloLGS NF (Nerdfont for Powerlevel10k) ───────────────────────
 font_family MesloLGS NF
 bold_font MesloLGS NF Bold
 italic_font MesloLGS NF Italic
 bold_italic_font MesloLGS NF Bold Italic
-font_size 11.0
+font_size 9.0
+disable_ligatures never
 
-# Scrollback
-scrollback_lines 10000
+# ─── Theme (OLED optimized - true black) ───────────────────────────────────
+background #000000
+foreground #d0d0d0
+cursor #d7af00
+cursor_text_color #000000
+selection_background #32291B
+selection_foreground #d7af00
 
-# Bell
+# 16-color palette
+color0  #000000
+color1  #d75f5f
+color2  #5fd700
+color3  #d7af00
+color4  #0087af
+color5  #af87d7
+color6  #00afff
+color7  #d0d0d0
+color8  #5a5a5a
+color9  #ff8787
+color10 #87ff5f
+color11 #ffd75f
+color12 #5fafff
+color13 #d7afff
+color14 #5fd7ff
+color15 #ffffff
+
+# ─── High Performance GPU Settings ─────────────────────────────────────────
+repaint_delay 5
+input_delay 1
+sync_to_monitor no
+
+# Large scrollback (RAM is cheap)
+scrollback_lines 50000
+scrollback_pager_history_size 100
+
+# No animations/distractions
+cursor_blink_interval 0
+visual_bell_duration 0
+window_alert_on_bell no
 enable_audio_bell no
 
-# Tab bar
+# ─── Input ─────────────────────────────────────────────────────────────────
+copy_on_select clipboard
+mouse_map right press ungrabbed paste_from_clipboard
+
+# ─── Shell Integration ─────────────────────────────────────────────────────
+shell_integration enabled
+
+# ─── UI ────────────────────────────────────────────────────────────────────
 tab_bar_style powerline
-
-# Window padding
 window_padding_width 4
+confirm_os_window_close 0
 
-# Cursor
+# ─── Cursor ────────────────────────────────────────────────────────────────
 cursor_shape beam
-cursor_blink_interval 0
 
-# URLs
+# ─── URLs ──────────────────────────────────────────────────────────────────
 url_style curly
 open_url_with default
 
-# Performance
-repaint_delay 10
-input_delay 3
-sync_to_monitor yes
+# ─── Keyboard Shortcuts ────────────────────────────────────────────────────
+map ctrl+equal change_font_size all +1.0
+map ctrl+minus change_font_size all -1.0
+map ctrl+0 change_font_size all 0
 EOF
-        success "Kitty configured"
+        success "Kitty configured (GPU-optimized)"
     fi
 else
     warn "Kitty already installed"
@@ -441,7 +483,47 @@ EOF
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 10. SHELL ALIASES FOR NEW TOOLS
+# 10. POP SHELL (GNOME TILING EXTENSION)
+# ═══════════════════════════════════════════════════════════════════════════
+info "Checking Pop Shell..."
+POP_SHELL_DIR="$HOME/.local/share/gnome-shell/extensions/pop-shell@system76.com"
+if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]] && [[ ! -d "$POP_SHELL_DIR" ]]; then
+    info "Installing Pop Shell (GNOME tiling extension)..."
+
+    # Install TypeScript dependency
+    sudo apt-get install -qq -y node-typescript
+
+    # Clone and build Pop Shell
+    TEMP_DIR=$(mktemp -d)
+    git clone --depth=1 https://github.com/pop-os/shell.git "$TEMP_DIR/pop-shell"
+    cd "$TEMP_DIR/pop-shell"
+
+    # Build without interactive prompts
+    make local-install <<< "n" 2>/dev/null || make local-install
+
+    cd - > /dev/null
+    rm -rf "$TEMP_DIR"
+
+    # Enable the extension
+    gnome-extensions enable "pop-shell@system76.com" 2>/dev/null || true
+
+    # Apply optimized settings
+    dconf write /org/gnome/shell/extensions/pop-shell/tile-by-default true
+    dconf write /org/gnome/shell/extensions/pop-shell/gap-inner 4
+    dconf write /org/gnome/shell/extensions/pop-shell/gap-outer 4
+    dconf write /org/gnome/shell/extensions/pop-shell/active-hint true
+    dconf write /org/gnome/shell/extensions/pop-shell/smart-gaps true
+    dconf write /org/gnome/shell/extensions/pop-shell/show-title false
+
+    success "Pop Shell installed and configured"
+elif [[ "$XDG_CURRENT_DESKTOP" != *"GNOME"* ]]; then
+    warn "Pop Shell skipped (requires GNOME desktop)"
+else
+    warn "Pop Shell already installed"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 11. SHELL ALIASES FOR NEW TOOLS
 # ═══════════════════════════════════════════════════════════════════════════
 if ! grep -q '# ─── AI Dev Stack Aliases' ~/.zshrc 2>/dev/null; then
     info "Adding tool aliases to .zshrc..."
@@ -471,12 +553,13 @@ echo "  - Zsh + Oh-My-Zsh + Powerlevel10k + MesloLGS Nerd Font"
 echo "  - Zsh plugins: zsh-autosuggestions, zsh-syntax-highlighting"
 echo "  - NVM + Node.js 22 LTS"
 echo "  - Mamba + 'dev' environment (anthropic, openai, httpx, rich, typer, pydantic)"
-echo "  - Kitty terminal (with auto-copy, right-click paste, Nerd Font)"
+echo "  - Kitty terminal (GPU-optimized, OLED theme, 4K ready)"
 echo "  - Yazi file manager"
 echo "  - CLI tools: ripgrep, fd, fzf, bat, eza, delta"
 echo "  - Zellij terminal multiplexer"
 echo "  - Bun JS runtime"
 echo "  - direnv"
+echo "  - Pop Shell (GNOME tiling - if GNOME detected)"
 echo ""
 echo "Quick start commands:"
 echo "  kitty          - Launch Kitty terminal"

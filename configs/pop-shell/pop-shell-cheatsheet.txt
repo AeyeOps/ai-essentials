@@ -1,0 +1,40 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                    POP SHELL CHEAT SHEET                         ║
+╠══════════════════════════════════════════════════════════════════╣
+║  BASICS                                                          ║
+║  ───────────────────────────────────────────────────────────     ║
+║  Super + Y          Toggle tiling on/off                         ║
+║  Super + G          Float/unfloat current window                 ║
+║  Super + /          Launcher (search actions)                    ║
+║  Super + ?          GNOME keyboard shortcuts help                ║
+║                                                                  ║
+║  FOCUS (move between windows)                                    ║
+║  ───────────────────────────────────────────────────────────     ║
+║  Super + Arrow      Move focus in direction                      ║
+║  Super + H/J/K/L    Move focus (vim-style)                       ║
+║                                                                  ║
+║  MOVE WINDOWS                                                    ║
+║  ───────────────────────────────────────────────────────────     ║
+║  Super + Shift + Arrow    Move window in direction               ║
+║  Super + Ctrl + Arrow     Swap windows                           ║
+║  Super + drag             Manual position (hold Super, drag)     ║
+║                                                                  ║
+║  RESIZE                                                          ║
+║  ───────────────────────────────────────────────────────────     ║
+║  Super + Enter      Enter resize mode                            ║
+║    → Arrows           Resize in direction                        ║
+║    → Esc              Exit resize mode                           ║
+║  Super + Minus/Plus Adjust gaps between windows                  ║
+║                                                                  ║
+║  STACKING & ORIENTATION                                          ║
+║  ───────────────────────────────────────────────────────────     ║
+║  Super + S          Toggle stacking mode                         ║
+║  Super + O          Change orientation (horiz/vert)              ║
+║                                                                  ║
+║  WORKSPACES                                                      ║
+║  ───────────────────────────────────────────────────────────     ║
+║  Super + Home/End   First/last workspace                         ║
+║  Super + 1-9        Switch to workspace                          ║
+║  Super + Shift + 1-9   Move window to workspace                  ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
