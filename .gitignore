@@ -19,6 +19,14 @@ build/
 dist/
 *.egg-info/
 
+# uv
+.python-version
+uv.lock
+
+# ONNX models (large files, download separately)
+packages/*/models/*
+!packages/*/models/.gitkeep
+
 # Local overrides (not tracked)
 .gitignore.local
 
