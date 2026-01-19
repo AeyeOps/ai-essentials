@@ -151,7 +151,7 @@ class PTTClient:
                 stream_task = asyncio.create_task(self._stream_audio())
 
                 # Wait for user to press Enter
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 await loop.run_in_executor(None, input)
 
                 self._recording = False

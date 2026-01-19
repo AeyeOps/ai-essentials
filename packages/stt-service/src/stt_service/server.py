@@ -29,8 +29,9 @@ logger = logging.getLogger(__name__)
 class STTSession:
     """Represents a single STT session with a client."""
 
-    # Max buffer: 60 seconds at 16kHz * 2 bytes/sample = ~1.9MB
-    MAX_BUFFER_SAMPLES = 16000 * 60
+    # Max buffer: 30 seconds at 16kHz (aligned with transcriber MAX_AUDIO_SECONDS)
+    # This prevents accepting audio that would be rejected during transcription
+    MAX_BUFFER_SAMPLES = 16000 * 30
 
     def __init__(self, session_id: str, websocket: WebSocketServerProtocol):
         self.session_id = session_id
@@ -76,6 +77,7 @@ class STTServer:
         self.transcriber: Optional[Transcriber] = None
         self.sessions: dict[str, STTSession] = {}
         self._shutdown_event = asyncio.Event()
+        self._connection_semaphore: Optional[asyncio.Semaphore] = None
 
     async def initialize(self) -> None:
         """Initialize the server and load the model.
@@ -86,39 +88,47 @@ class STTServer:
         logger.info("Initializing STT server...")
         self.transcriber = Transcriber()
         self.transcriber.load()
-        logger.info("STT server initialized")
+        self._connection_semaphore = asyncio.Semaphore(settings.server.max_connections)
+        logger.info(
+            f"STT server initialized (max {settings.server.max_connections} connections)"
+        )
 
     async def handle_connection(self, websocket: WebSocketServerProtocol) -> None:
-        """Handle a WebSocket connection."""
-        session_id = str(uuid.uuid4())[:8]
-        session = STTSession(session_id, websocket)
-        self.sessions[session_id] = session
+        """Handle a WebSocket connection.
 
-        logger.info(f"New connection: {session_id}")
+        Uses semaphore to enforce max_connections limit. Connections beyond
+        the limit will wait until a slot becomes available.
+        """
+        async with self._connection_semaphore:
+            session_id = str(uuid.uuid4())[:8]
+            session = STTSession(session_id, websocket)
+            self.sessions[session_id] = session
 
-        try:
-            # Send ready message
-            await websocket.send(
-                serialize_server_message(ReadyMessage(session_id=session_id))
-            )
+            logger.info(f"New connection: {session_id} ({len(self.sessions)} active)")
 
-            async for message in websocket:
-                await self._handle_message(session, message)
-
-        except websockets.exceptions.ConnectionClosed:
-            logger.info(f"Connection closed: {session_id}")
-        except Exception as e:
-            logger.error(f"Error in session {session_id}: {e}")
             try:
+                # Send ready message
                 await websocket.send(
-                    serialize_server_message(
-                        ErrorMessage(code="INTERNAL", message=str(e))
-                    )
+                    serialize_server_message(ReadyMessage(session_id=session_id))
                 )
-            except Exception:
-                pass
-        finally:
-            del self.sessions[session_id]
+
+                async for message in websocket:
+                    await self._handle_message(session, message)
+
+            except websockets.exceptions.ConnectionClosed:
+                logger.info(f"Connection closed: {session_id}")
+            except Exception as e:
+                logger.error(f"Error in session {session_id}: {e}")
+                try:
+                    await websocket.send(
+                        serialize_server_message(
+                            ErrorMessage(code="INTERNAL", message=str(e))
+                        )
+                    )
+                except Exception:
+                    pass
+            finally:
+                del self.sessions[session_id]
 
     async def _handle_message(
         self, session: STTSession, message: bytes | str
@@ -142,7 +152,7 @@ class STTServer:
                     serialize_server_message(
                         ErrorMessage(
                             code="BUFFER_FULL",
-                            message="Audio buffer full (max 60s). Send 'end' to transcribe.",
+                            message="Audio buffer full (max 30s). Send 'end' to transcribe.",
                         )
                     )
                 )
@@ -184,7 +194,7 @@ class STTServer:
 
         try:
             # Run transcription in thread pool to not block event loop
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             text = await loop.run_in_executor(
                 None,
                 self.transcriber.transcribe,

@@ -7,7 +7,8 @@ license = "MIT"
 requires-python = ">=3.12.3"
 dependencies = [
     "onnx-asr>=0.3.0",
-    "onnxruntime-gpu>=1.18.0",  # GPU-only, no CPU fallback
+    # NOTE: onnx-asr depends on onnxruntime. For GPU support, install onnxruntime-gpu
+    # separately: pip install onnxruntime-gpu (replaces onnxruntime)
     "websockets>=13.0",
     "sounddevice>=0.5.0",
     "numpy>=2.0.0",
@@ -16,6 +17,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+gpu = [
+    # Install GPU runtime - will replace CPU-only onnxruntime from onnx-asr
+    "onnxruntime-gpu>=1.18.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
