@@ -47,32 +47,33 @@ The container is disposable - delete it anytime with --clean.
 
 USAGE:
     ./test-sandbox.sh              Interactive shell (recommended for first test)
-    ./test-sandbox.sh --attach     Attach new shell to running container (2nd terminal)
-    ./test-sandbox.sh --auto       Run installer automatically (non-interactive)
+    ./test-sandbox.sh --auto       Install and start server, then attach to test audio
+    ./test-sandbox.sh --attach     Attach new shell to running container
     ./test-sandbox.sh --clean      Remove container and image
 
-INSIDE THE CONTAINER:
-    # Test install (local install.sh, package downloaded from GitHub)
-    bash /mnt/install.sh
+QUICK START (--auto):
+    # Terminal 1: Install and start server
+    ./test-sandbox.sh --auto
 
-    # Or test with options
-    STT_NONINTERACTIVE=1 bash /mnt/install.sh
-    bash /mnt/install.sh --help
-    bash /mnt/install.sh --uninstall
+    # Terminal 2: Attach and test audio
+    ./test-sandbox.sh --attach
+    cd ~/stt-service && ./scripts/stt-client.sh
 
-    # Verify GPU access
-    nvidia-smi
+MANUAL MODE (default):
+    # Inside the container:
+    bash /mnt/install.sh           # Run installer
+    cd ~/stt-service
+    ./scripts/stt-server.sh        # Start server
 
-    # Exit when done
-    exit
+    # In another terminal:
+    ./test-sandbox.sh --attach
+    cd ~/stt-service && ./scripts/stt-client.sh
 
 NOTES:
     - Container mounts this project at /mnt (read-only)
     - Install goes to ~/stt-service inside container
     - GPU is passed through via --gpus all
     - Audio is passed through via PulseAudio and ALSA
-    - Container persists until you exit the first shell
-    - Use --attach to open additional terminals while container runs
     - After updating this script, run --clean to rebuild the image
 EOF
 }
@@ -156,10 +157,16 @@ run_auto() {
     check_prerequisites
     build_image
 
-    info "Running non-interactive install test..."
+    info "Installing and starting server (non-interactive)..."
+    echo ""
 
     local uid=$(id -u)
-    docker run --rm \
+
+    # Remove any existing container
+    docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+
+    # Start container in background with install + server
+    docker run -d \
         --name "$CONTAINER_NAME" \
         --gpus all \
         -v "$PROJECT_DIR:/mnt:ro" \
@@ -171,18 +178,36 @@ run_auto() {
         -e "PULSE_SERVER=unix:/run/user/$uid/pulse/native" \
         "$IMAGE_NAME" \
         bash -c '
-            echo "=== GPU Check ==="
-            nvidia-smi -L || echo "WARNING: nvidia-smi not available (expected in container without full CUDA)"
-            echo ""
-            echo "=== Running Installer ==="
+            # Install
             bash /mnt/install.sh
+
+            # Source PATH for uv
+            export PATH="$HOME/.local/bin:$PATH"
+
+            # Start server (foreground to keep container alive)
+            cd ~/stt-service
             echo ""
-            echo "=== Verifying Installation ==="
-            ls -la ~/stt-service/ || echo "Install dir not found"
+            echo "════════════════════════════════════════════════════════════"
+            echo "  Server starting... attach with: ./test-sandbox.sh --attach"
+            echo "════════════════════════════════════════════════════════════"
             echo ""
-            echo "=== Testing Uninstall ==="
-            bash /mnt/install.sh --uninstall
+            ./scripts/stt-server.sh
         '
+
+    info "Container started in background"
+    info "Tailing logs (Ctrl+C to stop watching, container keeps running)..."
+    echo ""
+    warn "To test audio, open another terminal and run:"
+    echo "  ./test-sandbox.sh --attach"
+    echo "  cd ~/stt-service && ./scripts/stt-client.sh"
+    echo ""
+
+    # Follow logs until user hits Ctrl+C
+    docker logs -f "$CONTAINER_NAME" || true
+
+    echo ""
+    info "Container still running. Attach with: ./test-sandbox.sh --attach"
+    info "Stop with: ./test-sandbox.sh --clean"
 }
 
 clean() {

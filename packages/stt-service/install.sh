@@ -6,7 +6,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
 #
 # Or with wget:
-#   wget -qO- https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
+#   wget -O- https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
 #
 # Options (via environment variables):
 #   STT_NONINTERACTIVE=1  - No prompts, use defaults
