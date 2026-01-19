@@ -564,6 +564,21 @@ install_uv() {
         else
             die "Failed to install uv"
         fi
+
+        # Ensure PATH persists across sessions
+        local shell_rc=""
+        if [[ -f "$HOME/.bashrc" ]]; then
+            shell_rc="$HOME/.bashrc"
+        elif [[ -f "$HOME/.profile" ]]; then
+            shell_rc="$HOME/.profile"
+        else
+            shell_rc="$HOME/.bashrc"
+            touch "$shell_rc"
+        fi
+        if ! grep -q '\.local/bin' "$shell_rc" 2>/dev/null; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$shell_rc"
+            info "Added ~/.local/bin to PATH in $(basename "$shell_rc")"
+        fi
     fi
 }
 
@@ -769,6 +784,7 @@ setup_service() {
     # Detect container environment
     if [[ -f /.dockerenv ]] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
         info "Docker detected - systemd not available"
+        info "Before running: source ~/.bashrc"
         info "Run server: $INSTALL_DIR/scripts/stt-server.sh"
         info "Run client: $INSTALL_DIR/scripts/stt-client.sh"
         return
