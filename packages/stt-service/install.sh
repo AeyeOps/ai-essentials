@@ -38,6 +38,9 @@ CUDA_LIB="/usr/local/cuda-12.6/targets/sbsa-linux/lib"
 # Minimum disk space required (GB)
 MIN_DISK_GB=3
 
+# Track if CUDA upgrade is recommended
+CUDA_NEEDS_UPGRADE=0
+
 # ═══════════════════════════════════════════════════════════════════
 # Helper functions
 # ═══════════════════════════════════════════════════════════════════
@@ -182,12 +185,31 @@ preflight_checks() {
         info "Consider running as a regular user"
     fi
 
-    # NVIDIA driver
+    # NVIDIA driver and CUDA version
     if has_cmd nvidia-smi; then
         if nvidia-smi -L 2>/dev/null | grep -q GPU; then
             local gpu_name
             gpu_name=$(nvidia-smi -L | head -1 | sed 's/GPU 0: //' | cut -d'(' -f1)
             success "GPU: $gpu_name"
+
+            # Check CUDA version
+            local cuda_version
+            cuda_version=$(nvidia-smi 2>/dev/null | grep -oP "CUDA Version: \K[0-9]+\.[0-9]+" || echo "unknown")
+            if [[ "$cuda_version" != "unknown" ]]; then
+                local cuda_major="${cuda_version%%.*}"
+                success "CUDA Version: $cuda_version"
+
+                # Warn if CUDA is older than 12
+                if [[ "$cuda_major" -lt 12 ]]; then
+                    warn "CUDA $cuda_version is older than recommended (12.0+)"
+                    info "Consider upgrading CUDA for best performance"
+                    CUDA_NEEDS_UPGRADE=1
+                elif [[ "$cuda_major" -lt 13 ]]; then
+                    info "CUDA 13 is available for GB10 - upgrade optional"
+                fi
+            else
+                warn "Could not detect CUDA version"
+            fi
         else
             error "nvidia-smi found but no GPU detected"
             info "Check that your GPU is properly connected"
@@ -365,7 +387,7 @@ install_system_deps() {
 
     local need_cuda_repo=0
 
-    # First, check if CUDA toolkit is installed
+    # First, check if CUDA toolkit is installed or needs upgrade
     if ! cuda_installed; then
         warn "CUDA toolkit not detected"
         need_cuda_repo=1
@@ -383,6 +405,22 @@ install_system_deps() {
             install_cuda_toolkit
         else
             warn "Skipping CUDA toolkit - GPU acceleration may not work"
+        fi
+    elif [[ "$CUDA_NEEDS_UPGRADE" == "1" ]]; then
+        warn "CUDA upgrade recommended for optimal performance"
+
+        # Setup repo first if needed
+        if ! cuda_repo_configured; then
+            if [[ $(ask "Set up NVIDIA CUDA repository?" "y") == "y" ]]; then
+                setup_cuda_repo
+            fi
+        fi
+
+        if [[ $(ask "Upgrade to CUDA 13?" "n") == "y" ]]; then
+            install_cuda_toolkit
+            info "Note: A reboot may be required after CUDA upgrade"
+        else
+            info "Skipping CUDA upgrade - using existing version"
         fi
     else
         success "CUDA toolkit: Already installed"
