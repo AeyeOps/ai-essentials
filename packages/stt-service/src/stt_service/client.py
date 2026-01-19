@@ -28,6 +28,8 @@ class PTTClient:
         self.session_id: Optional[str] = None
         self._recording = False
         self._audio_queue: asyncio.Queue = asyncio.Queue()
+        self._server_error: Optional[str] = None
+        self._stop_event: asyncio.Event = asyncio.Event()
 
     # Connection timeout in seconds
     CONNECT_TIMEOUT = 10.0
@@ -106,6 +108,9 @@ class PTTClient:
     async def _stream_audio(self) -> None:
         """Stream queued audio chunks to server."""
         while self._recording or not self._audio_queue.empty():
+            # Check if we should stop due to server error
+            if self._stop_event.is_set():
+                break
             try:
                 chunk = await asyncio.wait_for(
                     self._audio_queue.get(),
@@ -116,6 +121,32 @@ class PTTClient:
                 continue
             except Exception as e:
                 logger.error(f"Error streaming audio: {e}")
+                break
+
+    async def _listen_for_errors(self) -> None:
+        """Listen for server error messages during recording."""
+        while self._recording and not self._stop_event.is_set():
+            try:
+                # Non-blocking check for incoming messages
+                response = await asyncio.wait_for(
+                    self.websocket.recv(),
+                    timeout=0.1,
+                )
+                msg = json.loads(response)
+
+                if msg.get("type") == "error":
+                    self._server_error = msg.get("message", "Unknown server error")
+                    logger.error(f"Server error during recording: {self._server_error}")
+                    self._stop_event.set()
+                    self._recording = False
+                    break
+                else:
+                    logger.debug(f"Received message during recording: {msg}")
+
+            except asyncio.TimeoutError:
+                continue
+            except Exception as e:
+                logger.debug(f"Error listener: {e}")
                 break
 
     async def record_and_transcribe(self) -> Optional[str]:
@@ -131,8 +162,10 @@ class PTTClient:
         # Send config first
         await self.send_config()
 
-        # Create queue BEFORE setting recording flag (avoid race condition)
+        # Reset state before recording
         self._audio_queue = asyncio.Queue(maxsize=1000)
+        self._server_error = None
+        self._stop_event = asyncio.Event()
         self._recording = True
 
         stream = sd.InputStream(
@@ -147,19 +180,33 @@ class PTTClient:
 
         try:
             with stream:
-                # Stream audio in background
+                # Stream audio and listen for errors concurrently
                 stream_task = asyncio.create_task(self._stream_audio())
+                error_listener_task = asyncio.create_task(self._listen_for_errors())
 
-                # Wait for user to press Enter
+                # Wait for user to press Enter (in executor to not block)
                 loop = asyncio.get_running_loop()
                 await loop.run_in_executor(None, input)
 
                 self._recording = False
+                self._stop_event.set()
+
+                # Wait for tasks to complete
                 await stream_task
+                error_listener_task.cancel()
+                try:
+                    await error_listener_task
+                except asyncio.CancelledError:
+                    pass
 
         except Exception as e:
             logger.error(f"Recording error: {e}")
             self._recording = False
+            return None
+
+        # Check if server sent an error during recording
+        if self._server_error:
+            logger.error(f"Recording aborted: {self._server_error}")
             return None
 
         # Signal end of audio

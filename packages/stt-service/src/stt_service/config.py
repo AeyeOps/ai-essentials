@@ -36,6 +36,11 @@ class ServerConfig(BaseSettings):
     host: str = Field(default="127.0.0.1", description="Server bind address")
     port: int = Field(default=9876, description="Server port")
     max_connections: int = Field(default=10, description="Maximum concurrent connections")
+    reject_when_full: bool = Field(
+        default=True,
+        description="If True, reject new connections when at capacity. "
+        "If False, queue connections until a slot is available.",
+    )
 
 
 class ModelConfig(BaseSettings):

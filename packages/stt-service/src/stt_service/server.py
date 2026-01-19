@@ -96,9 +96,28 @@ class STTServer:
     async def handle_connection(self, websocket: WebSocketServerProtocol) -> None:
         """Handle a WebSocket connection.
 
-        Uses semaphore to enforce max_connections limit. Connections beyond
-        the limit will wait until a slot becomes available.
+        Uses semaphore to enforce max_connections limit. Behavior when full
+        depends on settings.server.reject_when_full:
+        - True (default): Immediately reject with SERVER_FULL error
+        - False: Queue connection until a slot becomes available
         """
+        # Check if we should reject when at capacity
+        if settings.server.reject_when_full:
+            if self._connection_semaphore.locked():
+                logger.warning(
+                    f"Rejecting connection: server full ({len(self.sessions)} active)"
+                )
+                await websocket.send(
+                    serialize_server_message(
+                        ErrorMessage(
+                            code="SERVER_FULL",
+                            message=f"Server at capacity ({settings.server.max_connections} connections). Try again later.",
+                        )
+                    )
+                )
+                await websocket.close()
+                return
+
         async with self._connection_semaphore:
             session_id = str(uuid.uuid4())[:8]
             session = STTSession(session_id, websocket)
