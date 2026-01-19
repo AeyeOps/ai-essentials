@@ -146,8 +146,9 @@ find_cuda_lib() {
         dirname "$found"
         return 0
     fi
+    # Return empty string (not an error - just not found yet)
     echo ""
-    return 1
+    return 0
 }
 
 # Download helper (uses curl or wget)
