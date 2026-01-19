@@ -920,8 +920,11 @@ show_completion() {
     echo "  # Start the server"
     echo -e "  ${DIM}cd $INSTALL_DIR && ./scripts/stt-server.sh${NC}"
     echo ""
-    echo "  # In another terminal, run the client (hold SPACE to record)"
+    echo "  # In another terminal, run the client"
     echo -e "  ${DIM}cd $INSTALL_DIR && ./scripts/stt-client.sh --ptt${NC}"
+    echo ""
+    echo -e "  ${DIM}PTT mode: Hold SPACE to record, release to transcribe.${NC}"
+    echo -e "  ${DIM}Press 'q' or ESC to exit.${NC}"
     echo ""
 
     if systemctl is-active --quiet stt-service 2>/dev/null; then
