@@ -70,8 +70,10 @@ NOTES:
     - Container mounts this project at /mnt (read-only)
     - Install goes to ~/stt-service inside container
     - GPU is passed through via --gpus all
+    - Audio is passed through via PulseAudio and ALSA
     - Container persists until you exit the first shell
     - Use --attach to open additional terminals while container runs
+    - After updating this script, run --clean to rebuild the image
 EOF
 }
 
@@ -93,6 +95,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     sudo \
+    pulseaudio-utils \
+    alsa-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create test user (non-root, with sudo)
@@ -125,6 +129,10 @@ run_interactive() {
         --gpus all \
         -v "$PROJECT_DIR:/mnt:ro" \
         -e "HOME=/home/testuser" \
+        --device /dev/snd \
+        --group-add audio \
+        -v /run/user/$(id -u)/pulse:/run/user/1000/pulse \
+        -e "PULSE_SERVER=unix:/run/user/1000/pulse/native" \
         "$IMAGE_NAME" \
         bash
 }
