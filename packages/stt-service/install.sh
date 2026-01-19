@@ -184,10 +184,10 @@ disk_space_gb() {
     df -BG "$HOME" | awk 'NR==2 {print int($4)}'
 }
 
-# Check if model is already cached
+# Check if model is already cached (huggingface_hub cache)
 model_cached() {
-    local cache_dir="$HOME/.cache/onnx-asr"
-    [[ -d "$cache_dir" ]] && [[ -n "$(ls -A "$cache_dir" 2>/dev/null)" ]]
+    local hf_cache="${HF_HOME:-$HOME/.cache/huggingface}/hub"
+    ls -d "$hf_cache"/models--nvidia--parakeet* &>/dev/null 2>&1
 }
 
 # Check if systemd service exists
@@ -790,6 +790,7 @@ setup_service() {
     # Detect container environment
     if [[ -f /.dockerenv ]] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
         info "Docker detected - systemd not available"
+        info "To test: ./scripts/stt-server.sh & sleep 3 && ./scripts/stt-client.sh"
         return
     fi
 
@@ -973,12 +974,12 @@ uninstall() {
         fi
     fi
 
-    # Note about cached model
-    local cache_dir="$HOME/.cache/onnx-asr"
-    if [[ -d "$cache_dir" ]]; then
-        info "Speech model cache exists: $cache_dir"
-        if [[ $(ask "Remove cached model (~1GB)?" "n") == "y" ]]; then
-            rm -rf "$cache_dir"
+    # Note about cached model (huggingface cache)
+    local hf_cache="${HF_HOME:-$HOME/.cache/huggingface}/hub"
+    if ls -d "$hf_cache"/models--nvidia--parakeet* &>/dev/null 2>&1; then
+        info "Speech model cache exists in: $hf_cache"
+        if [[ $(ask "Remove cached model (~2.5GB)?" "n") == "y" ]]; then
+            rm -rf "$hf_cache"/models--nvidia--parakeet*
             success "Model cache removed"
             ((removed++))
         else

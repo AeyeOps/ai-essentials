@@ -304,25 +304,25 @@ def main() -> None:
 
     server = STTServer()
 
-    # Handle shutdown signals
-    def signal_handler(sig, frame):
-        logger.info("Received shutdown signal")
-        server.shutdown()
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
     try:
         asyncio.run(_run_server(server))
     except GPUNotAvailableError as e:
         logger.error(f"GPU not available: {e}")
         sys.exit(1)
     except KeyboardInterrupt:
-        pass
+        logger.info("Interrupted")
+
+
+async def _setup_signals(server: STTServer) -> None:
+    """Setup signal handlers within the event loop."""
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, server.shutdown)
 
 
 async def _run_server(server: STTServer) -> None:
     """Initialize and run the server."""
+    await _setup_signals(server)
     await server.initialize()
     await server.run()
 
