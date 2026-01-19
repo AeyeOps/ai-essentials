@@ -486,16 +486,12 @@ install_system_deps() {
         success "libcudnn9-cuda-12: Already installed"
     fi
 
-    if ! dpkg -s libcublas-12-6 &> /dev/null 2>&1; then
-        # Different systems might have different cublas package names
-        if ! ldconfig -p | grep -q libcublas; then
-            packages+=(libcublas-12-6)
-            need_cuda_repo=1
-        else
-            success "libcublas: Already installed"
-        fi
+    # onnxruntime-gpu needs CUDA 12 cublas specifically (not CUDA 13)
+    if ! ldconfig -p | grep -q 'libcublas.so.12'; then
+        packages+=(libcublas-12-6)
+        need_cuda_repo=1
     else
-        success "libcublas-12-6: Already installed"
+        success "libcublas (CUDA 12): Already installed"
     fi
 
     # Check if we need CUDA repo setup for compat libs
