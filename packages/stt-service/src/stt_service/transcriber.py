@@ -145,6 +145,9 @@ class Transcriber:
             RuntimeError: If model is not loaded.
             ValueError: If audio exceeds maximum duration.
         """
+        import time
+        t_start = time.perf_counter()
+
         if not self.is_loaded:
             raise RuntimeError("Model not loaded. Call load() first.")
 
@@ -167,17 +170,28 @@ class Transcriber:
                 "Record shorter segments or implement VAD chunking."
             )
 
+        t_preprocess = time.perf_counter()
+
         # onnx-asr uses recognize(), not transcribe()
         result = self._model.recognize(audio, sample_rate=sample_rate)
 
+        t_inference = time.perf_counter()
+
         # Handle different return types from onnx-asr
         if isinstance(result, str):
-            return result.strip()
+            text = result.strip()
         elif hasattr(result, "text"):
             # VAD segment result
-            return result.text.strip()
+            text = result.text.strip()
         else:
-            return str(result).strip()
+            text = str(result).strip()
+
+        logger.info(
+            f"⏱  Transcriber: preprocess={1000*(t_preprocess-t_start):.0f}ms, "
+            f"inference={1000*(t_inference-t_preprocess):.0f}ms"
+        )
+
+        return text
 
     def transcribe_chunks(
         self, chunks: list[np.ndarray], sample_rate: int = 16000

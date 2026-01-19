@@ -67,8 +67,33 @@ class ModelConfig(BaseSettings):
     device_id: int = Field(default=0, description="GPU device ID")
 
 
+class PTTConfig(BaseSettings):
+    """Push-to-Talk settings."""
+
+    model_config = SettingsConfigDict(env_prefix="STT_PTT_")
+
+    # Hotkey as list of key names (evdev KEY_* names without KEY_ prefix)
+    # Default: Ctrl+Super (LEFT variants)
+    hotkey: list[str] = Field(
+        default=["LEFTCTRL", "LEFTMETA"],
+        description="PTT hotkey as list of key names (e.g., ['LEFTCTRL', 'LEFTMETA'])",
+    )
+    click_sound: bool = Field(
+        default=True,
+        description="Play click sound when PTT activates",
+    )
+    auto_submit_on_limit: bool = Field(
+        default=True,
+        description="Auto-submit when 30s buffer limit is reached",
+    )
+    max_duration_seconds: float = Field(
+        default=30.0,
+        description="Maximum recording duration before auto-submit",
+    )
+
+
 class ClientConfig(BaseSettings):
-    """PTT client settings."""
+    """Client settings."""
 
     model_config = SettingsConfigDict(env_prefix="STT_CLIENT_")
 
@@ -91,6 +116,7 @@ class Settings(BaseSettings):
     server: ServerConfig = Field(default_factory=ServerConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     client: ClientConfig = Field(default_factory=ClientConfig)
+    ptt: PTTConfig = Field(default_factory=PTTConfig)
 
 
 # Global settings instance

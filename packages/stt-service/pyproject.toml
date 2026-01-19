@@ -27,6 +27,11 @@ gpu-arm64 = [
     # ARM64 GPU requires manual wheel installation from Ultralytics
     # pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/onnxruntime_gpu-1.24.0-cp312-cp312-linux_aarch64.whl
 ]
+ptt = [
+    # Push-to-Talk mode requires evdev for global hotkey capture (Linux only)
+    # User must have read access to /dev/input/event* (add to 'input' group)
+    "evdev>=1.7.0; sys_platform == 'linux'",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",

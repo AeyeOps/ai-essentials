@@ -202,6 +202,9 @@ class STTServer:
 
     async def _process_audio(self, session: STTSession) -> None:
         """Process accumulated audio and send transcription."""
+        import time
+        t_start = time.perf_counter()
+
         audio = session.get_audio()
         session.clear()
 
@@ -210,6 +213,9 @@ class STTServer:
                 serialize_server_message(FinalMessage(text="", confidence=0.0))
             )
             return
+
+        t_prep = time.perf_counter()
+        audio_duration = len(audio) / session.sample_rate
 
         try:
             # Run transcription in thread pool to not block event loop
@@ -220,9 +226,20 @@ class STTServer:
                 audio,
                 session.sample_rate,
             )
+            t_transcribe = time.perf_counter()
 
             await session.websocket.send(
                 serialize_server_message(FinalMessage(text=text, confidence=1.0))
+            )
+            t_sent = time.perf_counter()
+
+            # Log timing breakdown
+            logger.info(
+                f"⏱  Server timing: prep={1000*(t_prep-t_start):.0f}ms, "
+                f"transcribe={1000*(t_transcribe-t_prep):.0f}ms, "
+                f"send={1000*(t_sent-t_transcribe):.0f}ms, "
+                f"total={1000*(t_sent-t_start):.0f}ms "
+                f"(audio={audio_duration:.1f}s)"
             )
             logger.debug(f"Transcribed: {text[:50]}..." if len(text) > 50 else f"Transcribed: {text}")
 

@@ -7,6 +7,7 @@ import logging
 import os
 import subprocess
 import sys
+import time
 from typing import Optional
 
 import numpy as np
@@ -17,6 +18,20 @@ from .config import settings
 from .protocol import ConfigMessage
 
 logger = logging.getLogger(__name__)
+
+
+# PTT mode imports (optional - only needed with --ptt flag)
+def _import_ptt():
+    """Import PTT module on demand."""
+    try:
+        from .ptt import PTTController, PTTState
+        return PTTController, PTTState
+    except ImportError as e:
+        logger.error(
+            f"PTT mode requires evdev. Install with: pip install evdev\n"
+            f"Also ensure you have /dev/input access: sudo usermod -a -G input $USER"
+        )
+        raise
 
 
 class PTTClient:
@@ -188,6 +203,10 @@ class PTTClient:
                 loop = asyncio.get_running_loop()
                 await loop.run_in_executor(None, input)
 
+                # --- TIMING: Start ---
+                import time
+                t_enter = time.perf_counter()
+
                 self._recording = False
                 self._stop_event.set()
 
@@ -198,6 +217,8 @@ class PTTClient:
                     await error_listener_task
                 except asyncio.CancelledError:
                     pass
+
+                t_stream_done = time.perf_counter()
 
         except Exception as e:
             logger.error(f"Recording error: {e}")
@@ -211,6 +232,7 @@ class PTTClient:
 
         # Signal end of audio
         await self.websocket.send(json.dumps({"type": "end"}))
+        t_end_sent = time.perf_counter()
 
         # Wait for transcription
         try:
@@ -218,9 +240,18 @@ class PTTClient:
                 self.websocket.recv(),
                 timeout=30.0,
             )
+            t_response = time.perf_counter()
+
             msg = json.loads(response)
 
             if msg.get("type") == "final":
+                # --- TIMING: Report ---
+                print(f"\n⏱  Latency breakdown (ms):")
+                print(f"   Stream flush:    {(t_stream_done - t_enter) * 1000:7.1f} ms")
+                print(f"   Send 'end':      {(t_end_sent - t_stream_done) * 1000:7.1f} ms")
+                print(f"   Server process:  {(t_response - t_end_sent) * 1000:7.1f} ms")
+                print(f"   ─────────────────────────")
+                print(f"   Total:           {(t_response - t_enter) * 1000:7.1f} ms\n")
                 return msg.get("text", "")
             elif msg.get("type") == "error":
                 logger.error(f"Server error: {msg.get('message')}")
@@ -298,7 +329,7 @@ def setup_logging(verbose: bool = False) -> None:
 
 
 async def run_client(args: argparse.Namespace) -> int:
-    """Run the PTT client."""
+    """Run the PTT client (single recording mode)."""
     client = PTTClient(server_url=args.server)
 
     # Connect with retry
@@ -330,6 +361,163 @@ async def run_client(args: argparse.Namespace) -> int:
         await client.disconnect()
 
 
+async def run_ptt_mode(args: argparse.Namespace) -> int:
+    """Run continuous PTT mode with global hotkey."""
+    PTTController, PTTState = _import_ptt()
+
+    output_mode = args.output or settings.client.output_mode
+    server_url = args.server or settings.client.server_url
+
+    ptt = PTTController()
+    client: Optional[PTTClient] = None
+
+    # Shared state for PTT callbacks
+    recording_task: Optional[asyncio.Task] = None
+    stream: Optional[sd.InputStream] = None
+    audio_chunks: list[np.ndarray] = []
+
+    async def ensure_connected() -> bool:
+        """Ensure client is connected."""
+        nonlocal client
+        if client and client.websocket:
+            return True
+
+        client = PTTClient(server_url=server_url)
+        for attempt in range(settings.client.reconnect_attempts):
+            if await client.connect():
+                return True
+            logger.warning(f"Connection attempt {attempt + 1} failed...")
+            await asyncio.sleep(settings.client.reconnect_delay * (2 ** attempt))
+
+        logger.error("Failed to connect to server")
+        return False
+
+    def audio_callback(indata, frames, time_info, status):
+        """Sounddevice callback - collect audio chunks."""
+        if status:
+            logger.warning(f"Audio status: {status}")
+        audio_chunks.append(indata.copy())
+
+    async def start_recording():
+        """Start audio capture."""
+        nonlocal stream, audio_chunks
+
+        if not await ensure_connected():
+            ptt.state = PTTState.IDLE
+            return
+
+        # Send config
+        await client.send_config()
+
+        # Clear previous audio
+        audio_chunks.clear()
+
+        # Start audio stream
+        stream = sd.InputStream(
+            samplerate=settings.audio.sample_rate,
+            channels=settings.audio.channels,
+            dtype=np.int16,
+            blocksize=settings.audio.chunk_samples,
+            callback=audio_callback,
+        )
+        stream.start()
+
+    async def stop_recording():
+        """Stop recording and submit for transcription."""
+        nonlocal stream, audio_chunks
+
+        # Stop audio stream
+        if stream:
+            stream.stop()
+            stream.close()
+            stream = None
+
+        if not client or not client.websocket:
+            ptt.on_processing_complete()
+            return
+
+        # Concatenate audio
+        if not audio_chunks:
+            logger.warning("No audio recorded")
+            ptt.on_processing_complete()
+            return
+
+        audio = np.concatenate(audio_chunks)
+        duration = len(audio) / settings.audio.sample_rate
+
+        # Send audio to server
+        t_start = time.perf_counter()
+
+        try:
+            # Stream audio chunks to server
+            chunk_size = settings.audio.chunk_samples
+            for i in range(0, len(audio), chunk_size):
+                chunk = audio[i:i + chunk_size]
+                await client.websocket.send(chunk.tobytes())
+
+            # Signal end and wait for response
+            await client.websocket.send(json.dumps({"type": "end"}))
+
+            response = await asyncio.wait_for(
+                client.websocket.recv(),
+                timeout=30.0,
+            )
+            msg = json.loads(response)
+
+            t_done = time.perf_counter()
+
+            if msg.get("type") == "final":
+                text = msg.get("text", "")
+                if text:
+                    logger.info(f"Transcribed ({duration:.1f}s audio in {(t_done-t_start)*1000:.0f}ms)")
+                    output_text(text, output_mode)
+                else:
+                    logger.info("(silence)")
+            elif msg.get("type") == "error":
+                logger.error(f"Server error: {msg.get('message')}")
+
+        except asyncio.TimeoutError:
+            logger.error("Timeout waiting for transcription")
+        except Exception as e:
+            logger.error(f"Error during transcription: {e}")
+
+        ptt.on_processing_complete()
+
+    # Set up callbacks (these are called from sync context, schedule async work)
+    loop = asyncio.get_event_loop()
+
+    def on_start():
+        nonlocal recording_task
+        recording_task = loop.create_task(start_recording())
+
+    def on_stop():
+        nonlocal recording_task
+        # Cancel any pending start task
+        if recording_task and not recording_task.done():
+            recording_task.cancel()
+        loop.create_task(stop_recording())
+
+    ptt.set_callbacks(on_start=on_start, on_stop=on_stop)
+
+    # Print startup message
+    hotkey_str = "+".join(settings.ptt.hotkey)
+    print(f"\n🎤 PTT mode active. Hold [{hotkey_str}] to record, release to transcribe.")
+    print(f"   Output: {output_mode}")
+    print(f"   Server: {server_url}")
+    print(f"   Press Ctrl+C to exit.\n")
+
+    try:
+        await ptt.run()
+    except KeyboardInterrupt:
+        print("\n\nPTT mode stopped.")
+    finally:
+        ptt.stop()
+        if client:
+            await client.disconnect()
+
+    return 0
+
+
 def main() -> None:
     """Main entry point for stt-client command."""
     parser = argparse.ArgumentParser(description="STT Push-to-Talk Client")
@@ -343,6 +531,11 @@ def main() -> None:
         choices=["stdout", "type", "clipboard"],
         default=None,
         help=f"Output mode (default: {settings.client.output_mode})",
+    )
+    parser.add_argument(
+        "--ptt",
+        action="store_true",
+        help="Continuous PTT mode with global hotkey (Ctrl+Super by default)",
     )
     parser.add_argument(
         "--test",
@@ -359,7 +552,10 @@ def main() -> None:
     setup_logging(args.verbose)
 
     try:
-        exit_code = asyncio.run(run_client(args))
+        if args.ptt:
+            exit_code = asyncio.run(run_ptt_mode(args))
+        else:
+            exit_code = asyncio.run(run_client(args))
         sys.exit(exit_code)
     except KeyboardInterrupt:
         logger.info("Interrupted")
