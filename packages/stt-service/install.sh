@@ -739,6 +739,12 @@ download_model() {
         return
     fi
 
+    # Check if model already exists
+    if model_cached; then
+        success "Model already downloaded"
+        return
+    fi
+
     # Check disk space again before large download
     local space
     space=$(disk_space_gb)
@@ -784,9 +790,6 @@ setup_service() {
     # Detect container environment
     if [[ -f /.dockerenv ]] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
         info "Docker detected - systemd not available"
-        info "Before running: source ~/.bashrc"
-        info "Run server: $INSTALL_DIR/scripts/stt-server.sh"
-        info "Run client: $INSTALL_DIR/scripts/stt-client.sh"
         return
     fi
 
@@ -875,6 +878,9 @@ show_completion() {
     echo -e "${BOLD}════════════════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "${BOLD}Quick start:${NC}"
+    echo ""
+    echo "  # Load PATH (new terminal or first run)"
+    echo -e "  ${DIM}source ~/.bashrc${NC}"
     echo ""
     echo "  # Start the server"
     echo -e "  ${DIM}cd $INSTALL_DIR && ./scripts/stt-server.sh${NC}"
