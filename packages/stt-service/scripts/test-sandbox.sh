@@ -27,7 +27,7 @@ show_help() {
     cat << 'EOF'
 STT Service Test Sandbox
 
-Creates a CUDA 13 Ubuntu 24.04 container with GPU access for testing the installer.
+Creates a minimal CUDA 13 Ubuntu 24.04 container with GPU access for testing the installer.
 The container is disposable - delete it anytime with --clean.
 
 USAGE:
@@ -64,33 +64,18 @@ build_image() {
         return
     fi
 
-    info "Building test image (CUDA 13 Ubuntu 24.04 + CUDA 12 compat libs)..."
+    info "Building test image (CUDA 13 Ubuntu 24.04 - minimal)..."
     docker build -t "$IMAGE_NAME" - << 'DOCKERFILE'
 FROM nvidia/cuda:13.0.0-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Minimal packages needed to test installer
+# Minimal packages - installer handles CUDA libs, PortAudio, etc.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     sudo \
     && rm -rf /var/lib/apt/lists/*
-
-# CUDA 12 compatibility libraries for onnxruntime-gpu
-# (onnxruntime wheel built for CUDA 12, not 13)
-RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb -o /tmp/cuda-keyring.deb \
-    && dpkg -i /tmp/cuda-keyring.deb \
-    && rm /tmp/cuda-keyring.deb \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        libcudnn9-cuda-12 \
-        libcublas-12-6 \
-        libportaudio2 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Note: apt-installed CUDA libs go to standard paths (/usr/lib/...)
-# LD_LIBRARY_PATH not needed for apt packages
 
 # Create test user (non-root, with sudo)
 RUN useradd -m -s /bin/bash testuser && \
