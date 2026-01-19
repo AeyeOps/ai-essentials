@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.11] - 2026-01-19
+
+### Added
+- Claude Code ultrareview command suite (`claude-code/commands/ultrareview/`)
+  - `/ultrareview` - Deep validation of plans, code, and context
+  - `/ultrareview-fix` - Systematic resolution of ultrareview findings
+  - `/ultrareview-loop` - Automated validation loop (cycles until no findings)
+  - Session tokens for multi-user safety in shared projects
+  - Stop hook pattern following ralph-loop plugin architecture
+
 ## [0.0.10] - 2026-01-19
 
 ### Added

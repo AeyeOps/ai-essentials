@@ -1,0 +1,7 @@
+{
+  "name": "ultrareview-loop",
+  "description": "Automated ultrareview validation loop. Cycles through ultrareview → ultrareview-fix until no actionable findings remain.",
+  "author": {
+    "name": "Steve Sklar"
+  }
+}
