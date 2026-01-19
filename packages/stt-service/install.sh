@@ -159,7 +159,7 @@ download() {
     if has_cmd curl; then
         curl -fsSL "$url" -o "$dest"
     elif has_cmd wget; then
-        wget -q "$url" -O "$dest"
+        wget "$url" -O "$dest"
     else
         die "Neither curl nor wget found. Install one with: sudo apt install curl"
     fi
@@ -173,7 +173,7 @@ download_extract() {
     if has_cmd curl; then
         curl -fsSL "$url" | tar -xz -C "$dest"
     elif has_cmd wget; then
-        wget -qO- "$url" | tar -xz -C "$dest"
+        wget -O- "$url" | tar -xz -C "$dest"
     else
         die "Neither curl nor wget found. Install one with: sudo apt install curl"
     fi
@@ -404,7 +404,7 @@ setup_cuda_repo() {
     # Install keyring and update
     sudo dpkg -i "$keyring_file" || die "Failed to install CUDA keyring"
     rm -f "$keyring_file"
-    sudo apt-get update -qq
+    sudo apt-get update
     APT_UPDATED=1
 
     success "NVIDIA CUDA repository configured"
@@ -417,7 +417,7 @@ install_cuda_toolkit() {
 
     # Install the latest CUDA 13 toolkit (version-locked to 13.x series)
     # cuda-toolkit-13 is a meta-package that gets the latest 13.x release
-    sudo apt-get install -y -qq cuda-toolkit-13
+    sudo apt-get install -y cuda-toolkit-13
     success "CUDA toolkit installed"
 
     # Add CUDA to PATH for this session
@@ -527,10 +527,10 @@ install_system_deps() {
 
         # Only run apt-get update if not already done this session
         if [[ "$APT_UPDATED" != "1" ]]; then
-            sudo apt-get update -qq
+            sudo apt-get update
             APT_UPDATED=1
         fi
-        sudo apt-get install -y -qq "${packages[@]}"
+        sudo apt-get install -y "${packages[@]}"
         success "System dependencies installed"
     else
         success "All system dependencies already installed"
@@ -554,7 +554,7 @@ install_uv() {
         if has_cmd curl; then
             curl -LsSf https://astral.sh/uv/install.sh | sh
         else
-            wget -qO- https://astral.sh/uv/install.sh | sh
+            wget -O- https://astral.sh/uv/install.sh | sh
         fi
 
         # Add to PATH for this session
@@ -602,7 +602,7 @@ download_package() {
             if has_cmd git && [[ -d "$INSTALL_DIR/.git" ]]; then
                 info "Updating via git..."
                 cd "$INSTALL_DIR"
-                git pull --quiet
+                git pull
                 success "Updated from git"
             else
                 info "Re-downloading latest version..."
@@ -647,22 +647,22 @@ setup_python() {
         if .venv/bin/python --version &> /dev/null; then
             success "Python environment exists"
             info "Updating dependencies..."
-            uv sync --quiet
+            uv sync
         else
             warn "Python environment corrupted, recreating..."
             rm -rf .venv
-            uv sync --python 3.12 --quiet
+            uv sync --python 3.12
         fi
     else
         info "Creating Python 3.12 environment..."
-        uv sync --python 3.12 --quiet
+        uv sync --python 3.12
     fi
 
     success "Python dependencies installed"
 
     # Install GPU runtime
     info "Installing GPU runtime..."
-    uv pip install --quiet "$ONNX_WHEEL"
+    uv pip install "$ONNX_WHEEL"
     success "GPU runtime installed"
 }
 
