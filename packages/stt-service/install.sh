@@ -187,7 +187,7 @@ disk_space_gb() {
 # Check if model is already cached (huggingface_hub cache)
 model_cached() {
     local hf_cache="${HF_HOME:-$HOME/.cache/huggingface}/hub"
-    ls -d "$hf_cache"/models--nvidia--parakeet* &>/dev/null 2>&1
+    ls -d "$hf_cache"/models--nvidia--parakeet* &>/dev/null
 }
 
 # Check if systemd service exists

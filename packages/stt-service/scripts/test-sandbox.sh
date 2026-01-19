@@ -52,7 +52,7 @@ USAGE:
     ./test-sandbox.sh --clean      Remove container and image
 
 INSIDE THE CONTAINER:
-    # Test the curl install (uses local files, not GitHub)
+    # Test install (local install.sh, package downloaded from GitHub)
     bash /mnt/install.sh
 
     # Or test with options
@@ -99,8 +99,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     alsa-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Create test user (non-root, with sudo)
-RUN useradd -m -s /bin/bash testuser && \
+# Create test user (non-root, with sudo, in audio group)
+RUN useradd -m -s /bin/bash -G audio testuser && \
     echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 USER testuser
@@ -124,6 +124,7 @@ run_interactive() {
     echo "  nvidia-smi                     # Verify GPU"
     echo ""
 
+    local uid=$(id -u)
     docker run -it --rm \
         --name "$CONTAINER_NAME" \
         --gpus all \
@@ -131,8 +132,8 @@ run_interactive() {
         -e "HOME=/home/testuser" \
         --device /dev/snd \
         --group-add audio \
-        -v /run/user/$(id -u)/pulse:/run/user/1000/pulse \
-        -e "PULSE_SERVER=unix:/run/user/1000/pulse/native" \
+        -v "/run/user/$uid/pulse:/run/user/$uid/pulse" \
+        -e "PULSE_SERVER=unix:/run/user/$uid/pulse/native" \
         "$IMAGE_NAME" \
         bash
 }
@@ -145,7 +146,10 @@ attach_to_container() {
     fi
 
     info "Attaching to running container..."
-    docker exec -it "$CONTAINER_NAME" bash
+    local uid=$(id -u)
+    docker exec -it \
+        -e "PULSE_SERVER=unix:/run/user/$uid/pulse/native" \
+        "$CONTAINER_NAME" bash
 }
 
 run_auto() {
@@ -154,12 +158,17 @@ run_auto() {
 
     info "Running non-interactive install test..."
 
+    local uid=$(id -u)
     docker run --rm \
         --name "$CONTAINER_NAME" \
         --gpus all \
         -v "$PROJECT_DIR:/mnt:ro" \
         -e "HOME=/home/testuser" \
         -e "STT_NONINTERACTIVE=1" \
+        --device /dev/snd \
+        --group-add audio \
+        -v "/run/user/$uid/pulse:/run/user/$uid/pulse" \
+        -e "PULSE_SERVER=unix:/run/user/$uid/pulse/native" \
         "$IMAGE_NAME" \
         bash -c '
             echo "=== GPU Check ==="

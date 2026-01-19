@@ -5,12 +5,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+# Ensure uv is in PATH
+export PATH="$HOME/.local/bin:$PATH"
+if ! command -v uv &>/dev/null; then
+    echo "Error: uv not found. Run: source ~/.bashrc" >&2
+    exit 1
+fi
+
 # Find CUDA libraries (onnxruntime-gpu needs CUDA 12 compat libs)
 find_cuda_lib() {
     local paths=(
         "/usr/local/cuda/targets/sbsa-linux/lib"
         "/usr/local/cuda-13.0/targets/sbsa-linux/lib"
         "/usr/local/cuda-12.6/targets/sbsa-linux/lib"
+        "/usr/local/cuda-12/targets/sbsa-linux/lib"
         "/usr/local/cuda/lib64"
         "/usr/lib/aarch64-linux-gnu"
     )
