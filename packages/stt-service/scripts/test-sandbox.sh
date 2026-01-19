@@ -27,7 +27,8 @@ show_help() {
     cat << 'EOF'
 STT Service Test Sandbox
 
-Creates a minimal CUDA 13 Ubuntu 24.04 container with GPU access for testing the installer.
+Creates a minimal Ubuntu 24.04 container with GPU access for testing the installer.
+The installer handles all CUDA setup - this tests the full installation flow.
 The container is disposable - delete it anytime with --clean.
 
 USAGE:
@@ -64,13 +65,13 @@ build_image() {
         return
     fi
 
-    info "Building test image (CUDA 13 Ubuntu 24.04 - minimal)..."
+    info "Building test image (Ubuntu 24.04 - minimal, no CUDA)..."
     docker build -t "$IMAGE_NAME" - << 'DOCKERFILE'
-FROM nvidia/cuda:13.0.0-runtime-ubuntu24.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Minimal packages - installer handles CUDA libs, PortAudio, etc.
+# Truly minimal - installer handles CUDA, PortAudio, everything
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \

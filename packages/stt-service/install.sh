@@ -313,6 +313,15 @@ cuda_repo_configured() {
     grep -rq "developer.download.nvidia.com/compute/cuda" /etc/apt/sources.list.d/ 2>/dev/null
 }
 
+# Check if CUDA toolkit is installed
+cuda_installed() {
+    # Check for CUDA 13 or any recent CUDA installation
+    has_cmd nvcc || \
+    [[ -d /usr/local/cuda ]] || \
+    dpkg -l | grep -q "cuda-toolkit-13" || \
+    dpkg -l | grep -q "cuda-runtime-13"
+}
+
 # Set up NVIDIA CUDA repository
 setup_cuda_repo() {
     info "Setting up NVIDIA CUDA repository..."
@@ -338,12 +347,49 @@ setup_cuda_repo() {
     success "NVIDIA CUDA repository configured"
 }
 
+# Install CUDA toolkit
+install_cuda_toolkit() {
+    info "Installing CUDA 13 toolkit..."
+    info "This may take several minutes..."
+
+    sudo apt-get install -y -qq cuda-toolkit-13-0
+    success "CUDA 13 toolkit installed"
+
+    # Add CUDA to PATH for this session
+    export PATH="/usr/local/cuda/bin:$PATH"
+    export LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}"
+}
+
 install_system_deps() {
     step "Installing system dependencies..."
 
+    local need_cuda_repo=0
+
+    # First, check if CUDA toolkit is installed
+    if ! cuda_installed; then
+        warn "CUDA toolkit not detected"
+        need_cuda_repo=1
+
+        # Setup repo first if needed
+        if ! cuda_repo_configured; then
+            if [[ $(ask "Set up NVIDIA CUDA repository?" "y") == "y" ]]; then
+                setup_cuda_repo
+            else
+                die "CUDA repository required for installation"
+            fi
+        fi
+
+        if [[ $(ask "Install CUDA 13 toolkit?" "y") == "y" ]]; then
+            install_cuda_toolkit
+        else
+            warn "Skipping CUDA toolkit - GPU acceleration may not work"
+        fi
+    else
+        success "CUDA toolkit: Already installed"
+    fi
+
     # Packages we need
     local packages=()
-    local need_cuda_repo=0
 
     # Check each one
     if ! dpkg -s libportaudio2 &> /dev/null; then
@@ -352,11 +398,12 @@ install_system_deps() {
         success "libportaudio2: Already installed"
     fi
 
+    # CUDA 12 compatibility libs (onnxruntime-gpu built for CUDA 12)
     if ! dpkg -s libcudnn9-cuda-12 &> /dev/null; then
         packages+=(libcudnn9-cuda-12)
         need_cuda_repo=1
     else
-        success "libcudnn9: Already installed"
+        success "libcudnn9-cuda-12: Already installed"
     fi
 
     if ! dpkg -s libcublas-12-6 &> /dev/null 2>&1; then
@@ -368,10 +415,10 @@ install_system_deps() {
             success "libcublas: Already installed"
         fi
     else
-        success "libcublas: Already installed"
+        success "libcublas-12-6: Already installed"
     fi
 
-    # Check if we need CUDA repo setup
+    # Check if we need CUDA repo setup for compat libs
     if [[ "$need_cuda_repo" == "1" ]] && ! cuda_repo_configured; then
         warn "NVIDIA CUDA repository not configured"
         info "Required for: libcudnn9-cuda-12, libcublas-12-6"
@@ -380,7 +427,7 @@ install_system_deps() {
             setup_cuda_repo
         else
             warn "Skipping CUDA repo setup - CUDA packages may fail to install"
-            # Remove CUDA packages from list, let it fail gracefully or skip
+            # Remove CUDA packages from list
             packages=("${packages[@]/libcudnn9-cuda-12}")
             packages=("${packages[@]/libcublas-12-6}")
             # Clean empty elements
