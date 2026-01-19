@@ -306,11 +306,44 @@ detect_existing() {
 # Install system dependencies
 # ═══════════════════════════════════════════════════════════════════
 
+# Check if NVIDIA CUDA repo is configured
+cuda_repo_configured() {
+    [[ -f /etc/apt/sources.list.d/cuda-ubuntu2404-sbsa.list ]] || \
+    [[ -f /etc/apt/sources.list.d/cuda*.list ]] || \
+    grep -rq "developer.download.nvidia.com/compute/cuda" /etc/apt/sources.list.d/ 2>/dev/null
+}
+
+# Set up NVIDIA CUDA repository
+setup_cuda_repo() {
+    info "Setting up NVIDIA CUDA repository..."
+    info "This requires sudo access..."
+
+    local keyring_url="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb"
+    local keyring_file="/tmp/cuda-keyring.deb"
+
+    # Download keyring package
+    if has_cmd curl; then
+        curl -fsSL "$keyring_url" -o "$keyring_file" || die "Failed to download CUDA keyring"
+    elif has_cmd wget; then
+        wget -q "$keyring_url" -O "$keyring_file" || die "Failed to download CUDA keyring"
+    else
+        die "Neither curl nor wget available"
+    fi
+
+    # Install keyring and update
+    sudo dpkg -i "$keyring_file" || die "Failed to install CUDA keyring"
+    rm -f "$keyring_file"
+    sudo apt-get update -qq
+
+    success "NVIDIA CUDA repository configured"
+}
+
 install_system_deps() {
     step "Installing system dependencies..."
 
     # Packages we need
     local packages=()
+    local need_cuda_repo=0
 
     # Check each one
     if ! dpkg -s libportaudio2 &> /dev/null; then
@@ -321,6 +354,7 @@ install_system_deps() {
 
     if ! dpkg -s libcudnn9-cuda-12 &> /dev/null; then
         packages+=(libcudnn9-cuda-12)
+        need_cuda_repo=1
     else
         success "libcudnn9: Already installed"
     fi
@@ -329,11 +363,33 @@ install_system_deps() {
         # Different systems might have different cublas package names
         if ! ldconfig -p | grep -q libcublas; then
             packages+=(libcublas-12-6)
+            need_cuda_repo=1
         else
             success "libcublas: Already installed"
         fi
     else
         success "libcublas: Already installed"
+    fi
+
+    # Check if we need CUDA repo setup
+    if [[ "$need_cuda_repo" == "1" ]] && ! cuda_repo_configured; then
+        warn "NVIDIA CUDA repository not configured"
+        info "Required for: libcudnn9-cuda-12, libcublas-12-6"
+
+        if [[ $(ask "Set up NVIDIA CUDA repository?" "y") == "y" ]]; then
+            setup_cuda_repo
+        else
+            warn "Skipping CUDA repo setup - CUDA packages may fail to install"
+            # Remove CUDA packages from list, let it fail gracefully or skip
+            packages=("${packages[@]/libcudnn9-cuda-12}")
+            packages=("${packages[@]/libcublas-12-6}")
+            # Clean empty elements
+            local cleaned=()
+            for pkg in "${packages[@]}"; do
+                [[ -n "$pkg" ]] && cleaned+=("$pkg")
+            done
+            packages=("${cleaned[@]}")
+        fi
     fi
 
     # Install missing packages
