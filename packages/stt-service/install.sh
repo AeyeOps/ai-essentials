@@ -415,9 +415,8 @@ install_cuda_toolkit() {
     info "Installing CUDA toolkit..."
     info "This may take several minutes..."
 
-    # Install the latest CUDA 13 toolkit (version-locked to 13.x series)
-    # cuda-toolkit-13 is a meta-package that gets the latest 13.x release
-    sudo apt-get install -y cuda-toolkit-13
+    # Install CUDA 13.0 toolkit (pinned to match GB10)
+    sudo apt-get install -y cuda-toolkit-13-0
     success "CUDA toolkit installed"
 
     # Add CUDA to PATH for this session
