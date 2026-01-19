@@ -8,7 +8,7 @@
 #   - Mamba/Miniforge + 'dev' environment with AI packages
 #   - Kitty terminal (GPU-optimized for high-DPI/OLED)
 #   - Yazi file manager
-#   - CLI tools: fd, fzf, bat, eza, delta, ripgrep
+#   - CLI tools: fd, fzf, bat, eza, delta, ripgrep, glow
 #   - Zellij terminal multiplexer
 #   - bun (JS runtime) + direnv
 #   - Zsh + Oh-My-Zsh + Powerlevel10k
@@ -422,6 +422,22 @@ else
     warn "delta already installed"
 fi
 
+# glow (markdown renderer)
+info "Checking glow..."
+if ! command_exists glow; then
+    info "Installing glow..."
+    GLOW_VERSION=$(curl -s https://api.github.com/repos/charmbracelet/glow/releases/latest | grep -oP '"tag_name": "v\K[^"]+')
+    # glow uses 'arm64' not 'aarch64' in release names
+    GLOW_ARCH="${ARCH_ALT}"
+    [[ "$ARCH" == "aarch64" ]] && GLOW_ARCH="arm64"
+    curl -fsSL "https://github.com/charmbracelet/glow/releases/download/v${GLOW_VERSION}/glow_${GLOW_VERSION}_Linux_${GLOW_ARCH}.tar.gz" -o /tmp/glow.tar.gz
+    sudo tar -xzf /tmp/glow.tar.gz -C /usr/local/bin/ --strip-components=1 --wildcards "*/glow"
+    rm /tmp/glow.tar.gz
+    success "glow installed"
+else
+    warn "glow already installed"
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 7. ZELLIJ TERMINAL MULTIPLEXER
 # ═══════════════════════════════════════════════════════════════════════════
@@ -537,6 +553,7 @@ alias lt='eza --tree --icons --level=2'
 alias cat='bat --paging=never'
 alias y='yazi'
 alias zj='zellij'
+alias mdv='glow'
 EOF
 fi
 
@@ -555,7 +572,7 @@ echo "  - NVM + Node.js 22 LTS"
 echo "  - Mamba + 'dev' environment (anthropic, openai, httpx, rich, typer, pydantic)"
 echo "  - Kitty terminal (GPU-optimized, OLED theme, 4K ready)"
 echo "  - Yazi file manager"
-echo "  - CLI tools: ripgrep, fd, fzf, bat, eza, delta"
+echo "  - CLI tools: ripgrep, fd, fzf, bat, eza, delta, glow"
 echo "  - Zellij terminal multiplexer"
 echo "  - Bun JS runtime"
 echo "  - direnv"
@@ -565,6 +582,7 @@ echo "Quick start commands:"
 echo "  kitty          - Launch Kitty terminal"
 echo "  yazi / y       - File manager"
 echo "  zellij / zj    - Terminal multiplexer"
+echo "  glow / mdv     - Render markdown in terminal"
 echo "  mamba activate dev  - Activate AI dev environment"
 echo ""
 echo -e "${YELLOW}NOTES:${NC}"
