@@ -912,16 +912,16 @@ show_completion() {
 
     # Docker: show one-liner test option
     if [[ -f /.dockerenv ]] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
-        echo "  # Test in single terminal (Docker)"
-        echo -e "  ${DIM}cd $INSTALL_DIR && (./scripts/stt-server.sh &) && sleep 3 && ./scripts/stt-client.sh${NC}"
+        echo "  # Test in single terminal (Docker) - hold SPACE to record"
+        echo -e "  ${DIM}cd $INSTALL_DIR && (./scripts/stt-server.sh &) && sleep 3 && ./scripts/stt-client.sh --ptt${NC}"
         echo ""
     fi
 
     echo "  # Start the server"
     echo -e "  ${DIM}cd $INSTALL_DIR && ./scripts/stt-server.sh${NC}"
     echo ""
-    echo "  # In another terminal, run the client"
-    echo -e "  ${DIM}cd $INSTALL_DIR && ./scripts/stt-client.sh${NC}"
+    echo "  # In another terminal, run the client (hold SPACE to record)"
+    echo -e "  ${DIM}cd $INSTALL_DIR && ./scripts/stt-client.sh --ptt${NC}"
     echo ""
 
     if systemctl is-active --quiet stt-service 2>/dev/null; then

@@ -58,7 +58,7 @@ TESTING THE CURL INSTALLER:
     # Test the service
     cd ~/stt-service
     ./scripts/stt-server.sh &
-    ./scripts/stt-client.sh --ptt -v
+    ./scripts/stt-client.sh --ptt
 
     # In another terminal (optional)
     ./test-sandbox.sh --attach
