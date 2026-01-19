@@ -544,10 +544,19 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
 
     def on_stop():
         nonlocal recording_task
-        # Cancel any pending start task
-        if recording_task and not recording_task.done():
-            recording_task.cancel()
-        loop.create_task(stop_recording())
+
+        async def wait_and_stop():
+            """Wait for start_recording to complete, then stop."""
+            nonlocal recording_task
+            # Wait for connection/setup to complete before stopping
+            if recording_task and not recording_task.done():
+                try:
+                    await recording_task
+                except Exception:
+                    pass  # Ignore errors, stop_recording handles missing client
+            await stop_recording()
+
+        loop.create_task(wait_and_stop())
 
     ptt.set_callbacks(on_start=on_start, on_stop=on_stop)
 
