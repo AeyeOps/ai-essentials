@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.9] - 2026-01-18
+
+### Added
+- Pop Shell GNOME tiling extension to setup script
+  - Auto-installs from source on GNOME desktops
+  - Optimized settings: 4px gaps, active-hint, smart-gaps, hidden titles
+  - Cheatsheet included (`configs/pop-shell/pop-shell-cheatsheet.txt`)
+- Configuration files directory (`configs/`)
+  - `configs/kitty/kitty.conf` - GPU-optimized Kitty terminal config
+  - `configs/zellij/config.kdl` - Modern Zellij theme matching p10k
+  - `configs/pop-shell/` - Pop Shell settings and cheatsheet
+
+### Changed
+- Enhanced Kitty terminal configuration for high-performance GPU systems
+  - OLED-optimized true black background (#000000)
+  - 4K display support with 2x3 grid window sizing
+  - Low-latency GPU settings (repaint_delay 5ms, input_delay 1ms)
+  - 50k scrollback lines, shell integration enabled
+- Zellij theme converted to modern format with semantic component names
+  - Explicit control over ribbons, frames, tables, lists
+  - Color palette matching Powerlevel10k classic darkest (234)
+
 ## [0.0.8] - 2026-01-10
 
 ### Added

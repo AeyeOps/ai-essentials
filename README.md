@@ -10,6 +10,11 @@ Contents
   - `setup-ai-dev-stack.sh`: Comprehensive AI developer environment setup (terminal, tools, runtimes)
   - `google-chrome-wsl2.sh`: Chrome launcher optimized for WSL2 browser automation
   - `update_cli_ubuntu.sh`: Development environment setup for Ubuntu systems
+- `configs/`: Pre-configured dotfiles optimized for high-performance GPU workstations.
+  - `kitty/`: GPU-optimized Kitty terminal config (OLED black, 4K ready, low-latency)
+  - `zellij/`: Modern Zellij theme matching Powerlevel10k classic darkest
+  - `pop-shell/`: Pop Shell tiling settings and cheatsheet
+  - `zsh/`: Powerlevel10k configuration
 - `docs/`: Short guides, patterns, and checklists for AI dev and ops.
 - `AGENTS.md`: Guidance and conventions for agentic tooling and assistants working in this repo.
 
@@ -20,15 +25,22 @@ Quick Start
 
 AI Developer Environment Setup
 The `scripts/setup-ai-dev-stack.sh` script provides an idempotent setup for a complete AI development environment on Linux (amd64/arm64). Components include:
-- **Terminal**: Kitty with auto-copy on select and right-click paste
+- **Terminal**: Kitty (GPU-optimized for OLED/4K, low-latency settings)
 - **Shell**: Zsh + Oh-My-Zsh + Powerlevel10k + MesloLGS Nerd Font
 - **File Manager**: Yazi (fast, Rust-based TUI file manager with previews)
-- **Multiplexer**: Zellij (modern terminal multiplexer)
+- **Multiplexer**: Zellij (modern terminal multiplexer with custom p10k theme)
+- **Tiling**: Pop Shell (GNOME tiling extension with optimized settings)
 - **CLI Tools**: ripgrep, fd, fzf, bat, eza, delta
 - **Runtimes**: NVM + Node.js 22 LTS, Mamba + Python dev environment, Bun
 - **Utilities**: direnv for per-project environment variables
 
 The script is safe to run multiple times - it detects existing installations and skips them.
+
+Configuration Files
+Pre-configured dotfiles are available in `configs/` for manual installation or reference:
+- **Kitty** (`configs/kitty/kitty.conf`): True black background for OLED, 4K 2x3 grid sizing, 50k scrollback
+- **Zellij** (`configs/zellij/config.kdl`): Modern theme format with semantic component names
+- **Pop Shell** (`configs/pop-shell/`): Tiling settings (gaps, smart-gaps, active-hint) and keybinding cheatsheet
 
 Browser Automation in WSL2
 For developers using browser automation tools (Playwright, Puppeteer, Chrome DevTools Protocol) in WSL2 environments, the `scripts/google-chrome-wsl2.sh` script provides a reliable Chrome launcher that handles common WSL2 issues including D-Bus sessions, GPU acceleration limitations, and display server compatibility. This enables consistent browser automation testing and development workflows in WSL2.
