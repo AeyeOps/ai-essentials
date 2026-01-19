@@ -246,11 +246,11 @@ class PTTClient:
 
             if msg.get("type") == "final":
                 # --- TIMING: Report ---
-                print(f"\n⏱  Latency breakdown (ms):")
+                print(f"\n[timing] Latency breakdown (ms):")
                 print(f"   Stream flush:    {(t_stream_done - t_enter) * 1000:7.1f} ms")
                 print(f"   Send 'end':      {(t_end_sent - t_stream_done) * 1000:7.1f} ms")
                 print(f"   Server process:  {(t_response - t_end_sent) * 1000:7.1f} ms")
-                print(f"   ─────────────────────────")
+                print(f"   -------------------------")
                 print(f"   Total:           {(t_response - t_enter) * 1000:7.1f} ms\n")
                 return msg.get("text", "")
             elif msg.get("type") == "error":
@@ -361,9 +361,191 @@ async def run_client(args: argparse.Namespace) -> int:
         await client.disconnect()
 
 
+def _play_ptt_sound(sound_type: str) -> None:
+    """Play PTT audio feedback sound."""
+    try:
+        sample_rate = 44100
+        duration = 0.08  # 80ms
+
+        t = np.linspace(0, duration, int(sample_rate * duration), False)
+
+        if sound_type == "click":
+            freq = 880  # A5 - higher pitch "on air"
+            envelope = np.exp(-t * 15) * (1 - np.exp(-t * 100))
+        else:
+            freq = 440  # A4 - lower pitch "off air"
+            envelope = np.exp(-t * 20) * (1 - np.exp(-t * 100))
+
+        sound = np.sin(2 * np.pi * freq * t) * envelope
+        sound = (sound * 0.25).astype(np.float32)
+        sd.play(sound, sample_rate)
+    except Exception as e:
+        logger.debug(f"Could not play sound: {e}")
+
+
+async def run_ptt_terminal_mode(args: argparse.Namespace) -> int:
+    """Run PTT mode with hold-to-record (SPACE key simulates Ctrl+Super)."""
+    import sys
+    import tty
+    import termios
+    import select
+
+    output_mode = args.output or settings.client.output_mode
+    server_url = args.server or settings.client.server_url
+    max_duration = settings.ptt.max_duration_seconds
+
+    client = PTTClient(server_url=server_url)
+
+    # Connect
+    for attempt in range(settings.client.reconnect_attempts):
+        if await client.connect():
+            break
+        logger.warning(f"Connection attempt {attempt + 1} failed...")
+        await asyncio.sleep(settings.client.reconnect_delay * (2 ** attempt))
+    else:
+        logger.error("Failed to connect to server")
+        return 1
+
+    hotkey_char = settings.ptt.terminal_hotkey
+    hotkey_name = settings.ptt.terminal_hotkey_name
+
+    print(f"\n[PTT] Terminal mode (hold-to-record)")
+    print(f"   HOLD [{hotkey_name}] = record, RELEASE = transcribe")
+    print(f"   Output: {output_mode}")
+    print(f"   Max duration: {max_duration}s")
+    print(f"   Press 'q' to quit.\n")
+
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+
+    # Key release detection timeout (ms) - if no key repeat within this time, key was released
+    KEY_RELEASE_TIMEOUT = 0.15  # 150ms - typical key repeat interval is ~30-50ms
+
+    try:
+        tty.setraw(fd)
+
+        while True:
+            # Wait for keypress
+            print(f"\rReady. HOLD [{hotkey_name}] to record...        \r", end='', flush=True)
+
+            loop = asyncio.get_event_loop()
+            char = await loop.run_in_executor(None, sys.stdin.read, 1)
+
+            if char.lower() == 'q':
+                print("\r\nQuitting...\r\n")
+                break
+
+            if char == hotkey_char:
+                # === KEY DOWN: Start recording ===
+                _play_ptt_sound("click")
+                print(f"\r* Recording... (release [{hotkey_name}] to stop)\r", end='', flush=True)
+
+                await client.send_config()
+                audio_chunks = []
+                recording_start = time.perf_counter()
+                auto_submitted = False
+
+                def audio_callback(indata, frames, time_info, status):
+                    audio_chunks.append(indata.copy())
+
+                stream = sd.InputStream(
+                    samplerate=settings.audio.sample_rate,
+                    channels=settings.audio.channels,
+                    dtype=np.int16,
+                    blocksize=settings.audio.chunk_samples,
+                    callback=audio_callback,
+                )
+                stream.start()
+
+                # Record while SPACE is held (detect release via key repeat timeout)
+                while True:
+                    # Check for max duration
+                    elapsed = time.perf_counter() - recording_start
+                    if elapsed >= max_duration:
+                        print(f"\r[!] Max duration ({max_duration}s) reached, auto-submitting...\r")
+                        auto_submitted = True
+                        break
+
+                    # Check if key is still held (key repeat sends more chars)
+                    # Use select to check with timeout
+                    ready, _, _ = select.select([sys.stdin], [], [], KEY_RELEASE_TIMEOUT)
+
+                    if ready:
+                        # Key is still held (repeat char received)
+                        next_char = sys.stdin.read(1)
+                        if next_char != hotkey_char:
+                            # Different key pressed, treat as release
+                            break
+                    else:
+                        # Timeout - key was released
+                        break
+
+                # === KEY UP: Stop and submit ===
+                stream.stop()
+                stream.close()
+
+                _play_ptt_sound("unclick")
+                duration = time.perf_counter() - recording_start
+                print(f"\r... Processing ({duration:.1f}s audio)...            \r", end='', flush=True)
+
+                if not audio_chunks:
+                    print("\r(no audio captured)\r\n")
+                    continue
+
+                # Send to server
+                t_start = time.perf_counter()
+                audio = np.concatenate(audio_chunks)
+
+                chunk_size = settings.audio.chunk_samples
+                for i in range(0, len(audio), chunk_size):
+                    chunk = audio[i:i + chunk_size]
+                    await client.websocket.send(chunk.tobytes())
+
+                await client.websocket.send(json.dumps({"type": "end"}))
+
+                try:
+                    response = await asyncio.wait_for(client.websocket.recv(), timeout=30.0)
+                    msg = json.loads(response)
+                    t_done = time.perf_counter()
+
+                    if msg.get("type") == "final":
+                        text = msg.get("text", "")
+                        latency_ms = (t_done - t_start) * 1000
+                        print(f"\r[OK] {duration:.1f}s -> {latency_ms:.0f}ms                    \r\n")
+
+                        if text:
+                            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                            output_text(text, output_mode)
+                            print()  # newline after output
+                            tty.setraw(fd)
+                        else:
+                            print("(silence)\r\n")
+                    else:
+                        print(f"\rError: {msg.get('message', 'unknown')}\r\n")
+
+                except asyncio.TimeoutError:
+                    print("\rTimeout waiting for transcription\r\n")
+
+                # If auto-submitted, drain any remaining key repeats
+                if auto_submitted:
+                    while select.select([sys.stdin], [], [], 0.1)[0]:
+                        sys.stdin.read(1)
+
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        await client.disconnect()
+
+    return 0
+
+
 async def run_ptt_mode(args: argparse.Namespace) -> int:
     """Run continuous PTT mode with global hotkey."""
-    PTTController, PTTState = _import_ptt()
+    try:
+        PTTController, PTTState = _import_ptt()
+    except ImportError:
+        # Fall back to terminal mode if evdev not available
+        logger.info("evdev not available, using terminal mode")
+        return await run_ptt_terminal_mode(args)
 
     output_mode = args.output or settings.client.output_mode
     server_url = args.server or settings.client.server_url
@@ -501,7 +683,7 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
 
     # Print startup message
     hotkey_str = "+".join(settings.ptt.hotkey)
-    print(f"\n🎤 PTT mode active. Hold [{hotkey_str}] to record, release to transcribe.")
+    print(f"\n[PTT] Mode active. Hold [{hotkey_str}] to record, release to transcribe.")
     print(f"   Output: {output_mode}")
     print(f"   Server: {server_url}")
     print(f"   Press Ctrl+C to exit.\n")

@@ -72,11 +72,20 @@ class PTTConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="STT_PTT_")
 
-    # Hotkey as list of key names (evdev KEY_* names without KEY_ prefix)
-    # Default: Ctrl+Super (LEFT variants)
+    # Global hotkey (evdev KEY_* names without KEY_ prefix) - for production
     hotkey: list[str] = Field(
         default=["LEFTCTRL", "LEFTMETA"],
         description="PTT hotkey as list of key names (e.g., ['LEFTCTRL', 'LEFTMETA'])",
+    )
+    # Terminal hotkey - control character for terminal testing
+    # Common: ctrl+r=\x12, ctrl+t=\x14, ctrl+y=\x19, ctrl+space=\x00
+    terminal_hotkey: str = Field(
+        default="\x12",  # Ctrl+R
+        description="Terminal PTT key (control char, e.g., \\x12 for Ctrl+R)",
+    )
+    terminal_hotkey_name: str = Field(
+        default="Ctrl+R",
+        description="Human-readable name for terminal hotkey",
     )
     click_sound: bool = Field(
         default=True,

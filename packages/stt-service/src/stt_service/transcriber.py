@@ -187,7 +187,7 @@ class Transcriber:
             text = str(result).strip()
 
         logger.info(
-            f"⏱  Transcriber: preprocess={1000*(t_preprocess-t_start):.0f}ms, "
+            f"[timing] Transcriber: preprocess={1000*(t_preprocess-t_start):.0f}ms, "
             f"inference={1000*(t_inference-t_preprocess):.0f}ms"
         )
 

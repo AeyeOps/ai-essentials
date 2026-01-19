@@ -235,7 +235,7 @@ class STTServer:
 
             # Log timing breakdown
             logger.info(
-                f"⏱  Server timing: prep={1000*(t_prep-t_start):.0f}ms, "
+                f"[timing] Server: prep={1000*(t_prep-t_start):.0f}ms, "
                 f"transcribe={1000*(t_transcribe-t_prep):.0f}ms, "
                 f"send={1000*(t_sent-t_transcribe):.0f}ms, "
                 f"total={1000*(t_sent-t_start):.0f}ms "
