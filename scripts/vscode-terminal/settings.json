@@ -1,0 +1,48 @@
+{
+    "_comment": "VS Code Terminal Settings for Power Users (Zellij, kitty, Claude Code)",
+    "_version": "1.0.0",
+    "_description": "Terminal configuration that passes keybindings through to shell tools instead of VS Code intercepting them",
+    
+    "terminal.integrated.defaultProfile.linux": "zsh",
+    "terminal.integrated.profiles.linux": {
+        "zsh": {
+            "path": "/usr/bin/zsh"
+        },
+        "bash": {
+            "path": "/bin/bash"
+        }
+    },
+    "terminal.integrated.sendKeybindingsToShell": true,
+    "terminal.integrated.allowChords": false,
+    "terminal.integrated.commandsToSkipShell": [
+        "-workbench.action.quickOpen",
+        "-workbench.action.quickOpenNavigateNextInFilePicker",
+        "-workbench.action.quickOpenNavigatePreviousInFilePicker",
+        "-workbench.action.files.newUntitledFile",
+        "-workbench.action.files.save",
+        "-workbench.action.files.openFile",
+        "-workbench.action.toggleSidebarVisibility",
+        "-workbench.action.togglePanel",
+        "-workbench.action.replaceInFiles",
+        "-workbench.action.gotoLine",
+        "-workbench.action.showAllSymbols",
+        "-workbench.action.closeActiveEditor",
+        "-workbench.action.reloadWindow",
+        "-workbench.action.terminal.clear",
+        "-workbench.action.terminal.focusFind",
+        "-actions.find",
+        "-editor.action.selectAll",
+        "-editor.action.addSelectionToNextFindMatch",
+        "-expandLineSelection",
+        "-cursorUndo",
+        "-redo"
+    ],
+    "terminal.integrated.gpuAcceleration": "on",
+    "terminal.integrated.smoothScrolling": true,
+    "terminal.integrated.cursorBlinking": true,
+    "terminal.integrated.cursorStyle": "block",
+    "terminal.integrated.fontFamily": "'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', 'Hack Nerd Font', monospace",
+    "terminal.integrated.fontSize": 14,
+    "terminal.integrated.lineHeight": 1.2,
+    "terminal.integrated.scrollback": 10000
+}

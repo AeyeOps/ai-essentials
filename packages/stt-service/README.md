@@ -2,60 +2,71 @@
 
 GPU-accelerated Speech-to-Text service using NVIDIA Parakeet ONNX models with WebSocket streaming.
 
-## Features
-
-- Real-time speech transcription via WebSocket
-- Push-to-talk (PTT) client with multiple output modes
-- GPU-only execution (CUDA/TensorRT) - fails fast if unavailable
-- Configurable via environment variables
-- 30-second max audio length per transcription
-
-## Requirements
-
-- Python >= 3.12.3
-- NVIDIA GPU with CUDA support
-- onnxruntime-gpu (for GPU acceleration)
-
-## Installation
+## Install
 
 ```bash
-# Install base package
-uv sync
-
-# Install with GPU support (recommended)
-uv sync --extra gpu
-
-# Or manually install GPU runtime
-pip install onnxruntime-gpu
+curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
 ```
+
+That's it. The installer handles everything—dependencies, GPU setup, model download.
+
+<details>
+<summary>What does the installer do?</summary>
+
+- Checks system requirements (ARM64, NVIDIA GPU, disk space)
+- Installs uv, CUDA libraries, and PortAudio if missing
+- Downloads and configures STT Service
+- Optionally downloads the speech model (~1GB)
+- Optionally sets up a systemd service
+
+Re-run the installer anytime to update.
+</details>
+
+---
+
+## What You Need
+
+- NVIDIA GB10 or ARM64 system with CUDA GPU
+- Ubuntu 22.04+ (or similar Linux)
+- Internet connection (model download ~1GB on first run)
 
 ## Quick Start
 
-### Start the Server
+After installation, run:
 
 ```bash
-# Default settings (localhost:9876, CUDA)
-stt-server
-
-# With options
-stt-server --host 0.0.0.0 --port 8080 --provider tensorrt -v
+cd ~/stt-service
+./scripts/stt-server.sh        # Start server (terminal 1)
+./scripts/stt-client.sh        # Run client (terminal 2)
 ```
 
-### Run the Client
+## Uninstall
 
 ```bash
-# Record and print to stdout
-stt-client
-
-# Type into focused window (Linux)
-stt-client --output type
-
-# Copy to clipboard
-stt-client --output clipboard
-
-# Test connection only
-stt-client --test
+cd ~/stt-service && ./install.sh --uninstall
 ```
+
+Or manually:
+```bash
+# Stop and remove service (if installed)
+sudo systemctl stop stt-service
+sudo systemctl disable stt-service
+sudo rm /etc/systemd/system/stt-service.service
+
+# Remove installation
+rm -rf ~/stt-service
+
+# Optionally remove cached model (~1GB)
+rm -rf ~/.cache/onnx-asr
+```
+
+## Running as a System Service
+
+```bash
+cd ~/stt-service && ./scripts/install-systemd.sh
+```
+
+This generates a systemd service file from a template and optionally installs it.
 
 ## Configuration
 
@@ -75,48 +86,101 @@ All settings can be overridden via environment variables:
 | `STT_AUDIO_SAMPLE_RATE` | `16000` | Audio sample rate (Hz) |
 | `STT_AUDIO_CHUNK_MS` | `100` | Chunk duration (ms) |
 
-## WebSocket Protocol
+## Troubleshooting
 
-### Client → Server
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `uv: command not found` | uv not installed | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| `CUDA not available` | Missing GPU runtime | Install onnxruntime-gpu per instructions below |
+| `libcudnn.so.9: cannot open` | Missing cuDNN | `sudo apt install libcudnn9-cuda-12` |
+| `cublasLtGetVersion` | CUDA 12/13 mismatch | Set LD_LIBRARY_PATH (see "Running on CUDA 13") |
+| `PortAudio library not found` | Missing audio lib | `sudo apt install libportaudio2` |
+| `No module named 'huggingface_hub'` | Missing dep (older installs) | `uv sync` to reinstall |
+| `TypeError: unexpected keyword argument 'path'` | Old onnx-asr (older installs) | `uv sync` to reinstall |
 
-```json
-// Configuration (send first)
-{"type": "config", "sample_rate": 16000, "language": "en"}
+---
 
-// Audio: Binary frames (16-bit PCM, mono)
+## Advanced Usage
 
-// End stream
-{"type": "end"}
+### Developer Setup (Git Clone)
 
-// Keep alive
-{"type": "keepalive"}
+For contributing or developing:
+
+```bash
+git clone https://github.com/AeyeOps/ai-essentials.git
+cd ai-essentials/packages/stt-service
+./scripts/install-gb10.sh
 ```
 
-### Server → Client
+### Testing in a Sandbox
 
-```json
-// Ready
-{"type": "ready", "session_id": "abc123"}
+Test the installer in a disposable Docker container with GPU passthrough:
 
-// Final transcription
-{"type": "final", "text": "hello world", "confidence": 1.0}
+```bash
+# Interactive sandbox (recommended)
+./scripts/test-sandbox.sh
 
-// Errors
-{"type": "error", "code": "BUFFER_FULL", "message": "..."}
+# Inside the container:
+bash /mnt/install.sh              # Test install
+bash /mnt/install.sh --uninstall  # Test uninstall
+nvidia-smi                        # Verify GPU
+exit                              # Done (container auto-deletes)
 ```
 
-### Error Codes
+Other modes:
+```bash
+./scripts/test-sandbox.sh --auto   # Non-interactive full test
+./scripts/test-sandbox.sh --clean  # Remove image to rebuild fresh
+```
 
-| Code | Description |
-|------|-------------|
-| `NOT_CONFIGURED` | Audio sent before config message |
-| `BUFFER_FULL` | Audio exceeds 30s limit |
-| `PARSE_ERROR` | Invalid JSON message |
-| `TRANSCRIPTION_ERROR` | Model inference failed |
-| `SERVER_FULL` | Max connections reached |
-| `INTERNAL` | Unexpected server error |
+Requires Docker and [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html).
 
-## Pre-downloading Models
+### x86_64 Installation
+
+For x86_64 systems with NVIDIA GPU:
+
+```bash
+# Install base package
+uv sync
+
+# Install with GPU support (x86_64 only)
+uv sync --extra gpu
+
+# Or manually install GPU runtime
+pip install onnxruntime-gpu
+```
+
+### ARM64 / GB10 Manual Installation
+
+If the install script doesn't work, here are the manual steps:
+
+```bash
+# Install base package (requires Python 3.12)
+uv sync --python 3.12
+
+# Install ARM64 GPU wheel (not available on PyPI)
+uv pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/onnxruntime_gpu-1.24.0-cp312-cp312-linux_aarch64.whl
+
+# Install CUDA 12 compatibility libraries
+sudo apt-get install -y libcudnn9-cuda-12 libcublas-12-6 libportaudio2
+
+# Verify GPU is available
+python -c "import onnxruntime as ort; print(ort.get_available_providers())"
+# Should show: ['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider']
+```
+
+### Running on CUDA 13
+
+The Ultralytics wheel was built for CUDA 12. On CUDA 13 systems (GB10), set the library path to use CUDA 12 cuBLAS:
+
+```bash
+export LD_LIBRARY_PATH=/usr/local/cuda-12.6/targets/sbsa-linux/lib:$LD_LIBRARY_PATH
+stt-server  # or any other command
+```
+
+The provided shell scripts (`stt-server.sh`, `stt-client.sh`) set this automatically.
+
+### Pre-downloading Models
 
 Models are automatically downloaded on first use. For offline deployment:
 
@@ -125,10 +189,26 @@ Models are automatically downloaded on first use. For offline deployment:
 ./scripts/download-models.sh
 
 # Download multilingual model
-./scripts/download-models.sh parakeet-tdt-0.6b-v3
+./scripts/download-models.sh nemo-parakeet-tdt-0.6b-v3
+
+# List available models
+./scripts/download-models.sh --list
 ```
 
-## Python API
+### Server and Client Options
+
+```bash
+# Server with options
+stt-server --host 0.0.0.0 --port 8080 --provider tensorrt -v
+
+# Client modes
+stt-client                  # Record and print to stdout
+stt-client --output type    # Type into focused window (Linux)
+stt-client --output clipboard  # Copy to clipboard
+stt-client --test           # Test connection only
+```
+
+### Python API
 
 ```python
 from stt_service import Transcriber, PTTClient, settings
@@ -146,6 +226,47 @@ async def main():
     await client.disconnect()
 ```
 
+### WebSocket Protocol
+
+#### Client → Server
+
+```json
+// Configuration (send first)
+{"type": "config", "sample_rate": 16000, "language": "en"}
+
+// Audio: Binary frames (16-bit PCM, mono)
+
+// End stream
+{"type": "end"}
+
+// Keep alive
+{"type": "keepalive"}
+```
+
+#### Server → Client
+
+```json
+// Ready
+{"type": "ready", "session_id": "abc123"}
+
+// Final transcription
+{"type": "final", "text": "hello world", "confidence": 1.0}
+
+// Errors
+{"type": "error", "code": "BUFFER_FULL", "message": "..."}
+```
+
+#### Error Codes
+
+| Code | Description |
+|------|-------------|
+| `NOT_CONFIGURED` | Audio sent before config message |
+| `BUFFER_FULL` | Audio exceeds 30s limit |
+| `PARSE_ERROR` | Invalid JSON message |
+| `TRANSCRIPTION_ERROR` | Model inference failed |
+| `SERVER_FULL` | Max connections reached |
+| `INTERNAL` | Unexpected server error |
+
 ## Architecture
 
 ```
@@ -156,6 +277,14 @@ async def main():
                         ◄──────────     └─────────────────────────┘
                         JSON transcripts
 ```
+
+## Features
+
+- Real-time speech transcription via WebSocket
+- Push-to-talk (PTT) client with multiple output modes
+- GPU-only execution (CUDA/TensorRT) - fails fast if unavailable
+- Configurable via environment variables
+- 30-second max audio length per transcription
 
 ## License
 

@@ -1,0 +1,147 @@
+// VS Code Terminal Keybindings for Power Users
+// ==============================================
+// Passes keybindings through to terminal tools: Zellij, kitty, Claude Code, readline
+// 
+// Usage: Copy contents to your keybindings.json (Ctrl+Shift+P -> "Preferences: Open Keyboard Shortcuts (JSON)")
+// Pair with: vscode-terminal-settings.json for complete terminal passthrough
+//
+// Version: 1.0.0
+// Tools supported: Zellij, kitty, Claude Code, zsh/bash readline
+// Total bindings: 86 (26 unbinds + 50 passthroughs + 10 restores)
+
+[
+    // ══════════════════════════════════════════════════════════════════════════════
+    // VS CODE UNBINDS (remove defaults that conflict with terminal tools)
+    // ══════════════════════════════════════════════════════════════════════════════
+    
+    // Ctrl+K is a chord starter in VS Code - must fully disable
+    { "key": "ctrl+k", "command": "-workbench.action.terminal.clear", "when": "terminalFocus" },
+    { "key": "ctrl+k ctrl+s", "command": "-workbench.action.openGlobalKeybindings" },
+    
+    // Zellij mode keys - unbind VS Code defaults
+    { "key": "ctrl+b", "command": "-workbench.action.toggleSidebarVisibility" },
+    { "key": "ctrl+h", "command": "-workbench.action.replaceInFiles" },
+    { "key": "ctrl+o", "command": "-workbench.action.files.openFile" },
+    { "key": "ctrl+q", "command": "-workbench.action.quit" },
+    { "key": "ctrl+g", "command": "-workbench.action.gotoLine" },
+    { "key": "ctrl+g", "command": "-editor.cancelOperation" },
+    
+    // Readline keys - unbind VS Code defaults  
+    { "key": "ctrl+p", "command": "-workbench.action.quickOpen" },
+    { "key": "ctrl+p", "command": "-workbench.action.quickOpenNavigateNextInFilePicker" },
+    { "key": "ctrl+n", "command": "-workbench.action.files.newUntitledFile" },
+    { "key": "ctrl+n", "command": "-workbench.action.quickOpenNavigatePreviousInFilePicker" },
+    { "key": "ctrl+f", "command": "-actions.find" },
+    { "key": "ctrl+f", "command": "-workbench.action.terminal.focusFind" },
+    { "key": "ctrl+t", "command": "-workbench.action.showAllSymbols" },
+    { "key": "ctrl+w", "command": "-workbench.action.closeActiveEditor" },
+    { "key": "ctrl+j", "command": "-workbench.action.togglePanel" },
+    { "key": "ctrl+l", "command": "-expandLineSelection" },
+    { "key": "ctrl+r", "command": "-workbench.action.reloadWindow" },
+    { "key": "ctrl+s", "command": "-workbench.action.files.save" },
+    { "key": "ctrl+e", "command": "-workbench.action.quickOpen" },
+    { "key": "ctrl+a", "command": "-editor.action.selectAll" },
+    { "key": "ctrl+u", "command": "-cursorUndo" },
+    { "key": "ctrl+y", "command": "-redo" },
+    { "key": "ctrl+d", "command": "-editor.action.addSelectionToNextFindMatch" },
+    
+    // Alt keys - unbind VS Code defaults
+    { "key": "alt+f", "command": "-" },
+    { "key": "alt+b", "command": "-" },
+    
+    // ══════════════════════════════════════════════════════════════════════════════
+    // READLINE / SHELL BASICS (zsh, bash, Claude Code text editing)
+    // ══════════════════════════════════════════════════════════════════════════════
+    
+    // Line editing
+    { "key": "ctrl+a", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0001" }, "when": "terminalFocus" },
+    { "key": "ctrl+e", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0005" }, "when": "terminalFocus" },
+    { "key": "ctrl+k", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u000b" }, "when": "terminalFocus" },
+    { "key": "ctrl+u", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0015" }, "when": "terminalFocus" },
+    { "key": "ctrl+w", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0017" }, "when": "terminalFocus" },
+    { "key": "ctrl+y", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0019" }, "when": "terminalFocus" },
+    { "key": "ctrl+t", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0014" }, "when": "terminalFocus" },
+    { "key": "ctrl+d", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0004" }, "when": "terminalFocus" },
+    { "key": "ctrl+l", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u000c" }, "when": "terminalFocus" },
+    { "key": "ctrl+j", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u000a" }, "when": "terminalFocus" },
+    
+    // Word navigation (emacs style)
+    { "key": "alt+b", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bb" }, "when": "terminalFocus" },
+    { "key": "alt+f", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bf" }, "when": "terminalFocus" },
+    { "key": "alt+d", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bd" }, "when": "terminalFocus" },
+    { "key": "alt+backspace", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001b\u007f" }, "when": "terminalFocus" },
+    { "key": "alt+y", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001by" }, "when": "terminalFocus" },
+    
+    // History
+    { "key": "ctrl+r", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0012" }, "when": "terminalFocus" },
+    { "key": "ctrl+s", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0013" }, "when": "terminalFocus" },
+    { "key": "ctrl+p", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0010" }, "when": "terminalFocus" },
+    { "key": "ctrl+n", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u000e" }, "when": "terminalFocus" },
+    { "key": "alt+.", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001b." }, "when": "terminalFocus" },
+    
+    // Misc readline
+    { "key": "ctrl+g", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0007" }, "when": "terminalFocus" },
+    { "key": "ctrl+_", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001f" }, "when": "terminalFocus" },
+    { "key": "ctrl+shift+-", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001f" }, "when": "terminalFocus" },
+    
+    // ══════════════════════════════════════════════════════════════════════════════
+    // ZELLIJ MODE SWITCHES
+    // ══════════════════════════════════════════════════════════════════════════════
+    
+    { "key": "ctrl+b", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0002" }, "when": "terminalFocus" },
+    { "key": "ctrl+h", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0008" }, "when": "terminalFocus" },
+    { "key": "ctrl+o", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u000f" }, "when": "terminalFocus" },
+    { "key": "ctrl+q", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0011" }, "when": "terminalFocus" },
+    { "key": "ctrl+f", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u0006" }, "when": "terminalFocus" },
+    
+    // Zellij Alt bindings (pane/tab navigation)
+    { "key": "alt+h", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bh" }, "when": "terminalFocus" },
+    { "key": "alt+j", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bj" }, "when": "terminalFocus" },
+    { "key": "alt+k", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bk" }, "when": "terminalFocus" },
+    { "key": "alt+l", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bl" }, "when": "terminalFocus" },
+    { "key": "alt+n", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bn" }, "when": "terminalFocus" },
+    { "key": "alt+p", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bp" }, "when": "terminalFocus" },
+    { "key": "alt+i", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bi" }, "when": "terminalFocus" },
+    { "key": "alt+o", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bo" }, "when": "terminalFocus" },
+    { "key": "alt+[", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001b[" }, "when": "terminalFocus" },
+    { "key": "alt+]", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001b]" }, "when": "terminalFocus" },
+    { "key": "alt+=", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001b=" }, "when": "terminalFocus" },
+    { "key": "alt+-", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001b-" }, "when": "terminalFocus" },
+    { "key": "alt+shift+p", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bP" }, "when": "terminalFocus" },
+    
+    // Zellij arrow key variants
+    { "key": "alt+left", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001b[1;3D" }, "when": "terminalFocus" },
+    { "key": "alt+right", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001b[1;3C" }, "when": "terminalFocus" },
+    { "key": "alt+up", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001b[1;3A" }, "when": "terminalFocus" },
+    { "key": "alt+down", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001b[1;3B" }, "when": "terminalFocus" },
+    
+    // ══════════════════════════════════════════════════════════════════════════════
+    // CLAUDE CODE SPECIFIC
+    // ══════════════════════════════════════════════════════════════════════════════
+    
+    { "key": "alt+t", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bt" }, "when": "terminalFocus" },
+    { "key": "alt+m", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bm" }, "when": "terminalFocus" },
+    { "key": "alt+v", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001bv" }, "when": "terminalFocus" },
+    
+    // ══════════════════════════════════════════════════════════════════════════════
+    // ESCAPE KEY (for Vim mode in Claude Code)
+    // ══════════════════════════════════════════════════════════════════════════════
+    
+    { "key": "escape", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\u001b" }, "when": "terminalFocus && !terminalFindVisible" },
+    
+    // ══════════════════════════════════════════════════════════════════════════════
+    // RESTORE VS CODE COMMANDS (only work OUTSIDE terminal focus)
+    // ══════════════════════════════════════════════════════════════════════════════
+    
+    // These restore the commands but only when NOT in terminal
+    { "key": "ctrl+s", "command": "workbench.action.files.save", "when": "!terminalFocus" },
+    { "key": "ctrl+p", "command": "workbench.action.quickOpen", "when": "!terminalFocus" },
+    { "key": "ctrl+n", "command": "workbench.action.files.newUntitledFile", "when": "!terminalFocus" },
+    { "key": "ctrl+w", "command": "workbench.action.closeActiveEditor", "when": "!terminalFocus" },
+    { "key": "ctrl+f", "command": "actions.find", "when": "!terminalFocus" },
+    { "key": "ctrl+g", "command": "workbench.action.gotoLine", "when": "!terminalFocus && editorFocus" },
+    { "key": "ctrl+b", "command": "workbench.action.toggleSidebarVisibility", "when": "!terminalFocus" },
+    { "key": "ctrl+j", "command": "workbench.action.togglePanel", "when": "!terminalFocus" },
+    { "key": "ctrl+o", "command": "workbench.action.files.openFile", "when": "!terminalFocus" },
+    { "key": "ctrl+h", "command": "workbench.action.replaceInFiles", "when": "!terminalFocus" }
+]

@@ -30,7 +30,7 @@ The `scripts/setup-ai-dev-stack.sh` script provides an idempotent setup for a co
 - **File Manager**: Yazi (fast, Rust-based TUI file manager with previews)
 - **Multiplexer**: Zellij (modern terminal multiplexer with custom p10k theme)
 - **Tiling**: Pop Shell (GNOME tiling extension with optimized settings)
-- **CLI Tools**: ripgrep, fd, fzf, bat, eza, delta
+- **CLI Tools**: ripgrep, fd, fzf, bat, eza, delta, glow
 - **Runtimes**: NVM + Node.js 22 LTS, Mamba + Python dev environment, Bun
 - **Utilities**: direnv for per-project environment variables
 

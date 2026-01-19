@@ -6,7 +6,8 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12.3"
 dependencies = [
-    "onnx-asr>=0.3.0",
+    "onnx-asr>=0.10.0",  # API changed in 0.10 (path= parameter)
+    "huggingface_hub>=0.20.0",  # Required by onnx-asr for model downloads (not declared)
     # NOTE: onnx-asr depends on onnxruntime. For GPU support, install onnxruntime-gpu
     # separately: pip install onnxruntime-gpu (replaces onnxruntime)
     "websockets>=13.0",
@@ -18,8 +19,13 @@ dependencies = [
 
 [project.optional-dependencies]
 gpu = [
-    # Install GPU runtime - will replace CPU-only onnxruntime from onnx-asr
-    "onnxruntime-gpu>=1.18.0",
+    # PyPI onnxruntime-gpu doesn't have ARM64 wheels
+    # For ARM64 (GB10/DGX Spark), see README for manual installation
+    "onnxruntime-gpu>=1.18.0; platform_machine != 'aarch64'",
+]
+gpu-arm64 = [
+    # ARM64 GPU requires manual wheel installation from Ultralytics
+    # pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/onnxruntime_gpu-1.24.0-cp312-cp312-linux_aarch64.whl
 ]
 dev = [
     "pytest>=8.0.0",

@@ -80,7 +80,7 @@ class Transcriber:
     def load(self) -> None:
         """Load the ONNX model.
 
-        Uses local_directory if models_dir exists and contains the model,
+        Uses path if models_dir exists and contains the model,
         otherwise lets onnx-asr download from HuggingFace.
 
         Raises:
@@ -97,22 +97,22 @@ class Transcriber:
         providers = self._get_providers()
 
         # Check for local model directory
-        local_dir = None
+        model_path = None
         if self.config.models_dir.exists():
             # Look for model subdirectory matching the model name pattern
             # e.g., "nemo-parakeet-tdt-0.6b-v2" -> "parakeet-tdt-0.6b-v2"
             model_short_name = self.config.name.removeprefix("nemo-")
             potential_dir = self.config.models_dir / model_short_name
             if potential_dir.exists():
-                local_dir = str(potential_dir)
-                logger.info(f"Using local model from: {local_dir}")
+                model_path = str(potential_dir)
+                logger.info(f"Using local model from: {model_path}")
 
         logger.info(f"Loading model {self.config.name} with GPU providers: {providers}")
 
         try:
             self._model = onnx_asr.load_model(
                 self.config.name,
-                local_directory=local_dir,
+                path=model_path,
                 providers=providers,
             )
         except Exception as e:
