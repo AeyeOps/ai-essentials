@@ -77,14 +77,14 @@ class PTTConfig(BaseSettings):
         default=["LEFTCTRL", "LEFTMETA"],
         description="PTT hotkey as list of key names (e.g., ['LEFTCTRL', 'LEFTMETA'])",
     )
-    # Terminal hotkey - control character for terminal testing
-    # Common: ctrl+r=\x12, ctrl+t=\x14, ctrl+y=\x19, ctrl+space=\x00
+    # Terminal hotkey for Docker/SSH testing
+    # Using spacebar - intuitive for PTT and not intercepted by terminals
     terminal_hotkey: str = Field(
-        default="\x12",  # Ctrl+R
-        description="Terminal PTT key (control char, e.g., \\x12 for Ctrl+R)",
+        default=" ",  # Spacebar
+        description="Terminal PTT key (default: spacebar)",
     )
     terminal_hotkey_name: str = Field(
-        default="Ctrl+R",
+        default="SPACE",
         description="Human-readable name for terminal hotkey",
     )
     click_sound: bool = Field(

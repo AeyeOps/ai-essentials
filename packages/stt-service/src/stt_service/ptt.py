@@ -1,7 +1,11 @@
-"""Push-to-Talk (PTT) hotkey listener using evdev.
+"""Push-to-Talk (PTT) controller with pluggable hotkey listeners.
 
-Captures global hotkeys even when application doesn't have focus.
-Requires read access to /dev/input/event* (typically 'input' group).
+Supports two hotkey detection strategies:
+- EvdevHotkeyListener: Global hotkeys via evdev (production, requires /dev/input access)
+- TerminalHotkeyListener: Terminal raw mode (Docker/SSH testing, no special permissions)
+
+The PTTController handles state machine, sounds, and duration enforcement.
+Only the hotkey detection differs between environments.
 """
 
 import asyncio
@@ -23,11 +27,16 @@ class PTTState(Enum):
     PROCESSING = auto()  # Transcribing, ignore key events
 
 
-class HotkeyListener:
-    """Global hotkey listener using evdev.
+class EvdevHotkeyListener:
+    """Global hotkey listener using evdev (production).
 
     Monitors keyboard for configured hotkey combo (e.g., Ctrl+Super).
     Fires callbacks when hotkey is pressed/released.
+
+    Interface (duck typing):
+        - __init__(on_activate, on_deactivate, ...)
+        - async start() -> None
+        - stop() -> None
     """
 
     def __init__(
@@ -174,12 +183,114 @@ class HotkeyListener:
                 pass
 
 
+class TerminalHotkeyListener:
+    """Terminal-based hotkey listener for Docker/SSH testing.
+
+    Uses terminal raw mode to detect key press/release.
+    Detects release via key repeat timeout (no evdev required).
+
+    Interface (duck typing - same as EvdevHotkeyListener):
+        - __init__(on_activate, on_deactivate, ...)
+        - async start() -> None
+        - stop() -> None
+    """
+
+    # Key release detection timeout - if no key repeat within this time, key was released
+    # Typical key repeat interval is ~30-50ms, so 150ms is safe
+    KEY_RELEASE_TIMEOUT = 0.15
+
+    def __init__(
+        self,
+        on_activate: Callable[[], None],
+        on_deactivate: Callable[[], None],
+        hotkey_char: Optional[str] = None,
+    ):
+        """Initialize terminal hotkey listener.
+
+        Args:
+            on_activate: Called when hotkey is pressed
+            on_deactivate: Called when hotkey is released
+            hotkey_char: Control character to detect (e.g., '\\x12' for Ctrl+R).
+                         Default from settings.ptt.terminal_hotkey.
+        """
+        self.on_activate = on_activate
+        self.on_deactivate = on_deactivate
+        self.hotkey_char = hotkey_char or settings.ptt.terminal_hotkey
+        self._running = False
+        self._old_settings = None
+
+    async def start(self) -> None:
+        """Start listening for hotkey in terminal raw mode."""
+        import sys
+        import tty
+        import termios
+        import select
+
+        fd = sys.stdin.fileno()
+        self._old_settings = termios.tcgetattr(fd)
+        self._running = True
+
+        hotkey_name = settings.ptt.terminal_hotkey_name
+
+        try:
+            tty.setraw(fd)
+            loop = asyncio.get_event_loop()
+
+            while self._running:
+                # Wait for keypress
+                logger.debug(f"Terminal listener waiting for {hotkey_name}")
+                char = await loop.run_in_executor(None, sys.stdin.read, 1)
+
+                if not self._running:
+                    break
+
+                if char.lower() == 'q' or char == '\x1b':  # 'q' or ESC
+                    logger.info("Quit key pressed")
+                    break
+
+                if char == self.hotkey_char:
+                    # Key down - activate
+                    logger.debug("Terminal hotkey activated")
+                    self.on_activate()
+
+                    # Wait for key release (detected via key repeat timeout)
+                    while self._running:
+                        ready, _, _ = select.select([sys.stdin], [], [], self.KEY_RELEASE_TIMEOUT)
+
+                        if ready:
+                            # Key still held (repeat char received)
+                            next_char = sys.stdin.read(1)
+                            if next_char != self.hotkey_char:
+                                # Different key pressed, treat as release
+                                break
+                        else:
+                            # Timeout - key was released
+                            break
+
+                    # Key up - deactivate
+                    logger.debug("Terminal hotkey deactivated")
+                    self.on_deactivate()
+
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, self._old_settings)
+
+    def stop(self) -> None:
+        """Stop listening."""
+        self._running = False
+
+
 class PTTController:
     """Push-to-Talk controller managing state and audio feedback."""
 
-    def __init__(self):
+    def __init__(self, listener=None):
+        """Initialize PTT controller.
+
+        Args:
+            listener: HotkeyListener instance (EvdevHotkeyListener or TerminalHotkeyListener).
+                      If None, defaults to EvdevHotkeyListener (production).
+        """
         self.state = PTTState.IDLE
-        self._listener: Optional[HotkeyListener] = None
+        self._listener = listener
         self._on_start_recording: Optional[Callable[[], None]] = None
         self._on_stop_recording: Optional[Callable[[], None]] = None
         self._auto_submitted = False  # Track if we auto-submitted due to limit
@@ -309,10 +420,16 @@ class PTTController:
 
     async def run(self) -> None:
         """Run the PTT controller."""
-        self._listener = HotkeyListener(
-            on_activate=self._on_hotkey_activate,
-            on_deactivate=self._on_hotkey_deactivate,
-        )
+        # Use injected listener, or create default (evdev for production)
+        if self._listener is None:
+            self._listener = EvdevHotkeyListener(
+                on_activate=self._on_hotkey_activate,
+                on_deactivate=self._on_hotkey_deactivate,
+            )
+        else:
+            # Wire callbacks to injected listener
+            self._listener.on_activate = self._on_hotkey_activate
+            self._listener.on_deactivate = self._on_hotkey_deactivate
 
         try:
             await self._listener.start()

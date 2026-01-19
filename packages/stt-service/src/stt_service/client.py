@@ -20,20 +20,6 @@ from .protocol import ConfigMessage
 logger = logging.getLogger(__name__)
 
 
-# PTT mode imports (optional - only needed with --ptt flag)
-def _import_ptt():
-    """Import PTT module on demand."""
-    try:
-        from .ptt import PTTController, PTTState
-        return PTTController, PTTState
-    except ImportError as e:
-        logger.error(
-            f"PTT mode requires evdev. Install with: pip install evdev\n"
-            f"Also ensure you have /dev/input access: sudo usermod -a -G input $USER"
-        )
-        raise
-
-
 class PTTClient:
     """Push-to-talk client that streams audio to STT server."""
 
@@ -320,12 +306,44 @@ def output_text(text: str, mode: str) -> None:
 
 
 def setup_logging(verbose: bool = False) -> None:
-    """Configure logging."""
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+    """Configure logging to file (DEBUG level), console stays clean.
+
+    Args:
+        verbose: If True, also log to console at DEBUG level.
+
+    Log locations:
+        - Interactive: ~/.local/state/stt-service/client.log
+        - Override: STT_LOG_DIR environment variable
+        - systemd: use journalctl -u stt-client
+    """
+    from pathlib import Path
+
+    # XDG state directory (standard for logs/state in user space)
+    xdg_state = os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state"))
+    log_dir = Path(os.environ.get("STT_LOG_DIR", f"{xdg_state}/stt-service"))
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "client.log"
+
+    # File handler - always DEBUG, with rotation-friendly append
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    ))
+
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    root_logger.addHandler(file_handler)
+
+    # Console handler only if verbose
+    if verbose:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        console_handler.setFormatter(logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        ))
+        root_logger.addHandler(console_handler)
 
 
 async def run_client(args: argparse.Namespace) -> int:
@@ -361,196 +379,38 @@ async def run_client(args: argparse.Namespace) -> int:
         await client.disconnect()
 
 
-def _play_ptt_sound(sound_type: str) -> None:
-    """Play PTT audio feedback sound."""
-    try:
-        sample_rate = 44100
-        duration = 0.08  # 80ms
-
-        t = np.linspace(0, duration, int(sample_rate * duration), False)
-
-        if sound_type == "click":
-            freq = 880  # A5 - higher pitch "on air"
-            envelope = np.exp(-t * 15) * (1 - np.exp(-t * 100))
-        else:
-            freq = 440  # A4 - lower pitch "off air"
-            envelope = np.exp(-t * 20) * (1 - np.exp(-t * 100))
-
-        sound = np.sin(2 * np.pi * freq * t) * envelope
-        sound = (sound * 0.25).astype(np.float32)
-        sd.play(sound, sample_rate)
-    except Exception as e:
-        logger.debug(f"Could not play sound: {e}")
-
-
-async def run_ptt_terminal_mode(args: argparse.Namespace) -> int:
-    """Run PTT mode with hold-to-record (SPACE key simulates Ctrl+Super)."""
-    import sys
-    import tty
-    import termios
-    import select
-
-    output_mode = args.output or settings.client.output_mode
-    server_url = args.server or settings.client.server_url
-    max_duration = settings.ptt.max_duration_seconds
-
-    client = PTTClient(server_url=server_url)
-
-    # Connect
-    for attempt in range(settings.client.reconnect_attempts):
-        if await client.connect():
-            break
-        logger.warning(f"Connection attempt {attempt + 1} failed...")
-        await asyncio.sleep(settings.client.reconnect_delay * (2 ** attempt))
-    else:
-        logger.error("Failed to connect to server")
-        return 1
-
-    hotkey_char = settings.ptt.terminal_hotkey
-    hotkey_name = settings.ptt.terminal_hotkey_name
-
-    print(f"\n[PTT] Terminal mode (hold-to-record)")
-    print(f"   HOLD [{hotkey_name}] = record, RELEASE = transcribe")
-    print(f"   Output: {output_mode}")
-    print(f"   Max duration: {max_duration}s")
-    print(f"   Press 'q' to quit.\n")
-
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-
-    # Key release detection timeout (ms) - if no key repeat within this time, key was released
-    KEY_RELEASE_TIMEOUT = 0.15  # 150ms - typical key repeat interval is ~30-50ms
-
-    try:
-        tty.setraw(fd)
-
-        while True:
-            # Wait for keypress
-            print(f"\rReady. HOLD [{hotkey_name}] to record...        \r", end='', flush=True)
-
-            loop = asyncio.get_event_loop()
-            char = await loop.run_in_executor(None, sys.stdin.read, 1)
-
-            if char.lower() == 'q':
-                print("\r\nQuitting...\r\n")
-                break
-
-            if char == hotkey_char:
-                # === KEY DOWN: Start recording ===
-                _play_ptt_sound("click")
-                print(f"\r* Recording... (release [{hotkey_name}] to stop)\r", end='', flush=True)
-
-                await client.send_config()
-                audio_chunks = []
-                recording_start = time.perf_counter()
-                auto_submitted = False
-
-                def audio_callback(indata, frames, time_info, status):
-                    audio_chunks.append(indata.copy())
-
-                stream = sd.InputStream(
-                    samplerate=settings.audio.sample_rate,
-                    channels=settings.audio.channels,
-                    dtype=np.int16,
-                    blocksize=settings.audio.chunk_samples,
-                    callback=audio_callback,
-                )
-                stream.start()
-
-                # Record while SPACE is held (detect release via key repeat timeout)
-                while True:
-                    # Check for max duration
-                    elapsed = time.perf_counter() - recording_start
-                    if elapsed >= max_duration:
-                        print(f"\r[!] Max duration ({max_duration}s) reached, auto-submitting...\r")
-                        auto_submitted = True
-                        break
-
-                    # Check if key is still held (key repeat sends more chars)
-                    # Use select to check with timeout
-                    ready, _, _ = select.select([sys.stdin], [], [], KEY_RELEASE_TIMEOUT)
-
-                    if ready:
-                        # Key is still held (repeat char received)
-                        next_char = sys.stdin.read(1)
-                        if next_char != hotkey_char:
-                            # Different key pressed, treat as release
-                            break
-                    else:
-                        # Timeout - key was released
-                        break
-
-                # === KEY UP: Stop and submit ===
-                stream.stop()
-                stream.close()
-
-                _play_ptt_sound("unclick")
-                duration = time.perf_counter() - recording_start
-                print(f"\r... Processing ({duration:.1f}s audio)...            \r", end='', flush=True)
-
-                if not audio_chunks:
-                    print("\r(no audio captured)\r\n")
-                    continue
-
-                # Send to server
-                t_start = time.perf_counter()
-                audio = np.concatenate(audio_chunks)
-
-                chunk_size = settings.audio.chunk_samples
-                for i in range(0, len(audio), chunk_size):
-                    chunk = audio[i:i + chunk_size]
-                    await client.websocket.send(chunk.tobytes())
-
-                await client.websocket.send(json.dumps({"type": "end"}))
-
-                try:
-                    response = await asyncio.wait_for(client.websocket.recv(), timeout=30.0)
-                    msg = json.loads(response)
-                    t_done = time.perf_counter()
-
-                    if msg.get("type") == "final":
-                        text = msg.get("text", "")
-                        latency_ms = (t_done - t_start) * 1000
-                        print(f"\r[OK] {duration:.1f}s -> {latency_ms:.0f}ms                    \r\n")
-
-                        if text:
-                            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-                            output_text(text, output_mode)
-                            print()  # newline after output
-                            tty.setraw(fd)
-                        else:
-                            print("(silence)\r\n")
-                    else:
-                        print(f"\rError: {msg.get('message', 'unknown')}\r\n")
-
-                except asyncio.TimeoutError:
-                    print("\rTimeout waiting for transcription\r\n")
-
-                # If auto-submitted, drain any remaining key repeats
-                if auto_submitted:
-                    while select.select([sys.stdin], [], [], 0.1)[0]:
-                        sys.stdin.read(1)
-
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        await client.disconnect()
-
-    return 0
-
-
 async def run_ptt_mode(args: argparse.Namespace) -> int:
-    """Run continuous PTT mode with global hotkey."""
-    try:
-        PTTController, PTTState = _import_ptt()
-    except ImportError:
-        # Fall back to terminal mode if evdev not available
-        logger.info("evdev not available, using terminal mode")
-        return await run_ptt_terminal_mode(args)
+    """Run continuous PTT mode with global hotkey.
+
+    Uses EvdevHotkeyListener for production (global Ctrl+Super),
+    falls back to TerminalHotkeyListener for Docker/SSH testing.
+    """
+    from .ptt import PTTController, PTTState, TerminalHotkeyListener
 
     output_mode = args.output or settings.client.output_mode
     server_url = args.server or settings.client.server_url
 
-    ptt = PTTController()
+    # Try evdev first (production), fall back to terminal (Docker)
+    listener = None
+    try:
+        # Check if evdev is available (it's imported inside EvdevHotkeyListener methods)
+        import evdev  # noqa: F401
+        from .ptt import EvdevHotkeyListener
+        listener = EvdevHotkeyListener(
+            on_activate=lambda: None,  # Callbacks wired by PTTController.run()
+            on_deactivate=lambda: None,
+        )
+        hotkey_str = "+".join(settings.ptt.hotkey)
+        logger.info(f"Using evdev hotkey listener ({hotkey_str})")
+    except ImportError:
+        logger.info("evdev not available, using terminal mode")
+        listener = TerminalHotkeyListener(
+            on_activate=lambda: None,
+            on_deactivate=lambda: None,
+        )
+        hotkey_str = settings.ptt.terminal_hotkey_name
+
+    ptt = PTTController(listener=listener)
     client: Optional[PTTClient] = None
 
     # Shared state for PTT callbacks
@@ -681,12 +541,15 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
 
     ptt.set_callbacks(on_start=on_start, on_stop=on_stop)
 
-    # Print startup message
-    hotkey_str = "+".join(settings.ptt.hotkey)
+    # Print startup message (hotkey_str set during listener selection above)
+    is_terminal_mode = isinstance(listener, TerminalHotkeyListener)
     print(f"\n[PTT] Mode active. Hold [{hotkey_str}] to record, release to transcribe.")
     print(f"   Output: {output_mode}")
     print(f"   Server: {server_url}")
-    print(f"   Press Ctrl+C to exit.\n")
+    if is_terminal_mode:
+        print(f"   Press 'q', ESC, or Ctrl+C to exit.\n")
+    else:
+        print(f"   Press Ctrl+C to exit.\n")
 
     try:
         await ptt.run()

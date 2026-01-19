@@ -196,17 +196,30 @@ run_auto() {
             exec tail -f /dev/null
         '
 
-    info "Container started - tailing install logs..."
+    info "Container started - waiting for install to complete..."
     echo ""
 
-    # Follow logs until install completes (tail -f /dev/null keeps container alive but produces no output)
-    docker logs -f "$CONTAINER_NAME" 2>&1 | while IFS= read -r line; do
-        echo "$line"
-        # Stop tailing when we see the completion message
-        if [[ "$line" == *"Install complete"* ]]; then
-            sleep 1
+    # Poll logs until install completes (simpler and more reliable than -f with pipes)
+    local last_lines=0
+    while true; do
+        # Get current log length
+        local log_output
+        log_output=$(docker logs "$CONTAINER_NAME" 2>&1)
+        local current_lines
+        current_lines=$(echo "$log_output" | wc -l)
+
+        # Print new lines since last check
+        if [[ $current_lines -gt $last_lines ]]; then
+            echo "$log_output" | tail -n +$((last_lines + 1))
+            last_lines=$current_lines
+        fi
+
+        # Check if install complete
+        if echo "$log_output" | grep -q "Install complete"; then
             break
         fi
+
+        sleep 1
     done
 
     echo ""
