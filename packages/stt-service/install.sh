@@ -790,7 +790,6 @@ setup_service() {
     # Detect container environment
     if [[ -f /.dockerenv ]] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
         info "Docker detected - systemd not available"
-        info "To test: ./scripts/stt-server.sh & sleep 3 && ./scripts/stt-client.sh"
         return
     fi
 
@@ -883,6 +882,14 @@ show_completion() {
     echo "  # Load PATH (new terminal or first run)"
     echo -e "  ${DIM}source ~/.bashrc${NC}"
     echo ""
+
+    # Docker: show one-liner test option
+    if [[ -f /.dockerenv ]] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
+        echo "  # Test in single terminal (Docker)"
+        echo -e "  ${DIM}cd $INSTALL_DIR && (./scripts/stt-server.sh &) && sleep 3 && ./scripts/stt-client.sh${NC}"
+        echo ""
+    fi
+
     echo "  # Start the server"
     echo -e "  ${DIM}cd $INSTALL_DIR && ./scripts/stt-server.sh${NC}"
     echo ""
