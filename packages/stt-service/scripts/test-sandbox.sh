@@ -47,17 +47,19 @@ The container is disposable - delete it anytime with --clean.
 
 USAGE:
     ./test-sandbox.sh              Interactive shell (recommended for first test)
-    ./test-sandbox.sh --auto       Install and start server, then attach to test audio
+    ./test-sandbox.sh --auto       Non-interactive install, then attach to test
     ./test-sandbox.sh --attach     Attach new shell to running container
     ./test-sandbox.sh --clean      Remove container and image
 
 QUICK START (--auto):
-    # Terminal 1: Install and start server
+    # Terminal 1: Run install (stops after install completes)
     ./test-sandbox.sh --auto
 
-    # Terminal 2: Attach and test audio
+    # Terminal 2: Attach and start server + client
     ./test-sandbox.sh --attach
-    cd ~/stt-service && ./scripts/stt-client.sh
+    cd ~/stt-service
+    ./scripts/stt-server.sh &
+    ./scripts/stt-client.sh
 
 MANUAL MODE (default):
     # Inside the container:
@@ -181,38 +183,39 @@ run_auto() {
             # Install
             bash /mnt/install.sh
 
-            # Source PATH for uv
-            export PATH="$HOME/.local/bin:$PATH"
-
-            # Pause before starting server
+            # Done - container stays running for manual testing
             echo ""
             echo "════════════════════════════════════════════════════════════"
-            echo "  Install complete. Server starting in 10 seconds..."
-            echo "  Open another terminal now:  ./test-sandbox.sh --attach"
-            echo "════════════════════════════════════════════════════════════"
-            sleep 10
-
-            # Start server (foreground to keep container alive)
-            cd ~/stt-service
+            echo "  Install complete. Container ready for testing."
             echo ""
-            echo "Starting server..."
-            ./scripts/stt-server.sh
+            echo "  Attach:  ./test-sandbox.sh --attach"
+            echo "  Then:    cd ~/stt-service && ./scripts/stt-server.sh"
+            echo "════════════════════════════════════════════════════════════"
+
+            # Keep container alive
+            exec tail -f /dev/null
         '
 
-    info "Container started in background"
-    info "Tailing logs (Ctrl+C to stop watching, container keeps running)..."
+    info "Container started - tailing install logs..."
     echo ""
-    warn "To test audio, open another terminal and run:"
+
+    # Follow logs until install completes (tail -f /dev/null keeps container alive but produces no output)
+    docker logs -f "$CONTAINER_NAME" 2>&1 | while IFS= read -r line; do
+        echo "$line"
+        # Stop tailing when we see the completion message
+        if [[ "$line" == *"Install complete"* ]]; then
+            sleep 1
+            break
+        fi
+    done
+
+    echo ""
+    info "Install finished. Attach to test:"
     echo "  ./test-sandbox.sh --attach"
-    echo "  cd ~/stt-service && ./scripts/stt-client.sh"
+    echo "  cd ~/stt-service && ./scripts/stt-server.sh &"
+    echo "  ./scripts/stt-client.sh"
     echo ""
-
-    # Follow logs until user hits Ctrl+C
-    docker logs -f "$CONTAINER_NAME" || true
-
-    echo ""
-    info "Container still running. Attach with: ./test-sandbox.sh --attach"
-    info "Stop with: ./test-sandbox.sh --clean"
+    info "Clean up when done: ./test-sandbox.sh --clean"
 }
 
 clean() {
