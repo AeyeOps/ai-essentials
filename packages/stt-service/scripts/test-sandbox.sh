@@ -6,7 +6,6 @@
 # Usage:
 #   ./test-sandbox.sh              # Interactive shell in fresh Ubuntu
 #   ./test-sandbox.sh --attach     # Attach new shell to running container
-#   ./test-sandbox.sh --auto       # Run installer non-interactively
 #   ./test-sandbox.sh --clean      # Remove test container/image
 #
 set -euo pipefail
@@ -42,41 +41,36 @@ show_help() {
 STT Service Test Sandbox
 
 Creates a CUDA 13 Ubuntu 24.04 container with GPU access for testing the installer.
-Base image provides CUDA runtime; installer adds CUDA 12 compat libs for onnxruntime.
 The container is disposable - delete it anytime with --clean.
 
 USAGE:
-    ./test-sandbox.sh              Interactive shell (recommended for first test)
-    ./test-sandbox.sh --auto       Non-interactive install, then attach to test
+    ./test-sandbox.sh              Interactive shell
     ./test-sandbox.sh --attach     Attach new shell to running container
     ./test-sandbox.sh --clean      Remove container and image
 
-QUICK START (--auto):
-    # Terminal 1: Run install (stops after install completes)
-    ./test-sandbox.sh --auto
+TESTING THE CURL INSTALLER:
+    # Start sandbox
+    ./test-sandbox.sh
 
-    # Terminal 2: Attach and start server + client
-    ./test-sandbox.sh --attach
+    # Inside container, run the one-liner:
+    curl -fsSL https://cdn.jsdelivr.net/gh/AeyeOps/ai-essentials@main/packages/stt-service/install.sh | bash
+
+    # Test the service
     cd ~/stt-service
     ./scripts/stt-server.sh &
-    ./scripts/stt-client.sh
+    ./scripts/stt-client.sh --ptt
 
-MANUAL MODE (default):
-    # Inside the container:
-    bash /mnt/install.sh           # Run installer
-    cd ~/stt-service
-    ./scripts/stt-server.sh        # Start server
-
-    # In another terminal:
+    # In another terminal (optional)
     ./test-sandbox.sh --attach
-    cd ~/stt-service && ./scripts/stt-client.sh
+
+TESTING LOCAL CHANGES (before push):
+    # Inside container:
+    bash /mnt/install.sh
 
 NOTES:
     - Container mounts this project at /mnt (read-only)
-    - Install goes to ~/stt-service inside container
-    - GPU is passed through via --gpus all
-    - Audio is passed through via PulseAudio and ALSA
-    - After updating this script, run --clean to rebuild the image
+    - GPU passed through via --gpus all
+    - Audio passed through via PulseAudio
 EOF
 }
 
@@ -121,10 +115,8 @@ run_interactive() {
     info "Starting interactive sandbox..."
     info "Project mounted at /mnt (read-only)"
     echo ""
-    warn "Test commands to run inside:"
-    echo "  bash /mnt/install.sh           # Interactive install"
-    echo "  bash /mnt/install.sh --help    # Show help"
-    echo "  nvidia-smi                     # Verify GPU"
+    warn "Run inside container:"
+    echo "  curl -fsSL https://cdn.jsdelivr.net/gh/AeyeOps/ai-essentials@main/packages/stt-service/install.sh | bash"
     echo ""
 
     local uid=$(id -u)
@@ -155,82 +147,6 @@ attach_to_container() {
         "$CONTAINER_NAME" bash
 }
 
-run_auto() {
-    check_prerequisites
-    build_image
-
-    info "Installing and starting server (non-interactive)..."
-    echo ""
-
-    local uid=$(id -u)
-
-    # Remove any existing container
-    docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
-
-    # Start container in background with install + server
-    docker run -d \
-        --name "$CONTAINER_NAME" \
-        --gpus all \
-        -v "$PROJECT_DIR:/mnt:ro" \
-        -e "HOME=/home/testuser" \
-        -e "STT_NONINTERACTIVE=1" \
-        --device /dev/snd \
-        --group-add audio \
-        -v "/run/user/$uid/pulse:/run/user/$uid/pulse" \
-        -e "PULSE_SERVER=unix:/run/user/$uid/pulse/native" \
-        "$IMAGE_NAME" \
-        bash -c '
-            # Install
-            bash /mnt/install.sh
-
-            # Done - container stays running for manual testing
-            echo ""
-            echo "════════════════════════════════════════════════════════════"
-            echo "  Install complete. Container ready for testing."
-            echo ""
-            echo "  Attach:  ./test-sandbox.sh --attach"
-            echo "  Then:    cd ~/stt-service && ./scripts/stt-server.sh"
-            echo "════════════════════════════════════════════════════════════"
-
-            # Keep container alive
-            exec tail -f /dev/null
-        '
-
-    info "Container started - waiting for install to complete..."
-    echo ""
-
-    # Poll logs until install completes (simpler and more reliable than -f with pipes)
-    local last_lines=0
-    while true; do
-        # Get current log length
-        local log_output
-        log_output=$(docker logs "$CONTAINER_NAME" 2>&1)
-        local current_lines
-        current_lines=$(echo "$log_output" | wc -l)
-
-        # Print new lines since last check
-        if [[ $current_lines -gt $last_lines ]]; then
-            echo "$log_output" | tail -n +$((last_lines + 1))
-            last_lines=$current_lines
-        fi
-
-        # Check if install complete
-        if echo "$log_output" | grep -q "Install complete"; then
-            break
-        fi
-
-        sleep 1
-    done
-
-    echo ""
-    info "Install finished. Attach to test:"
-    echo "  ./test-sandbox.sh --attach"
-    echo "  cd ~/stt-service && ./scripts/stt-server.sh &"
-    echo "  ./scripts/stt-client.sh"
-    echo ""
-    info "Clean up when done: ./test-sandbox.sh --clean"
-}
-
 clean() {
     info "Cleaning up sandbox..."
 
@@ -254,9 +170,6 @@ case "${1:-}" in
         ;;
     --attach)
         attach_to_container
-        ;;
-    --auto)
-        run_auto
         ;;
     --clean)
         clean

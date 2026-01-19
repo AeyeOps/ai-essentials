@@ -25,12 +25,9 @@ NONINTERACTIVE="${STT_NONINTERACTIVE:-0}"
 SKIP_MODEL="${STT_SKIP_MODEL:-0}"
 WITH_SERVICE="${STT_WITH_SERVICE:-0}"
 
-# GitHub tarball for package download
+# GitHub download URL (tarball, no git required)
 REPO_TARBALL="https://github.com/AeyeOps/ai-essentials/archive/refs/heads/main.tar.gz"
 PACKAGE_SUBDIR="ai-essentials-main/packages/stt-service"
-
-# For comparing local vs remote (git commit hash)
-GITHUB_API_COMMITS="https://api.github.com/repos/AeyeOps/ai-essentials/commits/main"
 
 # ARM64 onnxruntime wheel (not on PyPI)
 ONNX_WHEEL="https://github.com/ultralytics/assets/releases/download/v0.0.0/onnxruntime_gpu-1.24.0-cp312-cp312-linux_aarch64.whl"
@@ -168,7 +165,7 @@ download() {
     fi
 }
 
-# Download and extract tarball (fallback)
+# Download and extract tarball
 download_extract() {
     local url="$1"
     local dest="$2"
@@ -181,7 +178,6 @@ download_extract() {
         die "Neither curl nor wget found. Install one with: sudo apt install curl"
     fi
 }
-
 
 # Get available disk space in GB
 disk_space_gb() {
@@ -589,37 +585,15 @@ install_uv() {
 download_package() {
     step "Downloading STT Service..."
 
-    # Smart source detection:
-    # 1. Check if local source exists (running from git repo)
-    # 2. Compare local git HEAD with remote main branch
-    # 3. If match → use local (skip download), if mismatch → download from GitHub
+    # Detect if running from local source (e.g., /mnt in Docker sandbox)
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local use_local=0
 
-    if [[ -f "$script_dir/pyproject.toml" ]] && [[ -d "$script_dir/../.git" ]] || [[ -d "$script_dir/.git" ]]; then
-        # Running from git repo - check if we're in sync with remote
-        info "Local git repo detected, checking if it matches remote..."
-
-        local local_hash remote_hash
-        # Get local HEAD commit
-        local_hash=$(git -C "$script_dir" rev-parse HEAD 2>/dev/null)
-
-        # Get remote main commit via GitHub API
-        if has_cmd curl; then
-            remote_hash=$(curl -fsSL "$GITHUB_API_COMMITS" 2>/dev/null | grep -m1 '"sha"' | cut -d'"' -f4)
-        elif has_cmd wget; then
-            remote_hash=$(wget -qO- "$GITHUB_API_COMMITS" 2>/dev/null | grep -m1 '"sha"' | cut -d'"' -f4)
-        fi
-
-        if [[ -n "$local_hash" ]] && [[ "$local_hash" == "$remote_hash" ]]; then
-            use_local=1
-            info "Local matches remote (${local_hash:0:8}) - using local source"
-        elif [[ -n "$remote_hash" ]]; then
-            info "Local (${local_hash:0:8}) differs from remote (${remote_hash:0:8}) - downloading"
-        else
-            warn "Could not fetch remote hash - downloading from GitHub"
-        fi
+    if [[ -f "$script_dir/pyproject.toml" ]] && [[ -f "$script_dir/src/stt_service/client.py" ]]; then
+        # Running from a complete source tree - use local copy
+        use_local=1
+        info "Detected local source at: $script_dir"
     fi
 
     case "$INSTALL_MODE" in
@@ -640,7 +614,8 @@ download_package() {
                 rm -rf "$INSTALL_DIR/.venv"
                 success "Copied to $INSTALL_DIR"
             else
-                # Download from GitHub tarball
+                # Download from GitHub
+                info "Downloading from GitHub..."
                 local tmp_dir
                 tmp_dir=$(mktemp -d)
 
@@ -676,7 +651,7 @@ download_package() {
                 git pull
                 success "Updated from git"
             else
-                # Download from GitHub tarball
+                info "Re-downloading latest version..."
                 local tmp_dir
                 tmp_dir=$(mktemp -d)
 
