@@ -100,7 +100,8 @@ class Transcriber:
         local_dir = None
         if self.config.models_dir.exists():
             # Look for model subdirectory matching the model name pattern
-            model_short_name = self.config.name.replace("nemo-", "").replace("-", "-")
+            # e.g., "nemo-parakeet-tdt-0.6b-v2" -> "parakeet-tdt-0.6b-v2"
+            model_short_name = self.config.name.removeprefix("nemo-")
             potential_dir = self.config.models_dir / model_short_name
             if potential_dir.exists():
                 local_dir = str(potential_dir)
