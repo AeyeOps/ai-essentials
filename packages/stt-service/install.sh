@@ -66,16 +66,19 @@ step()    { echo -e "\n${BOLD}$1${NC}"; }
 
 # Read single character with tty fallback for piped execution (curl | bash)
 # Sets REPLY variable, echoes newline after input
+# All prompts go to /dev/tty to avoid capture in command substitution
 read_char() {
     local prompt="$1"
     if [[ -t 0 ]]; then
         read -p "$prompt" -n 1 -r
+        echo >&2
     elif [[ -e /dev/tty ]]; then
-        read -p "$prompt" -n 1 -r < /dev/tty
+        printf '%s' "$prompt" > /dev/tty
+        read -n 1 -r < /dev/tty
+        echo > /dev/tty
     else
         REPLY=""
     fi
-    echo >&2
 }
 
 # Prompt with default (respects NONINTERACTIVE)
