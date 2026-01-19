@@ -306,10 +306,10 @@ def output_text(text: str, mode: str) -> None:
 
 
 def setup_logging(verbose: bool = False) -> None:
-    """Configure logging to file (DEBUG level), console stays clean.
+    """Configure logging to file (DEBUG level).
 
     Args:
-        verbose: If True, also log to console at DEBUG level.
+        verbose: Reserved for future use. Currently all logs go to file only.
 
     Log locations:
         - Interactive: ~/.local/state/stt-service/client.log
@@ -335,15 +335,6 @@ def setup_logging(verbose: bool = False) -> None:
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
     root_logger.addHandler(file_handler)
-
-    # Console handler only if verbose
-    if verbose:
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG)
-        console_handler.setFormatter(logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        ))
-        root_logger.addHandler(console_handler)
 
 
 async def run_client(args: argparse.Namespace) -> int:
@@ -413,6 +404,12 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
     ptt = PTTController(listener=listener)
     client: Optional[PTTClient] = None
 
+    # Set up safe print function (handles terminal raw mode)
+    if hasattr(listener, 'print_normal'):
+        print_fn = listener.print_normal
+    else:
+        print_fn = print  # EvdevListener doesn't need this
+
     # Shared state for PTT callbacks
     recording_task: Optional[asyncio.Task] = None
     stream: Optional[sd.InputStream] = None
@@ -445,6 +442,7 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
         nonlocal stream, audio_chunks
 
         if not await ensure_connected():
+            print_fn("[error] Failed to connect to server")
             ptt.state = PTTState.IDLE
             return
 
@@ -480,7 +478,7 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
 
         # Concatenate audio
         if not audio_chunks:
-            logger.warning("No audio recorded")
+            print_fn("[0.0s → 0ms] (no audio)")
             ptt.on_processing_complete()
             return
 
@@ -510,18 +508,30 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
 
             if msg.get("type") == "final":
                 text = msg.get("text", "")
-                if text:
-                    logger.info(f"Transcribed ({duration:.1f}s audio in {(t_done-t_start)*1000:.0f}ms)")
-                    output_text(text, output_mode)
+                latency_ms = (t_done - t_start) * 1000
+
+                # Output based on mode:
+                # - stdout: single line with timing + text (or timing + silence)
+                # - type/clipboard: print timing, send text via subprocess
+                if output_mode == "stdout":
+                    if text:
+                        print_fn(f"[{duration:.1f}s → {latency_ms:.0f}ms] {text}")
+                    else:
+                        print_fn(f"[{duration:.1f}s → {latency_ms:.0f}ms] (silence)")
                 else:
-                    logger.info("(silence)")
+                    # For type/clipboard: show timing, send text separately
+                    print_fn(f"[{duration:.1f}s → {latency_ms:.0f}ms]")
+                    if text:
+                        output_text(text, output_mode)
             elif msg.get("type") == "error":
-                logger.error(f"Server error: {msg.get('message')}")
+                print_fn(f"[error] Server: {msg.get('message')}")
+            else:
+                print_fn(f"[error] Unexpected response type: {msg.get('type')}")
 
         except asyncio.TimeoutError:
-            logger.error("Timeout waiting for transcription")
+            print_fn("[error] Timeout waiting for transcription")
         except Exception as e:
-            logger.error(f"Error during transcription: {e}")
+            print_fn(f"[error] Transcription failed: {e}")
 
         ptt.on_processing_complete()
 

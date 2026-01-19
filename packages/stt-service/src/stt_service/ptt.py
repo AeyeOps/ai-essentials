@@ -278,6 +278,33 @@ class TerminalHotkeyListener:
         """Stop listening."""
         self._running = False
 
+    def print_normal(self, *args, **kwargs) -> None:
+        """Print with normal terminal settings (exits raw mode temporarily).
+
+        Use this from callbacks to ensure output displays correctly.
+        In raw mode, newlines don't include carriage returns, causing
+        garbled horizontal output. This method temporarily restores
+        normal terminal settings before printing.
+        """
+        import sys
+        import tty
+        import termios
+
+        if self._old_settings is None:
+            # Not in raw mode, just print
+            print(*args, **kwargs)
+            return
+
+        fd = sys.stdin.fileno()
+        # Restore normal terminal
+        termios.tcsetattr(fd, termios.TCSADRAIN, self._old_settings)
+        try:
+            print(*args, **kwargs)
+            sys.stdout.flush()
+        finally:
+            # Return to raw mode
+            tty.setraw(fd)
+
 
 class PTTController:
     """Push-to-Talk controller managing state and audio feedback."""
