@@ -5,6 +5,7 @@
 #
 # Usage:
 #   ./test-sandbox.sh              # Interactive shell in fresh Ubuntu
+#   ./test-sandbox.sh --attach     # Attach new shell to running container
 #   ./test-sandbox.sh --auto       # Run installer non-interactively
 #   ./test-sandbox.sh --clean      # Remove test container/image
 #
@@ -46,6 +47,7 @@ The container is disposable - delete it anytime with --clean.
 
 USAGE:
     ./test-sandbox.sh              Interactive shell (recommended for first test)
+    ./test-sandbox.sh --attach     Attach new shell to running container (2nd terminal)
     ./test-sandbox.sh --auto       Run installer automatically (non-interactive)
     ./test-sandbox.sh --clean      Remove container and image
 
@@ -68,7 +70,8 @@ NOTES:
     - Container mounts this project at /mnt (read-only)
     - Install goes to ~/stt-service inside container
     - GPU is passed through via --gpus all
-    - Container is removed on exit (--rm flag) for clean testing
+    - Container persists until you exit the first shell
+    - Use --attach to open additional terminals while container runs
 EOF
 }
 
@@ -126,6 +129,17 @@ run_interactive() {
         bash
 }
 
+attach_to_container() {
+    if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        warn "No running container found: $CONTAINER_NAME"
+        info "Start one first with: ./test-sandbox.sh"
+        exit 1
+    fi
+
+    info "Attaching to running container..."
+    docker exec -it "$CONTAINER_NAME" bash
+}
+
 run_auto() {
     check_prerequisites
     build_image
@@ -174,6 +188,9 @@ clean() {
 case "${1:-}" in
     -h|--help)
         show_help
+        ;;
+    --attach)
+        attach_to_container
         ;;
     --auto)
         run_auto
