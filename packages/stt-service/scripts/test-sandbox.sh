@@ -184,13 +184,18 @@ run_auto() {
             # Source PATH for uv
             export PATH="$HOME/.local/bin:$PATH"
 
+            # Pause before starting server
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            echo "  Install complete. Server starting in 10 seconds..."
+            echo "  Open another terminal now:  ./test-sandbox.sh --attach"
+            echo "════════════════════════════════════════════════════════════"
+            sleep 10
+
             # Start server (foreground to keep container alive)
             cd ~/stt-service
             echo ""
-            echo "════════════════════════════════════════════════════════════"
-            echo "  Server starting... attach with: ./test-sandbox.sh --attach"
-            echo "════════════════════════════════════════════════════════════"
-            echo ""
+            echo "Starting server..."
             ./scripts/stt-server.sh
         '
 
