@@ -766,6 +766,21 @@ print('Model loaded successfully')
 setup_service() {
     step "System service setup..."
 
+    # Detect container environment
+    if [[ -f /.dockerenv ]] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
+        info "Docker detected - systemd not available"
+        info "Run server: $INSTALL_DIR/scripts/stt-server.sh"
+        info "Run client: $INSTALL_DIR/scripts/stt-client.sh"
+        return
+    fi
+
+    if ! has_cmd systemctl; then
+        info "Systemd not available, skipping service setup"
+        info "Run server: $INSTALL_DIR/scripts/stt-server.sh"
+        info "Run client: $INSTALL_DIR/scripts/stt-client.sh"
+        return
+    fi
+
     if service_exists; then
         info "Service already installed"
         if [[ $(ask "Update service configuration?" "n") == "y" ]]; then
