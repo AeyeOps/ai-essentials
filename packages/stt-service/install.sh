@@ -232,7 +232,8 @@ disk_space_gb() {
 # Check if model is already cached (huggingface_hub cache)
 model_cached() {
     local hf_cache="${HF_HOME:-$HOME/.cache/huggingface}/hub"
-    ls -d "$hf_cache"/models--nvidia--parakeet* &>/dev/null
+    # Model is from istupakov (ONNX conversion of NVIDIA Parakeet)
+    ls -d "$hf_cache"/models--istupakov--parakeet* &>/dev/null
 }
 
 # Check if systemd service exists
@@ -1204,10 +1205,10 @@ uninstall() {
 
     # Note about cached model (huggingface cache)
     local hf_cache="${HF_HOME:-$HOME/.cache/huggingface}/hub"
-    if ls -d "$hf_cache"/models--nvidia--parakeet* &>/dev/null 2>&1; then
+    if ls -d "$hf_cache"/models--istupakov--parakeet* &>/dev/null 2>&1; then
         info "Speech model cache exists in: $hf_cache"
         if [[ $(ask "Remove cached model (~2.5GB)?" "n") == "y" ]]; then
-            rm -rf "$hf_cache"/models--nvidia--parakeet*
+            rm -rf "$hf_cache"/models--istupakov--parakeet*
             success "Model cache removed"
             ((removed++))
         else
