@@ -943,6 +943,10 @@ EOF
     success "Service installed"
 
     if [[ $(ask "Enable and start service now?" "n") == "y" ]]; then
+        # Stop any existing server processes before starting service
+        sudo systemctl stop stt-service 2>/dev/null || true
+        pkill -f "stt-server" 2>/dev/null || true
+        sleep 1
         sudo systemctl enable --now stt-service
         sleep 2
         if systemctl is-active --quiet stt-service; then
@@ -1095,6 +1099,9 @@ show_completion() {
             echo -e "  Look for the ${GREEN}green tray icon${NC} (turns red when recording)."
         else
             # Already in input group - start client now via desktop entry
+            # Kill any existing client processes first to avoid duplicates
+            pkill -f "stt-client.*--daemon" 2>/dev/null || true
+            sleep 1
             echo -e "Starting AEO Push-to-Talk..."
             if gtk-launch aeo-ptt 2>/dev/null; then
                 sleep 1
