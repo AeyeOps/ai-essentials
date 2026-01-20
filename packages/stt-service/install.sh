@@ -122,26 +122,28 @@ has_cmd() {
     command -v "$1" &> /dev/null
 }
 
-# Find CUDA library directory (searches common locations)
+# Find CUDA 12 library directory (required by onnxruntime-gpu)
+# GB10 has CUDA 13 as primary, but onnxruntime needs CUDA 12 compat libs
 find_cuda_lib() {
+    # Prioritize CUDA 12 paths - onnxruntime-gpu needs libcublas.so.12
     local search_paths=(
-        "/usr/local/cuda/targets/sbsa-linux/lib"
-        "/usr/local/cuda-13.0/targets/sbsa-linux/lib"
-        "/usr/local/cuda-12.6/targets/sbsa-linux/lib"
+        "/usr/local/cuda-12.6/targets/sbsa-linux/lib"  # GB10 CUDA 12 compat
         "/usr/local/cuda-12/targets/sbsa-linux/lib"
+        "/usr/lib/aarch64-linux-gnu"                    # apt-installed libs
+        "/usr/local/cuda/targets/sbsa-linux/lib"        # Only if has .so.12
+        "/usr/local/cuda-13.0/targets/sbsa-linux/lib"   # Only if has .so.12
         "/usr/local/cuda/lib64"
-        "/usr/lib/aarch64-linux-gnu"
     )
     for p in "${search_paths[@]}"; do
-        # Check for CUDA 12 libs (needed by onnxruntime)
-        if [[ -f "$p/libcublas.so.12" ]] || [[ -f "$p/libcublas.so" ]]; then
+        # MUST have libcublas.so.12 specifically (not just .so which could be CUDA 13)
+        if [[ -f "$p/libcublas.so.12" ]]; then
             echo "$p"
             return 0
         fi
     done
-    # Fallback: search for libcublas
+    # Fallback: search for libcublas.so.12
     local found
-    found=$(find /usr -name "libcublas.so.12*" -type f 2>/dev/null | head -1)
+    found=$(find /usr -name "libcublas.so.12" -type f -o -name "libcublas.so.12" -type l 2>/dev/null | head -1)
     if [[ -n "$found" ]]; then
         dirname "$found"
         return 0
@@ -204,6 +206,14 @@ install_autostart() {
         info "Installing xdotool..."
         ensure_apt_updated
         sudo apt-get install -y xdotool
+    fi
+
+    # Install PyGObject for tray support on GNOME
+    # The venv uses system-site-packages to access these
+    if ! dpkg -s python3-gi &> /dev/null; then
+        info "Installing tray dependencies (PyGObject)..."
+        ensure_apt_updated
+        sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-ayatanaappindicator3-0.1
     fi
 
     success "Auto-start enabled"
@@ -707,6 +717,15 @@ setup_python() {
     fi
 
     success "Python dependencies installed"
+
+    # Enable system-site-packages for PyGObject access (needed for tray on GNOME)
+    # This allows the venv to access system-installed gi (gobject-introspection)
+    if [[ -f ".venv/pyvenv.cfg" ]]; then
+        if grep -q "include-system-site-packages = false" ".venv/pyvenv.cfg"; then
+            sed -i 's/include-system-site-packages = false/include-system-site-packages = true/' ".venv/pyvenv.cfg"
+            success "Enabled system-site-packages for tray support"
+        fi
+    fi
 
     # Install GPU runtime
     info "Installing GPU runtime..."
