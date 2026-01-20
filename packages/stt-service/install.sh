@@ -200,10 +200,22 @@ install_autostart() {
     uv pip install "$ONNX_WHEEL"
 
     # Create autostart entry from template
+    info "Creating autostart entry..."
     mkdir -p "$HOME/.config/autostart"
+    if [[ ! -f "$INSTALL_DIR/scripts/aeo-ptt.desktop.template" ]]; then
+        warn "Template not found: $INSTALL_DIR/scripts/aeo-ptt.desktop.template"
+        return 1
+    fi
     sed "s|{{INSTALL_DIR}}|$INSTALL_DIR|g" \
         "$INSTALL_DIR/scripts/aeo-ptt.desktop.template" \
         > "$HOME/.config/autostart/aeo-ptt.desktop"
+
+    # Verify file was created
+    if [[ ! -f "$HOME/.config/autostart/aeo-ptt.desktop" ]]; then
+        warn "Failed to create autostart entry"
+        return 1
+    fi
+    success "Autostart entry created"
 
     # Ensure xdotool is installed (for typing text at cursor)
     if ! has_cmd xdotool; then
@@ -1020,16 +1032,17 @@ show_completion() {
     # Offer: Auto-start PTT client at login (requires global hotkey + systemd)
     # ─────────────────────────────────────────────────────────────────
     local has_autostart=0
+    # Check actual file existence (not cached state)
     if [[ -f "$HOME/.config/autostart/aeo-ptt.desktop" ]]; then
-        # Already configured
         has_autostart=1
     elif [[ "$in_container" == "0" ]] && [[ "$has_global_hotkey" == "1" ]] && service_exists; then
         echo -e "${BOLD}Auto-Start Client${NC}"
         echo -e "${DIM}Start AEO Push-to-Talk automatically at login (Ctrl+Super in any app)${NC}"
         echo ""
         if [[ $(ask "Enable AEO Push-to-Talk auto-start?" "y") == "y" ]]; then
-            install_autostart
-            has_autostart=1
+            if install_autostart; then
+                has_autostart=1
+            fi
         else
             info "Skipped. Start client manually when needed"
         fi
