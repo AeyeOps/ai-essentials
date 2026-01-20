@@ -379,7 +379,12 @@ class PTTController:
 
     @classmethod
     def _init_sounds(cls) -> None:
-        """Pre-generate click sounds at class load time."""
+        """Pre-generate click sounds at class load time.
+
+        Generates sounds in two formats:
+        - float32 for sounddevice
+        - int16 for paplay (more compatible, less artifacts)
+        """
         if cls._sounds is not None:
             return
 
@@ -393,39 +398,53 @@ class PTTController:
             duration = 0.08  # 80ms tone
 
             # Add silence padding to prevent click/pop artifacts from audio subsystem
-            pad_ms = 5  # 5ms padding
+            pad_ms = 20  # 20ms padding (generous for paplay latency)
             pad_samples = int(sr * pad_ms / 1000)
             tone_samples = int(sr * duration)
 
             t = np.linspace(0, duration, tone_samples, False)
 
-            # Smooth fade-in (cosine ramp, 3ms)
-            fade_samples = int(sr * 0.003)
+            # Smooth fade-in/out (cosine ramp, 5ms)
+            fade_samples = int(sr * 0.005)
             fade_in = 0.5 * (1 - np.cos(np.pi * np.arange(fade_samples) / fade_samples))
+            fade_out = fade_in[::-1]
 
             # Click sound - higher pitch (880Hz)
             freq = 880
             envelope = np.exp(-t * 15) * (1 - np.exp(-t * 100))
-            click_tone = np.sin(2 * np.pi * freq * t) * envelope * 0.25
-            click_tone[:fade_samples] *= fade_in  # Apply fade-in
-            click = np.concatenate([
-                np.zeros(pad_samples, dtype=np.float32),
-                click_tone.astype(np.float32),
-                np.zeros(pad_samples, dtype=np.float32),
-            ])
+            click_tone = np.sin(2 * np.pi * freq * t) * envelope * 0.3
+            click_tone[:fade_samples] *= fade_in
+            click_tone[-fade_samples:] *= fade_out
 
             # Unclick sound - lower pitch (440Hz)
             freq = 440
             envelope = np.exp(-t * 20) * (1 - np.exp(-t * 100))
-            unclick_tone = np.sin(2 * np.pi * freq * t) * envelope * 0.25
-            unclick_tone[:fade_samples] *= fade_in  # Apply fade-in
-            unclick = np.concatenate([
-                np.zeros(pad_samples, dtype=np.float32),
-                unclick_tone.astype(np.float32),
-                np.zeros(pad_samples, dtype=np.float32),
+            unclick_tone = np.sin(2 * np.pi * freq * t) * envelope * 0.3
+            unclick_tone[:fade_samples] *= fade_in
+            unclick_tone[-fade_samples:] *= fade_out
+
+            # Build padded sounds in both formats
+            pad_f32 = np.zeros(pad_samples, dtype=np.float32)
+            pad_i16 = np.zeros(pad_samples, dtype=np.int16)
+
+            # float32 for sounddevice
+            click_f32 = np.concatenate([pad_f32, click_tone.astype(np.float32), pad_f32])
+            unclick_f32 = np.concatenate([pad_f32, unclick_tone.astype(np.float32), pad_f32])
+
+            # int16 for paplay (scale to int16 range)
+            click_i16 = np.concatenate([
+                pad_i16, (click_tone * 32767).astype(np.int16), pad_i16
+            ])
+            unclick_i16 = np.concatenate([
+                pad_i16, (unclick_tone * 32767).astype(np.int16), pad_i16
             ])
 
-            cls._sounds = {"click": click, "unclick": unclick}
+            cls._sounds = {
+                "click": click_f32,
+                "unclick": unclick_f32,
+                "click_i16": click_i16,
+                "unclick_i16": unclick_i16,
+            }
         except Exception as e:
             logger.debug(f"Could not initialize sounds: {e}")
             cls._sounds = {}
@@ -461,16 +480,20 @@ class PTTController:
 
         if self._use_paplay:
             # Use paplay for PulseAudio output (Docker/containers)
+            # Use int16 format (s16le) - more compatible, fewer artifacts
             try:
                 import subprocess
+                sound_key = f"{sound_type}_i16"
+                if sound_key not in self._sounds:
+                    return
                 proc = subprocess.Popen(
                     ["paplay", "--raw", f"--rate={self._sample_rate}",
-                     "--channels=1", "--format=float32le"],
+                     "--channels=1", "--format=s16le"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
-                proc.stdin.write(sound_data.tobytes())
+                proc.stdin.write(self._sounds[sound_key].tobytes())
                 proc.stdin.close()
                 proc.wait(timeout=1.0)
                 logger.debug(f"Playing {sound_type} sound via paplay")
