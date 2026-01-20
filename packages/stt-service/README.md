@@ -172,7 +172,7 @@ cd ~/stt-service && ./install.sh --uninstall
 ```bash
 git clone https://github.com/AeyeOps/ai-essentials.git
 cd ai-essentials/packages/stt-service
-./scripts/install-gb10.sh
+./install.sh
 ```
 
 ### Docker Sandbox
