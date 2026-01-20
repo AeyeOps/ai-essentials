@@ -808,7 +808,10 @@ def main() -> None:
             pids = result.stdout.decode().strip().split('\n')
             other_pids = [p for p in pids if p and int(p) != os.getpid()]
             if other_pids:
-                logger.info(f"Daemon already running (PID {other_pids[0]}), exiting")
+                logger.info(
+                    f"Client daemon started but another instance already running "
+                    f"(PID {other_pids[0]}). This instance exiting to avoid duplicates."
+                )
                 sys.exit(0)
 
     try:
