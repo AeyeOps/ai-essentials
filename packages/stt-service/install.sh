@@ -737,11 +737,18 @@ setup_python() {
     success "GPU runtime installed"
 
     # Install evdev for global hotkey support (Ctrl+Super)
-    # Requires linux-libc-dev for kernel headers (needed to compile evdev)
+    # Requires build tools and kernel headers to compile evdev
+    local evdev_deps=()
+    if ! has_cmd cc; then
+        evdev_deps+=(build-essential)
+    fi
     if ! dpkg -s linux-libc-dev &> /dev/null; then
-        info "Installing kernel headers for evdev..."
+        evdev_deps+=(linux-libc-dev)
+    fi
+    if [[ ${#evdev_deps[@]} -gt 0 ]]; then
+        info "Installing build dependencies for evdev: ${evdev_deps[*]}"
         ensure_apt_updated
-        sudo apt-get install -y linux-libc-dev
+        sudo apt-get install -y "${evdev_deps[@]}"
     fi
     info "Installing global hotkey support..."
     uv pip install "evdev>=1.7.0"
