@@ -381,20 +381,47 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
     output_mode = args.output or settings.client.output_mode
     server_url = args.server or settings.client.server_url
 
-    # Try evdev first (production), fall back to terminal (Docker)
+    # Try evdev first (production), fall back to terminal (Docker/no input access)
     listener = None
+    use_evdev = False
     try:
-        # Check if evdev is available (it's imported inside EvdevHotkeyListener methods)
-        import evdev  # noqa: F401
+        # Check if evdev is available and we can access keyboards
+        import evdev
+        from evdev import list_devices, InputDevice, ecodes
         from .ptt import EvdevHotkeyListener
-        listener = EvdevHotkeyListener(
-            on_activate=lambda: None,  # Callbacks wired by PTTController.run()
-            on_deactivate=lambda: None,
-        )
-        hotkey_str = "+".join(settings.ptt.hotkey)
-        logger.info(f"Using evdev hotkey listener ({hotkey_str})")
+
+        # Probe for accessible keyboards before committing to evdev
+        keyboards_found = False
+        for path in list_devices():
+            try:
+                device = InputDevice(path)
+                caps = device.capabilities()
+                if ecodes.EV_KEY in caps:
+                    key_caps = caps[ecodes.EV_KEY]
+                    if ecodes.KEY_A in key_caps and ecodes.KEY_ENTER in key_caps:
+                        keyboards_found = True
+                        device.close()
+                        break
+                device.close()
+            except (PermissionError, OSError):
+                continue
+
+        if keyboards_found:
+            listener = EvdevHotkeyListener(
+                on_activate=lambda: None,  # Callbacks wired by PTTController.run()
+                on_deactivate=lambda: None,
+            )
+            hotkey_str = "+".join(settings.ptt.hotkey)
+            use_evdev = True
+            logger.info(f"Using evdev hotkey listener ({hotkey_str})")
+        else:
+            logger.info("No accessible keyboards found, using terminal mode")
+
     except ImportError:
         logger.info("evdev not available, using terminal mode")
+
+    # Fall back to terminal mode if evdev not available or no keyboard access
+    if not use_evdev:
         listener = TerminalHotkeyListener(
             on_activate=lambda: None,
             on_deactivate=lambda: None,
