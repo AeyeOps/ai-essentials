@@ -585,20 +585,8 @@ install_uv() {
 download_package() {
     step "Downloading STT Service..."
 
-    # Detect if running from local source (e.g., /mnt in Docker sandbox)
-    local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || script_dir=""
-    local use_local=0
-
-    # Only use local source if:
-    # 1. script_dir is valid and different from INSTALL_DIR (avoid self-copy)
-    # 2. Contains the expected source files
-    if [[ -n "$script_dir" ]] && [[ "$script_dir" != "$INSTALL_DIR" ]] && \
-       [[ -f "$script_dir/pyproject.toml" ]] && [[ -f "$script_dir/src/stt_service/client.py" ]]; then
-        # Running from a complete source tree - use local copy
-        use_local=1
-        info "Detected local source at: $script_dir"
-    fi
+    # Always download from GitHub (curl installer path)
+    # Local development should use git clone directly
 
     case "$INSTALL_MODE" in
         fresh|reinstall)
@@ -610,27 +598,18 @@ download_package() {
 
             mkdir -p "$(dirname "$INSTALL_DIR")"
 
-            if [[ "$use_local" == "1" ]]; then
-                # Copy from local source (preserves uncommitted changes)
-                info "Copying from local source..."
-                cp -r "$script_dir" "$INSTALL_DIR"
-                # Remove any existing venv from source (will create fresh)
-                rm -rf "$INSTALL_DIR/.venv"
-                success "Copied to $INSTALL_DIR"
-            else
-                # Download from GitHub
-                info "Downloading from GitHub..."
-                local tmp_dir
-                tmp_dir=$(mktemp -d)
+            # Download from GitHub
+            info "Downloading from GitHub..."
+            local tmp_dir
+            tmp_dir=$(mktemp -d)
 
-                download_extract "$REPO_TARBALL" "$tmp_dir"
+            download_extract "$REPO_TARBALL" "$tmp_dir"
 
-                # Move just the stt-service package
-                mv "$tmp_dir/$PACKAGE_SUBDIR" "$INSTALL_DIR"
-                rm -rf "$tmp_dir"
+            # Move just the stt-service package
+            mv "$tmp_dir/$PACKAGE_SUBDIR" "$INSTALL_DIR"
+            rm -rf "$tmp_dir"
 
-                success "Downloaded to $INSTALL_DIR"
-            fi
+            success "Downloaded to $INSTALL_DIR"
             ;;
 
         update)
@@ -642,14 +621,7 @@ download_package() {
                 mv "$INSTALL_DIR/.venv" "$venv_backup/.venv"
             fi
 
-            if [[ "$use_local" == "1" ]]; then
-                # Update from local source
-                info "Updating from local source..."
-                rm -rf "$INSTALL_DIR"
-                cp -r "$script_dir" "$INSTALL_DIR"
-                rm -rf "$INSTALL_DIR/.venv"
-                success "Updated from local source"
-            elif has_cmd git && [[ -d "$INSTALL_DIR/.git" ]]; then
+            if has_cmd git && [[ -d "$INSTALL_DIR/.git" ]]; then
                 info "Updating via git..."
                 cd "$INSTALL_DIR"
                 git pull
