@@ -76,11 +76,16 @@ build_image() {
         return
     fi
 
+    local uid=$(id -u)
+    local gid=$(id -g)
+
     info "Building test image (CUDA 13 Ubuntu 24.04 with runtime)..."
-    docker build -t "$IMAGE_NAME" - << 'DOCKERFILE'
+    docker build -t "$IMAGE_NAME" --build-arg UID="$uid" --build-arg GID="$gid" - << 'DOCKERFILE'
 FROM nvidia/cuda:13.0.0-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ARG UID=1000
+ARG GID=1000
 
 # Minimal packages - CUDA runtime provided by base image
 # Installer will add CUDA 12 compat libs for onnxruntime
@@ -92,9 +97,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     alsa-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Create test user (non-root, with sudo, in audio group)
-RUN useradd -m -s /bin/bash -G audio testuser && \
+# Create test user with matching UID/GID for PulseAudio socket access
+RUN groupadd -g $GID testuser && \
+    useradd -m -u $UID -g $GID -s /bin/bash -G audio testuser && \
     echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# PulseAudio client config - connect to host's server, disable shared memory
+RUN mkdir -p /home/testuser/.config/pulse && \
+    echo "default-server = unix:/run/user/$UID/pulse/native" > /home/testuser/.config/pulse/client.conf && \
+    echo "autospawn = no" >> /home/testuser/.config/pulse/client.conf && \
+    echo "enable-shm = false" >> /home/testuser/.config/pulse/client.conf && \
+    chown -R $UID:$GID /home/testuser/.config
 
 USER testuser
 WORKDIR /home/testuser
