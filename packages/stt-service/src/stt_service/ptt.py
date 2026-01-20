@@ -343,12 +343,48 @@ class PTTController:
     # Pre-generated sounds (class-level, generated once)
     _sounds: Optional[dict] = None
     _sample_rate: int = 44100
+    _use_paplay: Optional[bool] = None  # None = not yet detected
+
+    @classmethod
+    def _detect_audio_backend(cls) -> None:
+        """Detect whether to use sounddevice or paplay for audio output.
+
+        Prefers sounddevice if it has PulseAudio backend, otherwise falls back
+        to paplay if available. This handles Docker containers where PortAudio
+        may lack PulseAudio support but paplay works via mounted socket.
+        """
+        if cls._use_paplay is not None:
+            return
+
+        # Check if sounddevice has PulseAudio backend
+        try:
+            import sounddevice as sd
+            hostapis = sd.query_hostapis()
+            has_pulse = any("pulse" in api["name"].lower() for api in hostapis)
+            if has_pulse:
+                cls._use_paplay = False
+                logger.debug("Using sounddevice (PulseAudio backend available)")
+                return
+        except Exception:
+            pass
+
+        # Check if paplay is available
+        import shutil
+        if shutil.which("paplay"):
+            cls._use_paplay = True
+            logger.debug("Using paplay fallback (sounddevice lacks PulseAudio)")
+        else:
+            cls._use_paplay = False
+            logger.debug("Using sounddevice (paplay not available)")
 
     @classmethod
     def _init_sounds(cls) -> None:
         """Pre-generate click sounds at class load time."""
         if cls._sounds is not None:
             return
+
+        # Detect audio backend
+        cls._detect_audio_backend()
 
         try:
             import numpy as np
@@ -391,15 +427,40 @@ class PTTController:
         self._init_sounds()
 
     def _play_sound_sync(self, sound_type: str) -> None:
-        """Synchronous sound playback (called from executor)."""
-        try:
-            import sounddevice as sd
-            if self._sounds and sound_type in self._sounds:
-                # Use system default output device (device=None)
-                sd.play(self._sounds[sound_type], self._sample_rate)
-                logger.debug(f"Playing {sound_type} sound")
-        except Exception as e:
-            logger.debug(f"Could not play {sound_type} sound: {e}")
+        """Synchronous sound playback (called from executor).
+
+        Uses paplay when sounddevice lacks PulseAudio support (e.g., Docker).
+        """
+        if not self._sounds or sound_type not in self._sounds:
+            return
+
+        sound_data = self._sounds[sound_type]
+
+        if self._use_paplay:
+            # Use paplay for PulseAudio output (Docker/containers)
+            try:
+                import subprocess
+                proc = subprocess.Popen(
+                    ["paplay", "--raw", f"--rate={self._sample_rate}",
+                     "--channels=1", "--format=float32le"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                proc.stdin.write(sound_data.tobytes())
+                proc.stdin.close()
+                proc.wait(timeout=1.0)
+                logger.debug(f"Playing {sound_type} sound via paplay")
+            except Exception as e:
+                logger.debug(f"Could not play {sound_type} sound via paplay: {e}")
+        else:
+            # Use sounddevice (has PulseAudio or ALSA)
+            try:
+                import sounddevice as sd
+                sd.play(sound_data, self._sample_rate)
+                logger.debug(f"Playing {sound_type} sound via sounddevice")
+            except Exception as e:
+                logger.debug(f"Could not play {sound_type} sound via sounddevice: {e}")
 
     def _play_sound(self, sound_type: str) -> None:
         """Play pre-generated audio feedback sound (fully async, zero blocking).
