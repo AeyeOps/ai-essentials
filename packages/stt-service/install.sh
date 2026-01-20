@@ -587,10 +587,14 @@ download_package() {
 
     # Detect if running from local source (e.g., /mnt in Docker sandbox)
     local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || script_dir=""
     local use_local=0
 
-    if [[ -f "$script_dir/pyproject.toml" ]] && [[ -f "$script_dir/src/stt_service/client.py" ]]; then
+    # Only use local source if:
+    # 1. script_dir is valid and different from INSTALL_DIR (avoid self-copy)
+    # 2. Contains the expected source files
+    if [[ -n "$script_dir" ]] && [[ "$script_dir" != "$INSTALL_DIR" ]] && \
+       [[ -f "$script_dir/pyproject.toml" ]] && [[ -f "$script_dir/src/stt_service/client.py" ]]; then
         # Running from a complete source tree - use local copy
         use_local=1
         info "Detected local source at: $script_dir"
