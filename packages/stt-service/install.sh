@@ -1082,16 +1082,30 @@ show_completion() {
 
     # Show appropriate next steps based on configuration
     if [[ "$has_autostart" == "1" ]]; then
-        # Fully automated setup - emphasize simplicity
+        # Fully automated setup
         echo -e "${BOLD}You're all set!${NC}"
         echo ""
-        echo -e "${YELLOW}${BOLD}► Log out and back in${NC} to activate the tray icon."
-        echo ""
-        echo -e "  After logging back in, press ${GREEN}Ctrl+Super${NC} in any app to dictate."
-        echo -e "  Look for the ${GREEN}green tray icon${NC} (turns red when recording)."
-        echo ""
-        echo -e "${DIM}  Optional: Test in terminal mode with spacebar:${NC}"
-        echo -e "${DIM}  $INSTALL_DIR/scripts/stt-client.sh --ptt${NC}"
+
+        if [[ "$needs_logout" == "1" ]]; then
+            # Just added to input group - must logout first
+            echo -e "${YELLOW}${BOLD}► Log out and back in${NC} to activate global hotkey."
+            echo ""
+            echo -e "  After logging back in, press ${GREEN}Ctrl+Super${NC} in any app to dictate."
+            echo -e "  Look for the ${GREEN}green tray icon${NC} (turns red when recording)."
+        else
+            # Already in input group - start client now
+            echo -e "Starting AEO Push-to-Talk..."
+            if "$INSTALL_DIR/scripts/stt-client.sh" --ptt --daemon --tray &>/dev/null & then
+                sleep 1
+                echo -e "${GREEN}✓${NC} Client started (check for tray icon)"
+                echo ""
+                echo -e "  Press ${GREEN}Ctrl+Super${NC} in any app to dictate."
+                echo -e "  Look for the ${GREEN}green tray icon${NC} (turns red when recording)."
+            else
+                echo -e "${YELLOW}Could not start client automatically${NC}"
+                echo -e "  Start manually: $INSTALL_DIR/scripts/stt-client.sh --ptt --daemon --tray &"
+            fi
+        fi
         echo ""
     elif [[ "$in_container" == "1" ]]; then
         # Docker: show one-liner test option
