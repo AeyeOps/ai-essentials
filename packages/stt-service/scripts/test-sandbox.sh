@@ -89,12 +89,14 @@ ARG GID=1000
 
 # Minimal packages - CUDA runtime provided by base image
 # Installer will add CUDA 12 compat libs for onnxruntime
+# libportaudio2: System PortAudio with PulseAudio support (sounddevice uses this over bundled)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     sudo \
     pulseaudio-utils \
     alsa-utils \
+    libportaudio2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create test user with matching UID/GID for PulseAudio socket access
