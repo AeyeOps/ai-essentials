@@ -1,6 +1,6 @@
 # STT Service
 
-GPU-accelerated Speech-to-Text service using NVIDIA Parakeet ONNX models with WebSocket streaming.
+GPU-accelerated Speech-to-Text using NVIDIA Parakeet ONNX models with WebSocket streaming.
 
 ## Install
 
@@ -8,47 +8,99 @@ GPU-accelerated Speech-to-Text service using NVIDIA Parakeet ONNX models with We
 curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
 ```
 
-That's it. The installer handles everything—dependencies, GPU setup, model download.
-
-<details>
-<summary>What does the installer do?</summary>
-
-- Checks system requirements (ARM64, NVIDIA GPU, disk space)
-- Installs uv, CUDA libraries, and PortAudio if missing
-- Downloads and configures STT Service
-- Optionally downloads the speech model (~1GB)
-- Optionally sets up a systemd service
-
-Re-run the installer anytime to update.
-</details>
-
----
-
-## What You Need
-
-- NVIDIA GB10 or ARM64 system with CUDA GPU
-- Ubuntu 22.04+ (or similar Linux)
-- Internet connection (model download ~1GB on first run)
+The installer handles dependencies, GPU setup, and model download. Follow any post-install instructions shown.
 
 ## Quick Start
 
-After installation, run:
-
 ```bash
 cd ~/stt-service
-./scripts/stt-server.sh        # Start server (terminal 1)
-./scripts/stt-client.sh --ptt  # PTT mode (terminal 2)
+./scripts/stt-server.sh        # Terminal 1: Start server
+./scripts/stt-client.sh --ptt  # Terminal 2: PTT mode
 ```
 
-**PTT Mode**: Hold spacebar to record, release to transcribe. Output shows timing:
+Output shows timing and transcription:
 ```
 [2.1s → 45ms] hello this is a test
 [0.3s → 38ms] (silence)
 ```
 
-For single recordings without PTT, omit `--ptt`:
+## PTT Modes
+
+The client auto-detects the best mode based on your environment:
+
+| Mode | Hotkey | When Used |
+|------|--------|-----------|
+| **Global** | Ctrl+Super | Desktop with input group access |
+| **Terminal** | Spacebar | Docker, SSH, or no input access |
+
+### Customizing Hotkeys
+
+**Global mode** (evdev): Set `STT_PTT_HOTKEY` to a JSON array of [evdev key names](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h) (without `KEY_` prefix):
+
 ```bash
-./scripts/stt-client.sh        # Records until Enter or Ctrl+C
+# Default: Ctrl+Super (Windows key)
+export STT_PTT_HOTKEY='["LEFTCTRL", "LEFTMETA"]'
+
+# Ctrl+Alt
+export STT_PTT_HOTKEY='["LEFTCTRL", "LEFTALT"]'
+
+# Right Ctrl + Right Alt
+export STT_PTT_HOTKEY='["RIGHTCTRL", "RIGHTALT"]'
+
+# Single key (F13)
+export STT_PTT_HOTKEY='["F13"]'
+```
+
+**Terminal mode**: Set `STT_PTT_TERMINAL_HOTKEY` to a character:
+
+```bash
+# Default: spacebar
+export STT_PTT_TERMINAL_HOTKEY=' '
+
+# Ctrl+R (ASCII 18)
+export STT_PTT_TERMINAL_HOTKEY=$'\x12'
+```
+
+## Configuration
+
+All settings via environment variables:
+
+### Server
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STT_SERVER_HOST` | `127.0.0.1` | Bind address |
+| `STT_SERVER_PORT` | `9876` | Port |
+| `STT_MODEL_PROVIDER` | `cuda` | `cuda` or `tensorrt` |
+
+### Client
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STT_CLIENT_OUTPUT_MODE` | `stdout` | `stdout`, `type`, `clipboard` |
+| `STT_CLIENT_SERVER_URL` | `ws://127.0.0.1:9876` | Server URL |
+
+### PTT
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STT_PTT_HOTKEY` | `["LEFTCTRL", "LEFTMETA"]` | Global mode keys |
+| `STT_PTT_TERMINAL_HOTKEY` | ` ` (space) | Terminal mode key |
+| `STT_PTT_CLICK_SOUND` | `true` | Audio feedback |
+| `STT_PTT_MAX_DURATION_SECONDS` | `30` | Auto-submit threshold |
+
+## Output Modes
+
+```bash
+./scripts/stt-client.sh --ptt                  # Print to stdout
+./scripts/stt-client.sh --ptt --output type    # Type into focused window (xdotool)
+./scripts/stt-client.sh --ptt --output clipboard  # Copy to clipboard
+```
+
+## Running as a Service
+
+```bash
+cd ~/stt-service && ./scripts/install-systemd.sh
 ```
 
 ## Uninstall
@@ -57,65 +109,31 @@ For single recordings without PTT, omit `--ptt`:
 cd ~/stt-service && ./install.sh --uninstall
 ```
 
-Or manually:
-```bash
-# Stop and remove service (if installed)
-sudo systemctl stop stt-service
-sudo systemctl disable stt-service
-sudo rm /etc/systemd/system/stt-service.service
-
-# Remove installation
-rm -rf ~/stt-service
-
-# Optionally remove cached model (~1GB)
-rm -rf ~/.cache/onnx-asr
-```
-
-## Running as a System Service
-
-```bash
-cd ~/stt-service && ./scripts/install-systemd.sh
-```
-
-This generates a systemd service file from a template and optionally installs it.
-
-## Configuration
-
-All settings can be overridden via environment variables:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `STT_SERVER_HOST` | `127.0.0.1` | Server bind address |
-| `STT_SERVER_PORT` | `9876` | Server port |
-| `STT_SERVER_MAX_CONNECTIONS` | `10` | Max concurrent connections |
-| `STT_SERVER_REJECT_WHEN_FULL` | `true` | Reject vs queue when full |
-| `STT_MODEL_NAME` | `nemo-parakeet-tdt-0.6b-v2` | Model name |
-| `STT_MODEL_PROVIDER` | `cuda` | `cuda` or `tensorrt` |
-| `STT_MODEL_DEVICE_ID` | `0` | GPU device ID |
-| `STT_CLIENT_SERVER_URL` | `ws://127.0.0.1:9876` | Server URL |
-| `STT_CLIENT_OUTPUT_MODE` | `stdout` | `stdout`, `type`, `clipboard` |
-| `STT_AUDIO_SAMPLE_RATE` | `16000` | Audio sample rate (Hz) |
-| `STT_AUDIO_CHUNK_MS` | `100` | Chunk duration (ms) |
+---
 
 ## Troubleshooting
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `uv: command not found` | uv not installed | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| `CUDA not available` | Missing GPU runtime | Install onnxruntime-gpu per instructions below |
-| `libcudnn.so.9: cannot open` | Missing cuDNN | `sudo apt install libcudnn9-cuda-12` |
-| `cublasLtGetVersion` | CUDA 12/13 mismatch | Set LD_LIBRARY_PATH (see "Running on CUDA 13") |
-| `PortAudio library not found` | Missing audio lib | `sudo apt install libportaudio2` |
-| `No module named 'huggingface_hub'` | Missing dep (older installs) | `uv sync` to reinstall |
-| `TypeError: unexpected keyword argument 'path'` | Old onnx-asr (older installs) | `uv sync` to reinstall |
+| Error | Fix |
+|-------|-----|
+| `CUDA not available` | Re-run installer, check GPU with `nvidia-smi` |
+| `No accessible keyboards` | Run `sudo usermod -a -G input $USER`, log out/in |
+| Server won't start | Check if port 9876 is in use: `lsof -i :9876` |
+
+## Features
+
+- **Real-time transcription** (40-200ms latency after warmup)
+- **Push-to-Talk**: Global hotkey (Ctrl+Super) or terminal (spacebar)
+- **Output modes**: stdout, type-to-window, clipboard
+- **Audio feedback**: Click sounds with container support
+- **30-second auto-submit** for long recordings
+- **GPU-only** (CUDA/TensorRT) - fails fast if unavailable
 
 ---
 
-## Advanced Usage
+<details>
+<summary><strong>Advanced: Developer Setup</strong></summary>
 
-### Developer Setup (Git Clone)
-
-For contributing or developing:
+### Git Clone
 
 ```bash
 git clone https://github.com/AeyeOps/ai-essentials.git
@@ -123,227 +141,41 @@ cd ai-essentials/packages/stt-service
 ./scripts/install-gb10.sh
 ```
 
-### Testing in a Sandbox
-
-Test the curl installer in a disposable Docker container with GPU and audio passthrough:
+### Docker Sandbox
 
 ```bash
-# Start interactive sandbox
-./scripts/test-sandbox.sh
-
-# Inside the container, run the one-liner:
-curl -fsSL https://cdn.jsdelivr.net/gh/AeyeOps/ai-essentials@main/packages/stt-service/install.sh | bash
-
-# Test the service
-cd ~/stt-service
-./scripts/stt-server.sh &
-./scripts/stt-client.sh --ptt    # Hold spacebar to record
-
-# In another terminal (optional)
-./scripts/test-sandbox.sh --attach
+./scripts/test-sandbox.sh        # Start container
+# Inside: run curl installer, test PTT
+./scripts/test-sandbox.sh --clean  # Rebuild image
 ```
-
-Other modes:
-```bash
-./scripts/test-sandbox.sh --clean  # Remove image to rebuild fresh
-./scripts/test-sandbox.sh --help   # Show usage
-```
-
-Requires Docker and [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html).
-
-### x86_64 Installation
-
-For x86_64 systems with NVIDIA GPU:
-
-```bash
-# Install base package
-uv sync
-
-# Install with GPU support (x86_64 only)
-uv sync --extra gpu
-
-# Or manually install GPU runtime
-pip install onnxruntime-gpu
-```
-
-### ARM64 / GB10 Manual Installation
-
-If the install script doesn't work, here are the manual steps:
-
-```bash
-# Install base package (requires Python 3.12)
-uv sync --python 3.12
-
-# Install ARM64 GPU wheel (not available on PyPI)
-uv pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/onnxruntime_gpu-1.24.0-cp312-cp312-linux_aarch64.whl
-
-# Install CUDA 12 compatibility libraries
-sudo apt-get install -y libcudnn9-cuda-12 libcublas-12-6 libportaudio2
-
-# Verify GPU is available
-python -c "import onnxruntime as ort; print(ort.get_available_providers())"
-# Should show: ['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider']
-```
-
-### Running on CUDA 13
-
-The Ultralytics wheel was built for CUDA 12. On CUDA 13 systems (GB10), set the library path to use CUDA 12 cuBLAS:
-
-```bash
-export LD_LIBRARY_PATH=/usr/local/cuda-12.6/targets/sbsa-linux/lib:$LD_LIBRARY_PATH
-stt-server  # or any other command
-```
-
-The provided shell scripts (`stt-server.sh`, `stt-client.sh`) set this automatically.
-
-### Pre-downloading Models
-
-Models are automatically downloaded on first use. For offline deployment:
-
-```bash
-# Download default model (English)
-./scripts/download-models.sh
-
-# Download multilingual model
-./scripts/download-models.sh nemo-parakeet-tdt-0.6b-v3
-
-# List available models
-./scripts/download-models.sh --list
-```
-
-### Global Hotkey Mode (Desktop)
-
-By default, PTT uses **terminal mode** (spacebar) which works everywhere including Docker/SSH. For **global hotkey mode** (Ctrl+Super) on Linux desktops, additional setup is required:
-
-```bash
-# 1. Install evdev for global keyboard capture
-cd ~/stt-service
-uv pip install evdev
-
-# 2. Add yourself to the input group (required for /dev/input access)
-sudo usermod -a -G input $USER
-
-# 3. Log out and back in for group change to take effect
-
-# 4. Verify access
-ls -la /dev/input/event*  # Should be readable
-
-# 5. Run PTT - it auto-detects evdev and uses Ctrl+Super
-./scripts/stt-client.sh --ptt
-```
-
-The client automatically detects if evdev is available:
-- **evdev available**: Uses global hotkey (Ctrl+Super by default)
-- **evdev unavailable**: Falls back to terminal mode (spacebar)
-
-Customize the hotkey via environment variable:
-```bash
-export STT_PTT_HOTKEY='["LEFTCTRL", "LEFTALT"]'  # Ctrl+Alt instead
-```
-
-### Server and Client Options
-
-```bash
-# Server with options
-stt-server --host 0.0.0.0 --port 8080 --provider tensorrt -v
-
-# Client modes
-stt-client                     # Single recording (Enter or Ctrl+C to stop)
-stt-client --ptt               # PTT mode: hold spacebar to record
-stt-client --ptt -v            # PTT with verbose logging to file
-stt-client --output type       # Type into focused window (Linux/xdotool)
-stt-client --output clipboard  # Copy to clipboard
-stt-client --test              # Test connection only
-```
-
-PTT mode environment variables:
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `STT_PTT_TERMINAL_HOTKEY` | `\x00` (space) | Terminal mode hotkey character |
-| `STT_PTT_MAX_DURATION` | `30` | Auto-submit after N seconds |
-| `STT_PTT_CLICK_SOUND` | `true` | Enable audio feedback |
 
 ### Python API
 
 ```python
-from stt_service import Transcriber, PTTClient, settings
+from stt_service import Transcriber
 
-# Direct transcription
 transcriber = Transcriber()
 transcriber.load()
 text = transcriber.transcribe(audio_array, sample_rate=16000)
-
-# PTT client
-async def main():
-    client = PTTClient()
-    await client.connect()
-    text = await client.record_and_transcribe()
-    await client.disconnect()
 ```
 
 ### WebSocket Protocol
 
-#### Client → Server
-
+**Client → Server:**
 ```json
-// Configuration (send first)
-{"type": "config", "sample_rate": 16000, "language": "en"}
-
-// Audio: Binary frames (16-bit PCM, mono)
-
-// End stream
-{"type": "end"}
-
-// Keep alive
-{"type": "keepalive"}
+{"type": "config", "sample_rate": 16000}  // First
+// Binary frames: 16-bit PCM mono
+{"type": "end"}  // Triggers transcription
 ```
 
-#### Server → Client
-
+**Server → Client:**
 ```json
-// Ready
 {"type": "ready", "session_id": "abc123"}
-
-// Final transcription
-{"type": "final", "text": "hello world", "confidence": 1.0}
-
-// Errors
+{"type": "final", "text": "hello", "confidence": 1.0}
 {"type": "error", "code": "BUFFER_FULL", "message": "..."}
 ```
 
-#### Error Codes
-
-| Code | Description |
-|------|-------------|
-| `NOT_CONFIGURED` | Audio sent before config message |
-| `BUFFER_FULL` | Audio exceeds 30s limit |
-| `PARSE_ERROR` | Invalid JSON message |
-| `TRANSCRIPTION_ERROR` | Model inference failed |
-| `SERVER_FULL` | Max connections reached |
-| `INTERNAL` | Unexpected server error |
-
-## Architecture
-
-```
-┌─────────────────┐     WebSocket      ┌─────────────────────────┐
-│  PTT Client     │ ◄──────────────────► │  STT Server            │
-│  (sounddevice)  │     PCM chunks      │  (onnx-asr + Parakeet) │
-└─────────────────┘     ──────────►     │  GPU inference         │
-                        ◄──────────     └─────────────────────────┘
-                        JSON transcripts
-```
-
-## Features
-
-- **Real-time transcription** via WebSocket (40-200ms latency after model warmup)
-- **Push-to-Talk modes**:
-  - Terminal mode: Spacebar (hold to record) - works in Docker/SSH
-  - Global hotkey: Ctrl+Super (requires evdev, Linux desktop)
-- **Multiple output modes**: stdout, type-to-window (xdotool), clipboard
-- **Audio feedback**: Click/unclick sounds with paplay fallback for containers
-- **GPU-only execution** (CUDA/TensorRT) - fails fast if unavailable
-- **30-second auto-submit** with seamless continuation for long recordings
-- Configurable via environment variables
+</details>
 
 ## License
 
