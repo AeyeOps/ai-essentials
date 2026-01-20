@@ -1093,9 +1093,9 @@ show_completion() {
             echo -e "  After logging back in, press ${GREEN}Ctrl+Super${NC} in any app to dictate."
             echo -e "  Look for the ${GREEN}green tray icon${NC} (turns red when recording)."
         else
-            # Already in input group - start client now
+            # Already in input group - start client now via desktop entry
             echo -e "Starting AEO Push-to-Talk..."
-            if "$INSTALL_DIR/scripts/stt-client.sh" --ptt --daemon --tray &>/dev/null & then
+            if gtk-launch aeo-ptt 2>/dev/null; then
                 sleep 1
                 echo -e "${GREEN}✓${NC} Client started (check for tray icon)"
                 echo ""
@@ -1103,7 +1103,7 @@ show_completion() {
                 echo -e "  Look for the ${GREEN}green tray icon${NC} (turns red when recording)."
             else
                 echo -e "${YELLOW}Could not start client automatically${NC}"
-                echo -e "  Start manually: $INSTALL_DIR/scripts/stt-client.sh --ptt --daemon --tray &"
+                echo -e "  Run: ${DIM}gtk-launch aeo-ptt${NC}"
             fi
         fi
         echo ""
