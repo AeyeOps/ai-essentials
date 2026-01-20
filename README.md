@@ -1,82 +1,212 @@
-AI Essentials
+# AI Essentials
 
-A public, general-purpose collection of scripts, docs, and utilities that support modern AI-based development: local tooling, cloud workflows, model evaluation, data handling, ops, and best practices. This repository is intended to be practical, lightweight, and framework-agnostic.
+**Production-ready tools for AI developers on Linux GPU workstations.**
 
-- Home: https://github.com/AeyeOps/ai-essentials
-- Maintainer: AeyeOps Support (support@aeyeops.com)
+Skip the setup grind. Get a complete AI development environment with one-line installers: speech-to-text that works system-wide, a tuned terminal stack, and battle-tested configs for high-performance hardware.
 
-Contents
-- `packages/`: Self-contained service packages
-  - `stt-service/`: GPU-accelerated Speech-to-Text with WebSocket streaming (see below)
-- `scripts/`: CLI helpers and setup scripts for common environments.
-  - `setup-ai-dev-stack.sh`: Comprehensive AI developer environment setup (terminal, tools, runtimes)
-  - `google-chrome-wsl2.sh`: Chrome launcher optimized for WSL2 browser automation
-  - `update_cli_ubuntu.sh`: Development environment setup for Ubuntu systems
-- `configs/`: Pre-configured dotfiles optimized for high-performance GPU workstations.
-  - `kitty/`: GPU-optimized Kitty terminal config (OLED black, 4K ready, low-latency)
-  - `zellij/`: Modern Zellij theme matching Powerlevel10k classic darkest
-  - `pop-shell/`: Pop Shell tiling settings and cheatsheet
-  - `zsh/`: Powerlevel10k configuration
-- `docs/`: Short guides, patterns, and checklists for AI dev and ops.
-- `AGENTS.md`: Guidance and conventions for agentic tooling and assistants working in this repo.
+```mermaid
+graph LR
+    subgraph "AI Essentials"
+        STT["🎤 STT Service<br/>Speech-to-Text"]
+        DEV["🛠️ Dev Stack<br/>Terminal + Tools"]
+        CFG["⚙️ Configs<br/>GPU-Optimized"]
+    end
 
-Quick Start
-1. Review the license and contribution guidelines.
-2. Explore `scripts/` for useful automation. Run scripts with caution and review them first.
-3. Browse `docs/` for task-oriented guidance and patterns.
+    STT --> |"Ctrl+Super"| APP["Any App"]
+    DEV --> |"one script"| ENV["Dev Environment"]
+    CFG --> |"dotfiles"| TERM["Terminal"]
+```
 
-STT Service (Speech-to-Text)
-GPU-accelerated speech-to-text using NVIDIA Parakeet ONNX models. One-line install:
+---
+
+## What's Inside
+
+| Component | What It Does | Install |
+|-----------|--------------|---------|
+| [**STT Service**](#-stt-service) | Dictate anywhere with Ctrl+Super | `curl ...install.sh \| bash` |
+| [**Dev Stack**](#-ai-developer-stack) | Complete terminal environment | `./setup-ai-dev-stack.sh` |
+| [**Configs**](#-configuration-files) | OLED/4K-optimized dotfiles | Copy to `~/.config/` |
+
+---
+
+## 🎤 STT Service
+
+**Speak instead of type — in any application.**
+
+GPU-accelerated speech-to-text using NVIDIA Parakeet models. Press a hotkey, talk, release — text appears at your cursor. Works in VS Code, browsers, Slack, terminals, everywhere.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
 ```
 
-Features:
-- **System-wide auto-start**: Server on boot, client at login with tray icon
-- **Real-time transcription** via WebSocket (40-200ms latency after warmup)
-- **Push-to-Talk modes**: Global hotkey (Ctrl+Super) or terminal spacebar
-- **Multiple outputs**: stdout, type-to-window, clipboard
-- **GPU-only execution** (CUDA/TensorRT) - fails fast if unavailable
+Answer yes to all prompts, log out and back in. Done.
 
-After install, log out and back in. Press **Ctrl+Super** in any app to dictate.
+### How It Works
 
-See [packages/stt-service/README.md](packages/stt-service/README.md) for full documentation.
+```mermaid
+sequenceDiagram
+    participant U as You
+    participant T as Tray Icon
+    participant S as STT Server
+    participant A as Active Window
 
-AI Developer Environment Setup
-The `scripts/setup-ai-dev-stack.sh` script provides an idempotent setup for a complete AI development environment on Linux (amd64/arm64). Components include:
-- **Terminal**: Kitty (GPU-optimized for OLED/4K, low-latency settings)
-- **Shell**: Zsh + Oh-My-Zsh + Powerlevel10k + MesloLGS Nerd Font
-- **File Manager**: Yazi (fast, Rust-based TUI file manager with previews)
-- **Multiplexer**: Zellij (modern terminal multiplexer with custom p10k theme)
-- **Tiling**: Pop Shell (GNOME tiling extension with optimized settings)
-- **CLI Tools**: ripgrep, fd, fzf, bat, eza, delta, glow
-- **Runtimes**: NVM + Node.js 22 LTS, Mamba + Python dev environment, Bun
-- **Utilities**: direnv for per-project environment variables
+    Note over T: 🟢 Ready
+    U->>T: Press Ctrl+Super
+    Note over T: 🔴 Recording
+    U->>S: Audio stream
+    U->>T: Release keys
+    S->>A: Type transcribed text
+    Note over T: 🟢 Ready
+```
 
-The script is safe to run multiple times - it detects existing installations and skips them.
+### Key Features
 
-Configuration Files
-Pre-configured dotfiles are available in `configs/` for manual installation or reference:
-- **Kitty** (`configs/kitty/kitty.conf`): True black background for OLED, 4K 2x3 grid sizing, 50k scrollback
-- **Zellij** (`configs/zellij/config.kdl`): Modern theme format with semantic component names
-- **Pop Shell** (`configs/pop-shell/`): Tiling settings (gaps, smart-gaps, active-hint) and keybinding cheatsheet
+| Feature | Description |
+|---------|-------------|
+| **System-wide hotkey** | Ctrl+Super works in any app (X11) |
+| **Auto-start** | Server on boot, client at login |
+| **Tray indicator** | Gray (connecting) → Green (ready) → Red (recording) |
+| **Fast** | 40-200ms latency after GPU warmup |
+| **Flexible output** | Type at cursor, copy to clipboard, or stdout |
 
-Browser Automation in WSL2
-For developers using browser automation tools (Playwright, Puppeteer, Chrome DevTools Protocol) in WSL2 environments, the `scripts/google-chrome-wsl2.sh` script provides a reliable Chrome launcher that handles common WSL2 issues including D-Bus sessions, GPU acceleration limitations, and display server compatibility. This enables consistent browser automation testing and development workflows in WSL2.
+### Requirements
 
-Goals
-- Keep utilities portable and dependency-light.
-- Prefer clear, auditable bash and Python scripts.
-- Document assumptions and side effects.
-- Avoid vendor lock-in where reasonable; provide adapters.
+- NVIDIA GPU with CUDA support
+- Ubuntu/Debian-based Linux
+- ~3GB disk space (model + dependencies)
 
-Contributing
-Contributions are welcome. Please see `CONTRIBUTING.md` and the `CODE_OF_CONDUCT.md`.
+📖 [Full documentation](packages/stt-service/README.md)
 
-Security
-- Avoid committing secrets. Use environment variables and secret managers.
-- See `.gitignore` and consider adding local overrides in `.gitignore.local` (not tracked).
+---
 
-License
-This project is licensed under the MIT License. See `LICENSE`.
+## 🛠️ AI Developer Stack
+
+**A complete terminal environment in one script.**
+
+Everything you need for AI development: modern terminal, smart shell, fast tools, multiple runtimes. Idempotent — safe to run multiple times.
+
+```bash
+# Clone and run
+git clone https://github.com/AeyeOps/ai-essentials.git
+cd ai-essentials
+./scripts/setup-ai-dev-stack.sh
+```
+
+### What Gets Installed
+
+```mermaid
+graph TD
+    subgraph Terminal
+        K[Kitty<br/>GPU-accelerated]
+        Z[Zellij<br/>Multiplexer]
+    end
+
+    subgraph Shell
+        ZSH[Zsh + Oh-My-Zsh]
+        P10K[Powerlevel10k]
+        FONT[MesloLGS Nerd Font]
+    end
+
+    subgraph Tools
+        CLI[ripgrep, fd, fzf<br/>bat, eza, delta, glow]
+        YAZI[Yazi File Manager]
+        POP[Pop Shell Tiling]
+    end
+
+    subgraph Runtimes
+        NODE[Node.js 22 via NVM]
+        PY[Python via Mamba]
+        BUN[Bun]
+    end
+```
+
+| Category | Components |
+|----------|------------|
+| **Terminal** | Kitty (GPU-optimized), Zellij (multiplexer) |
+| **Shell** | Zsh, Oh-My-Zsh, Powerlevel10k, MesloLGS Nerd Font |
+| **CLI Tools** | ripgrep, fd, fzf, bat, eza, delta, glow |
+| **File Manager** | Yazi (Rust-based TUI with previews) |
+| **Tiling** | Pop Shell (GNOME extension) |
+| **Runtimes** | NVM + Node.js 22, Mamba + Python, Bun |
+| **Utilities** | direnv (per-project env vars) |
+
+Works on both **amd64** and **arm64** (including NVIDIA GB10/DGX Spark).
+
+---
+
+## ⚙️ Configuration Files
+
+**Pre-tuned dotfiles for high-performance GPU systems.**
+
+Located in `configs/` — copy what you need or use as reference.
+
+| Config | Highlights |
+|--------|------------|
+| **Kitty** | True black (#000000) for OLED, 4K grid sizing, 50k scrollback, low-latency GPU settings |
+| **Zellij** | Modern theme matching Powerlevel10k classic darkest |
+| **Pop Shell** | 4px gaps, smart-gaps, active-hint, hidden window titles |
+
+```bash
+# Example: Install Kitty config
+mkdir -p ~/.config/kitty
+cp configs/kitty/kitty.conf ~/.config/kitty/
+```
+
+---
+
+## 🌐 WSL2 Browser Automation
+
+For developers running Playwright, Puppeteer, or Chrome DevTools Protocol in WSL2:
+
+```bash
+./scripts/google-chrome-wsl2.sh
+```
+
+Handles D-Bus sessions, GPU acceleration workarounds, and display server compatibility automatically.
+
+---
+
+## Project Goals
+
+- **Practical** — Solve real problems, not theoretical ones
+- **Lightweight** — Minimal dependencies, auditable scripts
+- **Portable** — Works across amd64/arm64, Ubuntu/Debian
+- **No lock-in** — Framework-agnostic, standard tools
+
+---
+
+## Repository Structure
+
+```
+ai-essentials/
+├── packages/
+│   └── stt-service/      # Speech-to-Text service
+├── scripts/
+│   ├── setup-ai-dev-stack.sh
+│   ├── google-chrome-wsl2.sh
+│   └── update_cli_ubuntu.sh
+├── configs/
+│   ├── kitty/
+│   ├── zellij/
+│   └── pop-shell/
+├── docs/                 # Guides and patterns
+└── AGENTS.md            # AI assistant conventions
+```
+
+---
+
+## Contributing
+
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
+## Security
+
+Never commit secrets. Use environment variables and secret managers. See `.gitignore` for excluded patterns.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+**Maintainer:** [AeyeOps](https://github.com/AeyeOps) (support@aeyeops.com)
