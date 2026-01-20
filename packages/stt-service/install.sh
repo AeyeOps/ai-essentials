@@ -199,9 +199,9 @@ install_autostart() {
     info "Ensuring GPU runtime..."
     uv pip install "$ONNX_WHEEL"
 
-    # Create autostart entry from template
-    info "Creating autostart entry..."
-    mkdir -p "$HOME/.config/autostart"
+    # Create desktop entry from template (both autostart and applications)
+    info "Creating desktop entries..."
+    mkdir -p "$HOME/.config/autostart" "$HOME/.local/share/applications"
     if [[ ! -f "$INSTALL_DIR/scripts/aeo-ptt.desktop.template" ]]; then
         warn "Template not found: $INSTALL_DIR/scripts/aeo-ptt.desktop.template"
         return 1
@@ -209,13 +209,14 @@ install_autostart() {
     sed "s|{{INSTALL_DIR}}|$INSTALL_DIR|g" \
         "$INSTALL_DIR/scripts/aeo-ptt.desktop.template" \
         > "$HOME/.config/autostart/aeo-ptt.desktop"
+    cp "$HOME/.config/autostart/aeo-ptt.desktop" "$HOME/.local/share/applications/"
 
-    # Verify file was created
+    # Verify files were created
     if [[ ! -f "$HOME/.config/autostart/aeo-ptt.desktop" ]]; then
         warn "Failed to create autostart entry"
         return 1
     fi
-    success "Autostart entry created"
+    success "Desktop entries created"
 
     # Ensure xdotool is installed (for typing text at cursor)
     if ! has_cmd xdotool; then
