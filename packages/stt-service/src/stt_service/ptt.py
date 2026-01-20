@@ -389,18 +389,41 @@ class PTTController:
         try:
             import numpy as np
 
-            duration = 0.08  # 80ms
-            t = np.linspace(0, duration, int(cls._sample_rate * duration), False)
+            sr = cls._sample_rate
+            duration = 0.08  # 80ms tone
 
-            # Click sound - higher pitch rising tone
+            # Add silence padding to prevent click/pop artifacts from audio subsystem
+            pad_ms = 5  # 5ms padding
+            pad_samples = int(sr * pad_ms / 1000)
+            tone_samples = int(sr * duration)
+
+            t = np.linspace(0, duration, tone_samples, False)
+
+            # Smooth fade-in (cosine ramp, 3ms)
+            fade_samples = int(sr * 0.003)
+            fade_in = 0.5 * (1 - np.cos(np.pi * np.arange(fade_samples) / fade_samples))
+
+            # Click sound - higher pitch (880Hz)
             freq = 880
             envelope = np.exp(-t * 15) * (1 - np.exp(-t * 100))
-            click = (np.sin(2 * np.pi * freq * t) * envelope * 0.25).astype(np.float32)
+            click_tone = np.sin(2 * np.pi * freq * t) * envelope * 0.25
+            click_tone[:fade_samples] *= fade_in  # Apply fade-in
+            click = np.concatenate([
+                np.zeros(pad_samples, dtype=np.float32),
+                click_tone.astype(np.float32),
+                np.zeros(pad_samples, dtype=np.float32),
+            ])
 
-            # Unclick sound - lower pitch falling tone
+            # Unclick sound - lower pitch (440Hz)
             freq = 440
             envelope = np.exp(-t * 20) * (1 - np.exp(-t * 100))
-            unclick = (np.sin(2 * np.pi * freq * t) * envelope * 0.25).astype(np.float32)
+            unclick_tone = np.sin(2 * np.pi * freq * t) * envelope * 0.25
+            unclick_tone[:fade_samples] *= fade_in  # Apply fade-in
+            unclick = np.concatenate([
+                np.zeros(pad_samples, dtype=np.float32),
+                unclick_tone.astype(np.float32),
+                np.zeros(pad_samples, dtype=np.float32),
+            ])
 
             cls._sounds = {"click": click, "unclick": unclick}
         except Exception as e:
