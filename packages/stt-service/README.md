@@ -119,6 +119,17 @@ cd ~/stt-service && ./install.sh --uninstall
 | `No accessible keyboards` | Run `sudo usermod -a -G input $USER`, log out/in |
 | Server won't start | Check if port 9876 is in use: `lsof -i :9876` |
 
+## Architecture
+
+```
+┌─────────────────┐     WebSocket      ┌─────────────────────────┐
+│  PTT Client     │ ◄────────────────► │  STT Server             │
+│  (sounddevice)  │     PCM chunks     │  (onnx-asr + Parakeet)  │
+└─────────────────┘     ──────────►    │  GPU inference          │
+                        ◄──────────    └─────────────────────────┘
+                        JSON transcripts
+```
+
 ## Features
 
 - **Real-time transcription** (40-200ms latency after warmup)
