@@ -965,7 +965,8 @@ show_completion() {
     # ─────────────────────────────────────────────────────────────────
     # Offer: Global hotkey setup (input group)
     # ─────────────────────────────────────────────────────────────────
-    if [[ "$in_container" == "0" ]] && ! groups | grep -q '\binput\b'; then
+    # Use id -nG to check /etc/group directly (not session groups)
+    if [[ "$in_container" == "0" ]] && ! id -nG "$USER" | grep -q '\binput\b'; then
         echo -e "${BOLD}Global Hotkey Setup${NC}"
         echo -e "${DIM}Enable Ctrl+Super hotkey for push-to-talk (works in any app)${NC}"
         echo ""
@@ -1018,7 +1019,10 @@ show_completion() {
     # Offer: Auto-start PTT client at login (requires global hotkey + systemd)
     # ─────────────────────────────────────────────────────────────────
     local has_autostart=0
-    if [[ "$in_container" == "0" ]] && [[ "$has_global_hotkey" == "1" ]] && service_exists; then
+    if [[ -f "$HOME/.config/autostart/aeo-ptt.desktop" ]]; then
+        # Already configured
+        has_autostart=1
+    elif [[ "$in_container" == "0" ]] && [[ "$has_global_hotkey" == "1" ]] && service_exists; then
         echo -e "${BOLD}Auto-Start Client${NC}"
         echo -e "${DIM}Start AEO Push-to-Talk automatically at login (Ctrl+Super in any app)${NC}"
         echo ""
