@@ -1300,6 +1300,10 @@ main() {
 # Argument parsing
 # ═══════════════════════════════════════════════════════════════════
 
+# Save original directory to return to after install (avoids direnv errors)
+_ORIGINAL_DIR="$(pwd)"
+trap 'cd "$_ORIGINAL_DIR" 2>/dev/null || true' EXIT
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help)
