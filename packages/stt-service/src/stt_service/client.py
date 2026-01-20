@@ -797,6 +797,20 @@ def main() -> None:
             logger.error("--tray requires --ptt mode")
             sys.exit(1)
 
+        # Singleton check: exit if another daemon is already running
+        import subprocess
+        result = subprocess.run(
+            ["pgrep", "-f", "stt-client.*--daemon"],
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            # Found existing processes - check if it's not just us
+            pids = result.stdout.decode().strip().split('\n')
+            other_pids = [p for p in pids if p and int(p) != os.getpid()]
+            if other_pids:
+                logger.info(f"Daemon already running (PID {other_pids[0]}), exiting")
+                sys.exit(0)
+
     try:
         if args.ptt:
             exit_code = asyncio.run(run_ptt_mode(args))
