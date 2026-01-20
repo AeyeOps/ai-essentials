@@ -6,6 +6,8 @@ A public, general-purpose collection of scripts, docs, and utilities that suppor
 - Maintainer: AeyeOps Support (support@aeyeops.com)
 
 Contents
+- `packages/`: Self-contained service packages
+  - `stt-service/`: GPU-accelerated Speech-to-Text with WebSocket streaming (see below)
 - `scripts/`: CLI helpers and setup scripts for common environments.
   - `setup-ai-dev-stack.sh`: Comprehensive AI developer environment setup (terminal, tools, runtimes)
   - `google-chrome-wsl2.sh`: Chrome launcher optimized for WSL2 browser automation
@@ -22,6 +24,28 @@ Quick Start
 1. Review the license and contribution guidelines.
 2. Explore `scripts/` for useful automation. Run scripts with caution and review them first.
 3. Browse `docs/` for task-oriented guidance and patterns.
+
+STT Service (Speech-to-Text)
+GPU-accelerated speech-to-text using NVIDIA Parakeet ONNX models. One-line install:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
+```
+
+Features:
+- **Real-time transcription** via WebSocket (40-200ms latency after warmup)
+- **Push-to-Talk modes**: Global hotkey (Ctrl+Super) or terminal spacebar
+- **Multiple outputs**: stdout, type-to-window, clipboard
+- **GPU-only execution** (CUDA/TensorRT) - fails fast if unavailable
+
+Quick usage after install:
+```bash
+cd ~/stt-service
+./scripts/stt-server.sh &       # Start server
+./scripts/stt-client.sh --ptt   # PTT mode (hold space to record)
+```
+
+See [packages/stt-service/README.md](packages/stt-service/README.md) for full documentation.
 
 AI Developer Environment Setup
 The `scripts/setup-ai-dev-stack.sh` script provides an idempotent setup for a complete AI development environment on Linux (amd64/arm64). Components include:

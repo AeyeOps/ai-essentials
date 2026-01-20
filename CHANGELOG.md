@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.12] - 2026-01-20
+
+### Added
+- STT Service Push-to-Talk (PTT) terminal mode for Docker/SSH environments
+  - Spacebar-based recording (hold to record, release to transcribe)
+  - Clean timing output format: `[2.1s → 45ms] transcribed text`
+  - 30-second auto-submit with seamless continuation
+  - Audio feedback (click/unclick sounds) with paplay fallback for containers
+  - Robust key release detection with two-phase timeout algorithm
+- STT Service test sandbox (`packages/stt-service/scripts/test-sandbox.sh`)
+  - CUDA 13 Ubuntu 24.04 container with GPU passthrough
+  - PulseAudio client configuration for audio output in Docker
+  - Automatic UID/GID matching for socket permissions
+
+### Changed
+- STT Service installer now always downloads from GitHub (removed local source detection)
+- STT Service logging moved to file-only (no console spam with -v flag)
+- Server and client logs written to `~/.local/state/stt-service/`
+
+### Fixed
+- PTT race condition where recording could be cancelled before WebSocket connection completed
+- Audio device selection now uses system default instead of first available device
+- Installer no longer deletes itself when run from within installation directory
+
 ## [0.0.11] - 2026-01-19
 
 ### Added

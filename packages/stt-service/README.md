@@ -37,7 +37,18 @@ After installation, run:
 ```bash
 cd ~/stt-service
 ./scripts/stt-server.sh        # Start server (terminal 1)
-./scripts/stt-client.sh        # Run client (terminal 2)
+./scripts/stt-client.sh --ptt  # PTT mode (terminal 2)
+```
+
+**PTT Mode**: Hold spacebar to record, release to transcribe. Output shows timing:
+```
+[2.1s → 45ms] hello this is a test
+[0.3s → 38ms] (silence)
+```
+
+For single recordings without PTT, omit `--ptt`:
+```bash
+./scripts/stt-client.sh        # Records until Enter or Ctrl+C
 ```
 
 ## Uninstall
@@ -114,23 +125,28 @@ cd ai-essentials/packages/stt-service
 
 ### Testing in a Sandbox
 
-Test the installer in a disposable Docker container with GPU passthrough:
+Test the curl installer in a disposable Docker container with GPU and audio passthrough:
 
 ```bash
-# Interactive sandbox (recommended)
+# Start interactive sandbox
 ./scripts/test-sandbox.sh
 
-# Inside the container:
-bash /mnt/install.sh              # Test install
-bash /mnt/install.sh --uninstall  # Test uninstall
-nvidia-smi                        # Verify GPU
-exit                              # Done (container auto-deletes)
+# Inside the container, run the one-liner:
+curl -fsSL https://cdn.jsdelivr.net/gh/AeyeOps/ai-essentials@main/packages/stt-service/install.sh | bash
+
+# Test the service
+cd ~/stt-service
+./scripts/stt-server.sh &
+./scripts/stt-client.sh --ptt    # Hold spacebar to record
+
+# In another terminal (optional)
+./scripts/test-sandbox.sh --attach
 ```
 
 Other modes:
 ```bash
-./scripts/test-sandbox.sh --auto   # Non-interactive full test
 ./scripts/test-sandbox.sh --clean  # Remove image to rebuild fresh
+./scripts/test-sandbox.sh --help   # Show usage
 ```
 
 Requires Docker and [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html).
@@ -202,11 +218,20 @@ Models are automatically downloaded on first use. For offline deployment:
 stt-server --host 0.0.0.0 --port 8080 --provider tensorrt -v
 
 # Client modes
-stt-client                  # Record and print to stdout
-stt-client --output type    # Type into focused window (Linux)
+stt-client                     # Single recording (Enter or Ctrl+C to stop)
+stt-client --ptt               # PTT mode: hold spacebar to record
+stt-client --ptt -v            # PTT with verbose logging to file
+stt-client --output type       # Type into focused window (Linux/xdotool)
 stt-client --output clipboard  # Copy to clipboard
-stt-client --test           # Test connection only
+stt-client --test              # Test connection only
 ```
+
+PTT mode environment variables:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STT_PTT_TERMINAL_HOTKEY` | `\x00` (space) | Terminal mode hotkey character |
+| `STT_PTT_MAX_DURATION` | `30` | Auto-submit after N seconds |
+| `STT_PTT_CLICK_SOUND` | `true` | Enable audio feedback |
 
 ### Python API
 
@@ -280,11 +305,15 @@ async def main():
 
 ## Features
 
-- Real-time speech transcription via WebSocket
-- Push-to-talk (PTT) client with multiple output modes
-- GPU-only execution (CUDA/TensorRT) - fails fast if unavailable
+- **Real-time transcription** via WebSocket (40-200ms latency after model warmup)
+- **Push-to-Talk modes**:
+  - Terminal mode: Spacebar (hold to record) - works in Docker/SSH
+  - Global hotkey: Ctrl+Super (requires evdev, Linux desktop)
+- **Multiple output modes**: stdout, type-to-window (xdotool), clipboard
+- **Audio feedback**: Click/unclick sounds with paplay fallback for containers
+- **GPU-only execution** (CUDA/TensorRT) - fails fast if unavailable
+- **30-second auto-submit** with seamless continuation for long recordings
 - Configurable via environment variables
-- 30-second max audio length per transcription
 
 ## License
 

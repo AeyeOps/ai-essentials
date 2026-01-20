@@ -1,6 +1,6 @@
 [project]
 name = "stt-service"
-version = "0.1.0"
+version = "0.2.0"
 description = "Speech-to-Text service using Parakeet ONNX models with WebSocket streaming"
 readme = "README.md"
 license = "MIT"
