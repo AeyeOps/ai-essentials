@@ -390,52 +390,14 @@ class PTTController:
         # Initialize sounds on first instance
         self._init_sounds()
 
-    # Cached output device (None = not checked, -1 = no valid device found)
-    _output_device: Optional[int] = None
-
-    @classmethod
-    def _find_output_device(cls) -> Optional[int]:
-        """Find a device with output capability."""
-        if cls._output_device is not None:
-            return None if cls._output_device == -1 else cls._output_device
-
-        try:
-            import sounddevice as sd
-            devices = sd.query_devices()
-
-            # First try default output
-            try:
-                default = sd.query_devices(kind='output')
-                if default['max_output_channels'] > 0:
-                    cls._output_device = default['index']
-                    return cls._output_device
-            except Exception:
-                pass
-
-            # Search for any device with output channels
-            for i, dev in enumerate(devices):
-                if dev['max_output_channels'] > 0:
-                    cls._output_device = i
-                    logger.debug(f"Using audio output device: {dev['name']}")
-                    return cls._output_device
-
-            cls._output_device = -1  # No valid device
-            return None
-        except Exception as e:
-            logger.debug(f"Could not query audio devices: {e}")
-            cls._output_device = -1
-            return None
-
     def _play_sound_sync(self, sound_type: str) -> None:
         """Synchronous sound playback (called from executor)."""
         try:
             import sounddevice as sd
-            device = self._find_output_device()
-            if device is not None and self._sounds and sound_type in self._sounds:
-                logger.debug(f"Playing {sound_type} sound on device {device}")
-                sd.play(self._sounds[sound_type], self._sample_rate, device=device)
-            else:
-                logger.debug(f"Cannot play {sound_type}: device={device}, sounds={bool(self._sounds)}")
+            if self._sounds and sound_type in self._sounds:
+                # Use system default output device (device=None)
+                sd.play(self._sounds[sound_type], self._sample_rate)
+                logger.debug(f"Playing {sound_type} sound")
         except Exception as e:
             logger.debug(f"Could not play {sound_type} sound: {e}")
 

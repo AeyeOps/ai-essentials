@@ -28,18 +28,8 @@ for i, d in enumerate(sd.query_devices()):
         marker = '*' if i == default_out else ' '
         print(f"  {marker} [{i}] {d['name']} ({', '.join(io)})")
 
-# Find first output device
-output_dev = None
-for i, d in enumerate(sd.query_devices()):
-    if d['max_output_channels'] > 0:
-        output_dev = i
-        break
-
-if output_dev is None:
-    print("\nERROR: No output device found!")
-    exit(1)
-
-print(f"\nUsing device [{output_dev}] for playback test...")
+# Use system default (None = default device)
+print(f"\nUsing system default output device...")
 
 # Generate click sounds (same as PTT)
 sr = 44100
@@ -55,14 +45,14 @@ envelope = np.exp(-t * 20) * (1 - np.exp(-t * 100))
 unclick = (np.sin(2 * np.pi * 440 * t) * envelope * 0.25).astype(np.float32)
 
 print("\nPlaying 'click' sound (880Hz - PTT activate)...")
-sd.play(click, sr, device=output_dev)
+sd.play(click, sr)
 sd.wait()
 
 import time
 time.sleep(0.3)
 
 print("Playing 'unclick' sound (440Hz - PTT deactivate)...")
-sd.play(unclick, sr, device=output_dev)
+sd.play(unclick, sr)
 sd.wait()
 
 print("\nDone. If you heard two tones, audio output is working.")
