@@ -1061,8 +1061,8 @@ show_completion() {
         echo ""
     fi
 
-    # Logout reminder if needed
-    if [[ "$needs_logout" == "1" ]]; then
+    # Logout reminder if needed (but not if autostart - that section has its own)
+    if [[ "$needs_logout" == "1" ]] && [[ "$has_autostart" != "1" ]]; then
         echo -e "${YELLOW}${BOLD}► Log out and back in${NC} for group change to take effect"
         echo ""
     fi
@@ -1072,11 +1072,9 @@ show_completion() {
         # Fully automated setup - emphasize simplicity
         echo -e "${BOLD}You're all set!${NC}"
         echo ""
-        if [[ "$needs_logout" == "1" ]]; then
-            echo -e "  After logging back in, press ${GREEN}Ctrl+Super${NC} in any app to dictate."
-        else
-            echo -e "  Press ${GREEN}Ctrl+Super${NC} in any app to dictate."
-        fi
+        echo -e "${YELLOW}${BOLD}► Log out and back in${NC} to activate the tray icon."
+        echo ""
+        echo -e "  After logging back in, press ${GREEN}Ctrl+Super${NC} in any app to dictate."
         echo -e "  Look for the ${GREEN}green tray icon${NC} (turns red when recording)."
         echo ""
         echo -e "${DIM}  Optional: Test in terminal mode with spacebar:${NC}"
