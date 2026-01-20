@@ -306,7 +306,7 @@ def output_text(text: str, mode: str) -> None:
 
 
 def setup_logging(verbose: bool = False) -> None:
-    """Configure logging to file (DEBUG level).
+    """Configure logging to file with rotation (DEBUG level).
 
     Args:
         verbose: Reserved for future use. Currently all logs go to file only.
@@ -315,7 +315,12 @@ def setup_logging(verbose: bool = False) -> None:
         - Interactive: ~/.local/state/stt-service/client.log
         - Override: STT_LOG_DIR environment variable
         - systemd: use journalctl -u stt-client
+
+    Log rotation:
+        - Max size: 5MB per file
+        - Keeps 3 backup files (client.log.1, client.log.2, client.log.3)
     """
+    from logging.handlers import RotatingFileHandler
     from pathlib import Path
 
     # XDG state directory (standard for logs/state in user space)
@@ -324,8 +329,12 @@ def setup_logging(verbose: bool = False) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "client.log"
 
-    # File handler - always DEBUG, with rotation-friendly append
-    file_handler = logging.FileHandler(log_file)
+    # Rotating file handler - 5MB max, keep 3 backups
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=5 * 1024 * 1024,  # 5MB
+        backupCount=3,
+    )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -392,6 +401,35 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
     daemon_mode = getattr(args, 'daemon', False)
     tray_enabled = getattr(args, 'tray', False)
 
+    # Initialize tray indicator first (needed for device count callback)
+    tray = None
+    TrayStateEnum = None
+    if tray_enabled:
+        try:
+            from .tray import TrayIndicator, TrayState as TrayStateEnum
+
+            tray = TrayIndicator(on_quit=lambda: None)  # Wire quit handler later
+            tray.start()
+            logger.info("Tray indicator started")
+        except ImportError as e:
+            logger.warning(f"Tray dependencies not installed: {e}")
+            logger.warning("Continuing without tray indicator")
+        except Exception as e:
+            logger.warning(f"Could not start tray: {e}")
+            logger.warning("Continuing without tray indicator")
+
+    # Device count callback for tray state (KVM switch support)
+    def on_device_count_changed(count: int) -> None:
+        """Update tray state when keyboard count changes."""
+        if tray and TrayStateEnum:
+            if count == 0:
+                tray.set_state(TrayStateEnum.DEGRADED)
+            else:
+                # Only set READY if we're not recording
+                # (recording state is managed elsewhere)
+                if tray.state != TrayStateEnum.RECORDING:
+                    tray.set_state(TrayStateEnum.READY)
+
     # Try evdev first (production), fall back to terminal (Docker/no input access)
     listener = None
     use_evdev = False
@@ -402,10 +440,13 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
         from .ptt import EvdevHotkeyListener
 
         # Probe for accessible keyboards before committing to evdev
+        # Note: With hot-plug support, evdev mode works even with no keyboards initially
         keyboards_found = False
+        has_input_access = False
         for path in list_devices():
             try:
                 device = InputDevice(path)
+                has_input_access = True  # We can access at least one device
                 caps = device.capabilities()
                 if ecodes.EV_KEY in caps:
                     key_caps = caps[ecodes.EV_KEY]
@@ -417,21 +458,25 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
             except (PermissionError, OSError):
                 continue
 
-        if keyboards_found:
+        # Use evdev if we have input group access (keyboards may connect later via KVM)
+        if keyboards_found or has_input_access:
             listener = EvdevHotkeyListener(
                 on_activate=lambda: None,  # Callbacks wired by PTTController.run()
                 on_deactivate=lambda: None,
+                on_device_count_changed=on_device_count_changed,
             )
             hotkey_str = "+".join(settings.ptt.hotkey)
             use_evdev = True
             logger.info(f"Using evdev hotkey listener ({hotkey_str})")
+            if not keyboards_found:
+                logger.info("No keyboards currently connected (KVM may be switched away)")
         else:
-            logger.info("No accessible keyboards found, using terminal mode")
+            logger.info("No accessible input devices, using terminal mode")
 
     except ImportError:
         logger.info("evdev not available, using terminal mode")
 
-    # Fall back to terminal mode if evdev not available or no keyboard access
+    # Fall back to terminal mode if evdev not available or no input access
     if not use_evdev:
         listener = TerminalHotkeyListener(
             on_activate=lambda: None,
@@ -442,25 +487,9 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
     ptt = PTTController(listener=listener)
     client: Optional[PTTClient] = None
 
-    # Initialize tray indicator if requested
-    tray = None
-    if tray_enabled:
-        try:
-            from .tray import TrayIndicator, TrayState as TrayStateEnum
-
-            def on_tray_quit():
-                """Handle quit from tray menu."""
-                ptt.stop()
-
-            tray = TrayIndicator(on_quit=on_tray_quit)
-            tray.start()
-            logger.info("Tray indicator started")
-        except ImportError as e:
-            logger.warning(f"Tray dependencies not installed: {e}")
-            logger.warning("Continuing without tray indicator")
-        except Exception as e:
-            logger.warning(f"Could not start tray: {e}")
-            logger.warning("Continuing without tray indicator")
+    # Wire up tray quit handler now that ptt exists
+    if tray:
+        tray.on_quit = lambda: ptt.stop()
 
     # Set up safe print function (handles terminal raw mode)
     if hasattr(listener, 'print_normal'):

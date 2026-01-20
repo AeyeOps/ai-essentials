@@ -99,6 +99,14 @@ class PTTConfig(BaseSettings):
         default=30.0,
         description="Maximum recording duration before auto-submit",
     )
+    processing_timeout_seconds: float = Field(
+        default=60.0,
+        description="Max time in PROCESSING state before auto-reset to IDLE",
+    )
+    device_scan_interval: float = Field(
+        default=2.0,
+        description="Interval between device scans for hot-plug detection (seconds)",
+    )
 
 
 class ClientConfig(BaseSettings):

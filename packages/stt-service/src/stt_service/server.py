@@ -274,7 +274,7 @@ class STTServer:
 
 
 def setup_logging(verbose: bool = False) -> None:
-    """Configure logging to file (INFO level by default).
+    """Configure logging to file with rotation (INFO level by default).
 
     Args:
         verbose: If True, use DEBUG level. All logs go to file only.
@@ -283,8 +283,13 @@ def setup_logging(verbose: bool = False) -> None:
         - Interactive: ~/.local/state/stt-service/server.log
         - Override: STT_LOG_DIR environment variable
         - systemd: use journalctl -u stt-service
+
+    Log rotation:
+        - Max size: 5MB per file
+        - Keeps 3 backup files (server.log.1, server.log.2, server.log.3)
     """
     import os
+    from logging.handlers import RotatingFileHandler
     from pathlib import Path
 
     level = logging.DEBUG if verbose else logging.INFO
@@ -295,8 +300,12 @@ def setup_logging(verbose: bool = False) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "server.log"
 
-    # File handler only - no console spam
-    file_handler = logging.FileHandler(log_file)
+    # Rotating file handler - 5MB max, keep 3 backups
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=5 * 1024 * 1024,  # 5MB
+        backupCount=3,
+    )
     file_handler.setLevel(level)
     file_handler.setFormatter(logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

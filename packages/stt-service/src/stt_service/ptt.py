@@ -33,6 +33,11 @@ class EvdevHotkeyListener:
     Monitors keyboard for configured hotkey combo (e.g., Ctrl+Super).
     Fires callbacks when hotkey is pressed/released.
 
+    Supports device hot-plug for KVM switch scenarios:
+    - Automatically detects device disconnection (normal operation)
+    - Periodically scans for new/reconnected devices
+    - Clears key state when devices disconnect to prevent stuck hotkeys
+
     Interface (duck typing):
         - __init__(on_activate, on_deactivate, ...)
         - async start() -> None
@@ -44,6 +49,7 @@ class EvdevHotkeyListener:
         on_activate: Callable[[], None],
         on_deactivate: Callable[[], None],
         hotkey: Optional[list[str]] = None,
+        on_device_count_changed: Optional[Callable[[int], None]] = None,
     ):
         """Initialize hotkey listener.
 
@@ -52,16 +58,24 @@ class EvdevHotkeyListener:
             on_deactivate: Called when any hotkey key is released
             hotkey: List of key names (evdev KEY_* without prefix).
                     Default from settings: ["LEFTCTRL", "LEFTMETA"]
+            on_device_count_changed: Optional callback when device count changes.
+                    Called with new device count (for tray state updates).
         """
         self.on_activate = on_activate
         self.on_deactivate = on_deactivate
         self.hotkey = hotkey or settings.ptt.hotkey
+        self.on_device_count_changed = on_device_count_changed
 
-        self._pressed_keys: set[int] = set()
+        # Per-device key tracking (path -> set of pressed key codes)
+        self._pressed_keys_by_device: dict[str, set[int]] = {}
         self._hotkey_codes: set[int] = set()
         self._hotkey_active = False
         self._running = False
-        self._devices: list = []
+
+        # Device management for hot-plug support
+        self._device_tasks: dict[str, asyncio.Task] = {}  # path -> read task
+        self._device_names: dict[str, str] = {}  # path -> device name (for logging)
+        self._device_scan_interval = settings.ptt.device_scan_interval
 
     def _resolve_key_codes(self) -> None:
         """Convert key names to evdev key codes."""
@@ -82,15 +96,28 @@ class EvdevHotkeyListener:
 
         logger.info(f"PTT hotkey: {self.hotkey} -> codes {self._hotkey_codes}")
 
-    def _find_keyboards(self) -> list:
-        """Find keyboard input devices."""
+    def _find_keyboards(self, exclude_paths: Optional[set[str]] = None) -> list:
+        """Find keyboard input devices.
+
+        Args:
+            exclude_paths: Set of device paths to skip (already being monitored)
+
+        Returns:
+            List of InputDevice objects for keyboards not in exclude_paths.
+            Returns empty list if no keyboards found (normal during KVM switch).
+        """
         try:
             from evdev import InputDevice, list_devices, ecodes
         except ImportError:
             raise ImportError("evdev is required for PTT mode")
 
+        exclude = exclude_paths or set()
         keyboards = []
+
         for path in list_devices():
+            if path in exclude:
+                continue  # Already monitoring this device
+
             try:
                 device = InputDevice(path)
                 caps = device.capabilities()
@@ -104,20 +131,28 @@ class EvdevHotkeyListener:
             except (PermissionError, OSError) as e:
                 logger.debug(f"Cannot access {path}: {e}")
 
-        if not keyboards:
-            raise RuntimeError(
-                "No keyboards found. Ensure you have read access to /dev/input/event*. "
-                "Try: sudo usermod -a -G input $USER (then log out/in)"
+        # Don't raise on empty - KVM switch may reconnect devices later
+        if not keyboards and not exclude:
+            logger.warning(
+                "No keyboards currently accessible. "
+                "Waiting for devices (normal during KVM switch)."
             )
 
         return keyboards
 
     async def _read_device(self, device) -> None:
-        """Read events from a single device."""
+        """Read events from a single device with disconnect recovery.
+
+        When the device disconnects (KVM switch, unplug), this method logs
+        the event and cleans up. The device scanner will detect reconnection.
+        """
         try:
-            from evdev import ecodes, categorize
+            from evdev import ecodes
         except ImportError:
             return
+
+        device_path = device.path
+        device_name = device.name
 
         try:
             async for event in device.async_read_loop():
@@ -127,60 +162,192 @@ class EvdevHotkeyListener:
                 if event.type == ecodes.EV_KEY:
                     # Key event: value 0=release, 1=press, 2=repeat
                     if event.value == 1:  # Press
-                        self._pressed_keys.add(event.code)
+                        self._pressed_keys_by_device.setdefault(device_path, set()).add(event.code)
                         self._check_hotkey()
                     elif event.value == 0:  # Release
-                        self._pressed_keys.discard(event.code)
+                        if device_path in self._pressed_keys_by_device:
+                            self._pressed_keys_by_device[device_path].discard(event.code)
                         self._check_hotkey()
 
-        except (OSError, asyncio.CancelledError):
+        except OSError as e:
+            # Device disconnected - normal for KVM switch
+            logger.info(f"Device disconnected: {device_name} ({device_path})")
+        except asyncio.CancelledError:
             pass
+        finally:
+            # Clean up this device's state
+            self._on_device_disconnected(device_path, device_name)
+
+    def _get_all_pressed_keys(self) -> set[int]:
+        """Get union of all pressed keys across all devices."""
+        all_keys: set[int] = set()
+        for keys in self._pressed_keys_by_device.values():
+            all_keys.update(keys)
+        return all_keys
 
     def _check_hotkey(self) -> None:
         """Check if hotkey state changed."""
-        all_pressed = self._hotkey_codes.issubset(self._pressed_keys)
+        all_pressed = self._hotkey_codes.issubset(self._get_all_pressed_keys())
 
         if all_pressed and not self._hotkey_active:
             # Hotkey just activated
             self._hotkey_active = True
             logger.debug("Hotkey activated")
-            self.on_activate()
+            try:
+                self.on_activate()
+            except Exception as e:
+                logger.error(f"Hotkey activate callback failed: {e}")
 
         elif not all_pressed and self._hotkey_active:
             # Hotkey just deactivated (a key was released)
             self._hotkey_active = False
             logger.debug("Hotkey deactivated")
-            self.on_deactivate()
+            try:
+                self.on_deactivate()
+            except Exception as e:
+                logger.error(f"Hotkey deactivate callback failed: {e}")
+
+    def _on_device_disconnected(self, path: str, name: str) -> None:
+        """Handle device disconnection (KVM switch, unplug).
+
+        Cleans up device state and notifies listeners of device count change.
+        """
+        # Clear pressed keys for this device (prevents stuck hotkey)
+        if path in self._pressed_keys_by_device:
+            del self._pressed_keys_by_device[path]
+
+        # Remove from tracking
+        self._device_tasks.pop(path, None)
+        self._device_names.pop(path, None)
+
+        # If hotkey was active and keys are now incomplete, deactivate
+        if self._hotkey_active and not self._hotkey_codes.issubset(self._get_all_pressed_keys()):
+            self._hotkey_active = False
+            logger.debug("Hotkey auto-deactivated due to device disconnect")
+            try:
+                self.on_deactivate()
+            except Exception as e:
+                logger.error(f"Hotkey deactivate callback failed: {e}")
+
+        # Notify of device count change
+        device_count = len(self._device_tasks)
+        if device_count == 0:
+            logger.warning("All keyboards disconnected (waiting for reconnection)")
+
+        if self.on_device_count_changed:
+            try:
+                self.on_device_count_changed(device_count)
+            except Exception as e:
+                logger.debug(f"Device count callback failed: {e}")
+
+    def _start_device_task(self, device) -> None:
+        """Start a read task for a device."""
+        path = device.path
+        if path in self._device_tasks:
+            return  # Already monitoring
+
+        self._device_names[path] = device.name
+        self._pressed_keys_by_device[path] = set()
+        task = asyncio.create_task(self._read_device(device))
+        self._device_tasks[path] = task
+        logger.debug(f"Started monitoring: {device.name} ({path})")
+
+    async def _device_scanner_loop(self) -> None:
+        """Periodically scan for new/reconnected keyboard devices.
+
+        This enables transparent KVM switch support - when devices
+        disconnect and reconnect, they are automatically picked up.
+        """
+        while self._running:
+            await asyncio.sleep(self._device_scan_interval)
+
+            if not self._running:
+                break
+
+            # Clean up completed tasks (devices that disconnected)
+            completed = [p for p, t in self._device_tasks.items() if t.done()]
+            for path in completed:
+                self._device_tasks.pop(path, None)
+                self._device_names.pop(path, None)
+
+            # Scan for new devices (excluding ones we're already monitoring)
+            try:
+                current_paths = set(self._device_tasks.keys())
+                new_devices = self._find_keyboards(exclude_paths=current_paths)
+
+                for device in new_devices:
+                    logger.info(f"New keyboard detected: {device.name} ({device.path})")
+                    self._start_device_task(device)
+
+                    # Notify of device count change
+                    if self.on_device_count_changed:
+                        try:
+                            self.on_device_count_changed(len(self._device_tasks))
+                        except Exception as e:
+                            logger.debug(f"Device count callback failed: {e}")
+
+            except Exception as e:
+                logger.debug(f"Device scan error: {e}")
 
     async def start(self) -> None:
-        """Start listening for hotkey."""
+        """Start listening for hotkey with hot-plug support.
+
+        Supports KVM switch scenarios:
+        - Starts with whatever keyboards are available (may be zero)
+        - Continuously scans for new/reconnected devices
+        - Automatically resumes when devices return
+        """
         self._resolve_key_codes()
-        self._devices = self._find_keyboards()
         self._running = True
 
-        logger.info(f"PTT listening on {len(self._devices)} keyboard(s)")
+        # Initial device scan
+        initial_devices = self._find_keyboards()
+        for device in initial_devices:
+            self._start_device_task(device)
 
-        # Read from all keyboards concurrently
-        tasks = [
-            asyncio.create_task(self._read_device(dev))
-            for dev in self._devices
-        ]
+        device_count = len(self._device_tasks)
+        if device_count > 0:
+            logger.info(f"PTT listening on {device_count} keyboard(s)")
+        else:
+            logger.info("PTT waiting for keyboards (KVM may be switched away)")
+
+        # Notify initial device count
+        if self.on_device_count_changed:
+            try:
+                self.on_device_count_changed(device_count)
+            except Exception:
+                pass
+
+        # Start device scanner for hot-plug detection
+        scanner_task = asyncio.create_task(self._device_scanner_loop())
 
         try:
-            await asyncio.gather(*tasks)
+            # Keep running until stopped
+            while self._running:
+                await asyncio.sleep(0.5)
         except asyncio.CancelledError:
             pass
         finally:
             self._running = False
+            scanner_task.cancel()
+
+            # Cancel all device read tasks
+            for task in list(self._device_tasks.values()):
+                task.cancel()
 
     def stop(self) -> None:
-        """Stop listening."""
+        """Stop listening and clean up all devices."""
         self._running = False
-        for device in self._devices:
-            try:
-                device.close()
-            except Exception:
-                pass
+
+        # Cancel all device tasks (they'll clean up in finally blocks)
+        for task in list(self._device_tasks.values()):
+            task.cancel()
+
+        # Clear state
+        self._device_tasks.clear()
+        self._device_names.clear()
+        self._pressed_keys_by_device.clear()
+        self._hotkey_active = False
 
 
 class TerminalHotkeyListener:
@@ -462,8 +629,11 @@ class PTTController:
         self._on_stop_recording: Optional[Callable[[], None]] = None
         self._auto_submitted = False  # Track if we auto-submitted due to limit
         self._recording_start_time: float = 0
+        self._processing_start_time: float = 0  # For stuck state watchdog
         self._max_duration = settings.ptt.max_duration_seconds
+        self._processing_timeout = settings.ptt.processing_timeout_seconds
         self._duration_check_task: Optional[asyncio.Task] = None
+        self._watchdog_task: Optional[asyncio.Task] = None
 
         # Initialize sounds on first instance
         self._init_sounds()
@@ -571,6 +741,7 @@ class PTTController:
 
         duration = time.perf_counter() - self._recording_start_time
         self.state = PTTState.PROCESSING
+        self._processing_start_time = time.perf_counter()  # Track for watchdog
 
         self._play_sound("unclick")
         logger.info(f"PTT: Recording stopped ({duration:.1f}s), processing...")
@@ -591,10 +762,33 @@ class PTTController:
         except asyncio.CancelledError:
             pass
 
+    async def _state_watchdog(self) -> None:
+        """Monitor for stuck states and auto-recover.
+
+        If PTT gets stuck in PROCESSING state (e.g., server disconnect, callback
+        failure), this watchdog will reset it to IDLE after the configured timeout.
+        """
+        try:
+            while True:
+                await asyncio.sleep(5.0)  # Check every 5 seconds
+
+                if self.state == PTTState.PROCESSING and self._processing_start_time > 0:
+                    elapsed = time.perf_counter() - self._processing_start_time
+                    if elapsed > self._processing_timeout:
+                        logger.warning(
+                            f"PTT stuck in PROCESSING for {elapsed:.1f}s, resetting to IDLE"
+                        )
+                        self.state = PTTState.IDLE
+                        self._processing_start_time = 0
+
+        except asyncio.CancelledError:
+            pass
+
     def on_processing_complete(self) -> None:
         """Called when transcription processing is complete."""
         if self.state == PTTState.PROCESSING:
             self.state = PTTState.IDLE
+            self._processing_start_time = 0  # Reset watchdog timer
             logger.debug("PTT: Processing complete, ready for next recording")
 
     def set_callbacks(
@@ -624,10 +818,15 @@ class PTTController:
             self._listener.on_activate = self._on_hotkey_activate
             self._listener.on_deactivate = self._on_hotkey_deactivate
 
+        # Start state watchdog for stuck PROCESSING recovery
+        self._watchdog_task = asyncio.create_task(self._state_watchdog())
+
         try:
             await self._listener.start()
         finally:
             self._listener.stop()
+            if self._watchdog_task:
+                self._watchdog_task.cancel()
 
     def stop(self) -> None:
         """Stop the PTT controller."""
@@ -635,3 +834,5 @@ class PTTController:
             self._listener.stop()
         if self._duration_check_task:
             self._duration_check_task.cancel()
+        if self._watchdog_task:
+            self._watchdog_task.cancel()

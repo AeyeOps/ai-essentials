@@ -4,6 +4,7 @@ Provides visual feedback for PTT state:
 - Gray: Disconnected / starting up
 - Green: Ready (connected, waiting for hotkey)
 - Red: Recording ("on air")
+- Yellow: Degraded (connected but no input devices, e.g., KVM switched away)
 """
 
 import logging
@@ -19,6 +20,7 @@ class TrayState(Enum):
     DISCONNECTED = "gray"    # Starting up / no server connection
     READY = "green"          # Connected, waiting for hotkey
     RECORDING = "red"        # On air - currently recording
+    DEGRADED = "yellow"      # Connected but no input devices (KVM switched away)
 
 
 class TrayIndicator:
@@ -33,6 +35,7 @@ class TrayIndicator:
         "gray": "#666666",
         "green": "#22c55e",
         "red": "#ef4444",
+        "yellow": "#eab308",
     }
 
     def __init__(self, on_quit: Callable[[], None]):
