@@ -981,12 +981,14 @@ show_completion() {
     # ─────────────────────────────────────────────────────────────────
     # Offer: Auto-start PTT client at login (requires global hotkey + systemd)
     # ─────────────────────────────────────────────────────────────────
+    local has_autostart=0
     if [[ "$in_container" == "0" ]] && [[ "$has_global_hotkey" == "1" ]] && service_exists; then
         echo -e "${BOLD}Auto-Start Client${NC}"
         echo -e "${DIM}Start AEO Push-to-Talk automatically at login (Ctrl+Super in any app)${NC}"
         echo ""
         if [[ $(ask "Enable AEO Push-to-Talk auto-start?" "y") == "y" ]]; then
             install_autostart
+            has_autostart=1
         else
             info "Skipped. Start client manually when needed"
         fi
@@ -994,42 +996,88 @@ show_completion() {
     fi
 
     # ─────────────────────────────────────────────────────────────────
-    # Final instructions
+    # Final summary and instructions
     # ─────────────────────────────────────────────────────────────────
+
+    # Show configuration summary (non-container only)
+    if [[ "$in_container" == "0" ]]; then
+        echo -e "${BOLD}Configuration:${NC}"
+        if [[ "$has_global_hotkey" == "1" ]]; then
+            echo -e "  ${GREEN}✓${NC} Global hotkey: ${GREEN}Ctrl+Super${NC}"
+        else
+            echo -e "  ${DIM}○${NC} Global hotkey: ${DIM}not configured (using spacebar)${NC}"
+        fi
+        if service_exists; then
+            echo -e "  ${GREEN}✓${NC} Server auto-start: ${GREEN}enabled${NC} (systemd)"
+        else
+            echo -e "  ${DIM}○${NC} Server auto-start: ${DIM}manual${NC}"
+        fi
+        if [[ "$has_autostart" == "1" ]]; then
+            echo -e "  ${GREEN}✓${NC} Client auto-start: ${GREEN}enabled${NC} (tray icon at login)"
+        else
+            echo -e "  ${DIM}○${NC} Client auto-start: ${DIM}manual${NC}"
+        fi
+        echo ""
+    fi
+
+    # Logout reminder if needed
     if [[ "$needs_logout" == "1" ]]; then
         echo -e "${YELLOW}${BOLD}► Log out and back in${NC} for group change to take effect"
         echo ""
     fi
 
-    echo -e "${BOLD}Quick start:${NC}"
-    echo ""
-
-    # Docker: show one-liner test option
-    if [[ "$in_container" == "1" ]]; then
+    # Show appropriate next steps based on configuration
+    if [[ "$has_autostart" == "1" ]]; then
+        # Fully automated setup - emphasize simplicity
+        echo -e "${BOLD}You're all set!${NC}"
+        echo ""
+        if [[ "$needs_logout" == "1" ]]; then
+            echo -e "  After logging back in, press ${GREEN}Ctrl+Super${NC} in any app to dictate."
+        else
+            echo -e "  Press ${GREEN}Ctrl+Super${NC} in any app to dictate."
+        fi
+        echo -e "  Look for the ${GREEN}green tray icon${NC} (turns red when recording)."
+        echo ""
+        echo -e "${DIM}  Optional: Test in terminal mode with spacebar:${NC}"
+        echo -e "${DIM}  $INSTALL_DIR/scripts/stt-client.sh --ptt${NC}"
+        echo ""
+    elif [[ "$in_container" == "1" ]]; then
+        # Docker: show one-liner test option
+        echo -e "${BOLD}Quick start:${NC}"
+        echo ""
         echo "  # Test in single terminal (Docker) - hold SPACE to record"
         echo -e "  ${DIM}cd $INSTALL_DIR && (./scripts/stt-server.sh &) && sleep 3 && ./scripts/stt-client.sh --ptt${NC}"
         echo ""
-    elif systemctl is-active --quiet stt-service 2>/dev/null; then
-        # Server already running via systemd
-        echo "  # Server is running. Just start the client:"
+        echo -e "  ${DIM}Hold SPACE to record, release to transcribe${NC}"
+        echo ""
+    elif service_exists; then
+        # Server running but no autostart - show client command only
+        echo -e "${BOLD}Quick start:${NC}"
+        echo ""
+        echo "  # Server is running. Start the client:"
         echo -e "  ${DIM}$INSTALL_DIR/scripts/stt-client.sh --ptt${NC}"
         echo ""
+        if [[ "$has_global_hotkey" == "1" ]]; then
+            echo -e "  ${DIM}Hold Ctrl+Super to record, release to transcribe${NC}"
+        else
+            echo -e "  ${DIM}Hold SPACE to record, release to transcribe${NC}"
+        fi
+        echo ""
     else
+        # Fully manual setup
+        echo -e "${BOLD}Quick start:${NC}"
+        echo ""
         echo "  # Start server, then client"
         echo -e "  ${DIM}$INSTALL_DIR/scripts/stt-server.sh &${NC}"
         echo -e "  ${DIM}$INSTALL_DIR/scripts/stt-client.sh --ptt${NC}"
         echo ""
+        if [[ "$has_global_hotkey" == "1" ]]; then
+            echo -e "  ${DIM}Hold Ctrl+Super to record, release to transcribe${NC}"
+        else
+            echo -e "  ${DIM}Hold SPACE to record, release to transcribe${NC}"
+        fi
+        echo ""
     fi
-
-    # Show hotkey info
-    if [[ "$in_container" == "1" ]]; then
-        echo -e "  ${DIM}Hold SPACE to record, release to transcribe${NC}"
-    elif [[ "$has_global_hotkey" == "1" ]]; then
-        echo -e "  ${DIM}Hold Ctrl+Super to record, release to transcribe${NC}"
-    else
-        echo -e "  ${DIM}Hold SPACE to record, release to transcribe${NC}"
-    fi
-    echo ""
 }
 
 # ═══════════════════════════════════════════════════════════════════
