@@ -892,65 +892,97 @@ show_completion() {
         in_container=1
     fi
 
-    # Check if user needs input group for global hotkey (non-container only)
-    local needs_input_group=0
+    local needs_logout=0
+    local has_global_hotkey=0
+
+    # ─────────────────────────────────────────────────────────────────
+    # Offer: Global hotkey setup (input group)
+    # ─────────────────────────────────────────────────────────────────
     if [[ "$in_container" == "0" ]] && ! groups | grep -q '\binput\b'; then
-        needs_input_group=1
+        echo -e "${BOLD}Global Hotkey Setup${NC}"
+        echo -e "${DIM}Enable Ctrl+Super hotkey for push-to-talk (works in any app)${NC}"
+        echo ""
+        if [[ $(ask "Add yourself to input group for global hotkey?" "y") == "y" ]]; then
+            if sudo usermod -a -G input "$USER"; then
+                success "Added $USER to input group"
+                needs_logout=1
+                has_global_hotkey=1
+            else
+                warn "Failed to add to input group (sudo required)"
+                echo -e "  ${DIM}Run manually: sudo usermod -a -G input \$USER${NC}"
+            fi
+        else
+            info "Skipped. PTT will use terminal mode (spacebar)"
+        fi
+        echo ""
+    else
+        # Already in input group or container
+        if [[ "$in_container" == "0" ]]; then
+            has_global_hotkey=1
+        fi
     fi
 
-    # Show required action if needed
-    if [[ "$needs_input_group" == "1" ]]; then
-        echo -e "${YELLOW}${BOLD}► One more step for global hotkey (Ctrl+Super):${NC}"
+    # ─────────────────────────────────────────────────────────────────
+    # Offer: Systemd service (auto-start server on boot)
+    # ─────────────────────────────────────────────────────────────────
+    if [[ "$in_container" == "0" ]] && has_cmd systemctl && ! service_exists; then
+        echo -e "${BOLD}Auto-Start Server${NC}"
+        echo -e "${DIM}Start STT server automatically on boot${NC}"
         echo ""
-        echo -e "  ${BOLD}sudo usermod -a -G input \$USER${NC}"
+        if [[ $(ask "Install systemd service for auto-start?" "y") == "y" ]]; then
+            if "$INSTALL_DIR/scripts/install-systemd.sh" --yes 2>/dev/null || \
+               "$INSTALL_DIR/scripts/install-systemd.sh" 2>/dev/null; then
+                success "Systemd service installed"
+                # Start it now
+                if sudo systemctl start stt-service 2>/dev/null; then
+                    success "Server started"
+                fi
+            else
+                warn "Failed to install service"
+                echo -e "  ${DIM}Run manually: $INSTALL_DIR/scripts/install-systemd.sh${NC}"
+            fi
+        else
+            info "Skipped. Start server manually when needed"
+        fi
         echo ""
-        echo -e "  ${DIM}Then log out and back in. This grants access to keyboard${NC}"
-        echo -e "  ${DIM}events for the Ctrl+Super hotkey. Without it, PTT falls${NC}"
-        echo -e "  ${DIM}back to terminal mode (spacebar).${NC}"
+    fi
+
+    # ─────────────────────────────────────────────────────────────────
+    # Final instructions
+    # ─────────────────────────────────────────────────────────────────
+    if [[ "$needs_logout" == "1" ]]; then
+        echo -e "${YELLOW}${BOLD}► Log out and back in${NC} for group change to take effect"
         echo ""
     fi
 
     echo -e "${BOLD}Quick start:${NC}"
     echo ""
-    echo "  # Load PATH (new terminal or first run)"
-    echo -e "  ${DIM}source ~/.bashrc${NC}"
-    echo ""
 
-    # Docker: show one-liner test option with spacebar
+    # Docker: show one-liner test option
     if [[ "$in_container" == "1" ]]; then
         echo "  # Test in single terminal (Docker) - hold SPACE to record"
         echo -e "  ${DIM}cd $INSTALL_DIR && (./scripts/stt-server.sh &) && sleep 3 && ./scripts/stt-client.sh --ptt${NC}"
         echo ""
-    fi
-
-    echo "  # Start the server"
-    echo -e "  ${DIM}cd $INSTALL_DIR && ./scripts/stt-server.sh${NC}"
-    echo ""
-    echo "  # In another terminal, run the client"
-    echo -e "  ${DIM}cd $INSTALL_DIR && ./scripts/stt-client.sh --ptt${NC}"
-    echo ""
-
-    # Show appropriate hotkey based on environment
-    if [[ "$in_container" == "1" ]]; then
-        echo -e "  ${DIM}PTT mode: Hold SPACE to record, release to transcribe.${NC}"
-        echo -e "  ${DIM}Press 'q' or ESC to exit.${NC}"
-    elif [[ "$needs_input_group" == "1" ]]; then
-        echo -e "  ${DIM}PTT mode: Hold SPACE to record (Ctrl+Super after input group setup).${NC}"
-        echo -e "  ${DIM}Press 'q' or ESC to exit.${NC}"
+    elif systemctl is-active --quiet stt-service 2>/dev/null; then
+        # Server already running via systemd
+        echo "  # Server is running. Just start the client:"
+        echo -e "  ${DIM}$INSTALL_DIR/scripts/stt-client.sh --ptt${NC}"
+        echo ""
     else
-        echo -e "  ${DIM}PTT mode: Hold Ctrl+Super to record, release to transcribe.${NC}"
-    fi
-    echo ""
-
-    if systemctl is-active --quiet stt-service 2>/dev/null; then
-        echo -e "${BOLD}Service status:${NC}"
-        echo -e "  ${DIM}sudo systemctl status stt-service${NC}"
-        echo -e "  ${DIM}journalctl -u stt-service -f${NC}  # logs"
+        echo "  # Start server, then client"
+        echo -e "  ${DIM}$INSTALL_DIR/scripts/stt-server.sh &${NC}"
+        echo -e "  ${DIM}$INSTALL_DIR/scripts/stt-client.sh --ptt${NC}"
         echo ""
     fi
 
-    echo -e "${BOLD}Need help?${NC}"
-    echo -e "  ${DIM}$INSTALL_DIR/README.md${NC}"
+    # Show hotkey info
+    if [[ "$in_container" == "1" ]]; then
+        echo -e "  ${DIM}Hold SPACE to record, release to transcribe${NC}"
+    elif [[ "$has_global_hotkey" == "1" ]]; then
+        echo -e "  ${DIM}Hold Ctrl+Super to record, release to transcribe${NC}"
+    else
+        echo -e "  ${DIM}Hold SPACE to record, release to transcribe${NC}"
+    fi
     echo ""
 }
 

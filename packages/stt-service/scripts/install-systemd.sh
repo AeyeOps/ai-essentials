@@ -7,6 +7,12 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 TEMPLATE="$SCRIPT_DIR/stt-service.service.template"
 OUTPUT="/tmp/stt-service.service"
 
+# Parse args
+AUTO_YES=0
+if [[ "${1:-}" == "--yes" ]] || [[ "${1:-}" == "-y" ]]; then
+    AUTO_YES=1
+fi
+
 # Detect values
 USER="$(whoami)"
 HOME="$HOME"
@@ -49,15 +55,19 @@ cat "$OUTPUT"
 echo "----------------------------------------"
 echo ""
 
-read -p "Install to /etc/systemd/system/stt-service.service? [y/N] " -n 1 -r
-echo
+if [[ "$AUTO_YES" == "1" ]]; then
+    REPLY="y"
+else
+    read -p "Install to /etc/systemd/system/stt-service.service? [y/N] " -n 1 -r
+    echo
+fi
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     sudo cp "$OUTPUT" /etc/systemd/system/stt-service.service
     sudo systemctl daemon-reload
+    sudo systemctl enable stt-service
     rm -f "$OUTPUT"  # Clean up temp file
     echo ""
-    echo "Installed successfully. Commands:"
-    echo "  sudo systemctl enable stt-service   # Start on boot"
+    echo "Installed and enabled. Commands:"
     echo "  sudo systemctl start stt-service    # Start now"
     echo "  sudo systemctl status stt-service   # Check status"
     echo "  journalctl -u stt-service -f        # View logs"
