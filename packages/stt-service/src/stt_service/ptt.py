@@ -105,6 +105,11 @@ class EvdevHotkeyListener:
         Returns:
             List of InputDevice objects for keyboards not in exclude_paths.
             Returns empty list if no keyboards found (normal during KVM switch).
+
+        Note:
+            Deduplicates by device name - some keyboards (e.g., Logi K950) create
+            multiple input nodes. We only monitor one per unique name to prevent
+            duplicate hotkey events.
         """
         try:
             from evdev import InputDevice, list_devices, ecodes
@@ -113,6 +118,12 @@ class EvdevHotkeyListener:
 
         exclude = exclude_paths or set()
         keyboards = []
+        seen_names: set[str] = set()
+
+        # Also track names of devices we're already monitoring
+        for path in exclude:
+            if path in self._device_names:
+                seen_names.add(self._device_names[path])
 
         for path in list_devices():
             if path in exclude:
@@ -120,6 +131,12 @@ class EvdevHotkeyListener:
 
             try:
                 device = InputDevice(path)
+
+                # Skip if we already have a device with this name
+                if device.name in seen_names:
+                    logger.debug(f"Skipping duplicate device: {device.name} at {device.path}")
+                    continue
+
                 caps = device.capabilities()
                 # Check if device has EV_KEY capability with typical keyboard keys
                 if ecodes.EV_KEY in caps:
@@ -127,6 +144,7 @@ class EvdevHotkeyListener:
                     # Look for common keyboard keys
                     if ecodes.KEY_A in key_caps and ecodes.KEY_ENTER in key_caps:
                         keyboards.append(device)
+                        seen_names.add(device.name)
                         logger.debug(f"Found keyboard: {device.name} at {device.path}")
             except (PermissionError, OSError) as e:
                 logger.debug(f"Cannot access {path}: {e}")
