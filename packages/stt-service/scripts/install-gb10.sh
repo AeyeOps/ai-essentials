@@ -1,13 +1,39 @@
 #!/usr/bin/env bash
 # Install AEO Push-to-Talk on NVIDIA GB10 (Grace Blackwell ARM64)
+# Usage: curl -fsSL <url> | bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 CURRENT_USER="$(whoami)"
 
-echo "=== AEO Push-to-Talk GB10 Installer ==="
-echo "Project: $PROJECT_DIR"
+# Detect curl-pipe mode vs local run
+if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "bash" ]]; then
+    # Running via curl pipe - clone repo first
+    INSTALL_DIR="$HOME/stt-service"
+    echo "=== AEO Push-to-Talk GB10 Installer (curl mode) ==="
+    echo "Install dir: $INSTALL_DIR"
+
+    if ! command -v git &> /dev/null; then
+        echo "ERROR: git not found. Install with: sudo apt install git"
+        exit 1
+    fi
+
+    if [[ -d "$INSTALL_DIR/.git" ]]; then
+        echo "Updating existing installation..."
+        cd "$INSTALL_DIR"
+        git pull --ff-only
+    else
+        echo "Cloning repository..."
+        rm -rf "$INSTALL_DIR"
+        git clone --depth 1 https://github.com/AeyeOps/ai-essentials.git "$INSTALL_DIR"
+    fi
+    PROJECT_DIR="$INSTALL_DIR/packages/stt-service"
+else
+    # Running locally from cloned repo
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+    echo "=== AEO Push-to-Talk GB10 Installer ==="
+    echo "Project: $PROJECT_DIR"
+fi
 echo "User: $CURRENT_USER"
 
 # Check architecture
@@ -75,10 +101,8 @@ print('GPU support verified')
 "
 
 echo ""
-echo "5. Pre-downloading model (optional, will download on first run if skipped)..."
-read -p "Download model now? [Y/n] " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+echo "5. Pre-downloading model..."
+if true; then
     # Set CUDA 12 library path if available
     CUDA_LIB="/usr/local/cuda-12.6/targets/sbsa-linux/lib"
     if [[ -d "$CUDA_LIB" ]]; then
