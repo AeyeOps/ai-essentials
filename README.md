@@ -33,17 +33,13 @@ curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages
 ```
 
 Features:
+- **System-wide auto-start**: Server on boot, client at login with tray icon
 - **Real-time transcription** via WebSocket (40-200ms latency after warmup)
 - **Push-to-Talk modes**: Global hotkey (Ctrl+Super) or terminal spacebar
 - **Multiple outputs**: stdout, type-to-window, clipboard
 - **GPU-only execution** (CUDA/TensorRT) - fails fast if unavailable
 
-Quick usage after install:
-```bash
-cd ~/stt-service
-./scripts/stt-server.sh &       # Start server
-./scripts/stt-client.sh --ptt   # PTT mode (hold space to record)
-```
+After install, log out and back in. Press **Ctrl+Super** in any app to dictate.
 
 See [packages/stt-service/README.md](packages/stt-service/README.md) for full documentation.
 

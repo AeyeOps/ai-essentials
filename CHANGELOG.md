@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.13] - 2026-01-19
+
+### Added
+- STT Service system-wide auto-start (AEO Push-to-Talk)
+  - XDG autostart desktop entry for automatic client launch at login
+  - System tray indicator with state colors (gray=connecting, green=ready, red=recording)
+  - Daemon mode (`--daemon`) for silent background operation
+  - `desktop` optional dependency group (evdev, pystray, pillow)
+  - Installer prompts for auto-start after systemd service setup
+  - Uninstaller cleanup for autostart entry
+
+### Changed
+- STT Service installer comments now use raw.githubusercontent.com instead of jsdelivr
+- Test sandbox script URLs updated to raw.githubusercontent.com
+
 ## [0.0.12] - 2026-01-20
 
 ### Added

@@ -8,9 +8,17 @@ GPU-accelerated Speech-to-Text using NVIDIA Parakeet ONNX models with WebSocket 
 curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
 ```
 
-The installer handles dependencies, GPU setup, and model download. Follow any post-install instructions shown.
+The installer handles dependencies, GPU setup, and model download. Answer **yes** to all prompts for the full experience:
 
-## Quick Start
+- **Input group** - enables global Ctrl+Super hotkey
+- **Systemd service** - server auto-starts on boot
+- **Auto-start client** - tray icon appears at login
+
+Log out and back in after install. Press **Ctrl+Super** in any app to dictate.
+
+## Quick Start (Manual)
+
+If you skipped auto-start, run manually:
 
 ```bash
 cd ~/stt-service
@@ -97,6 +105,20 @@ All settings via environment variables:
 ./scripts/stt-client.sh --ptt --output clipboard  # Copy to clipboard
 ```
 
+## System Tray (Auto-Start Mode)
+
+When auto-start is enabled, a system tray icon shows PTT status:
+
+| Color | State |
+|-------|-------|
+| Gray | Connecting to server |
+| Green | Ready (listening for Ctrl+Super) |
+| Red | Recording ("on air") |
+
+Right-click the tray icon to quit.
+
+**Requirements:** GNOME users may need the [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/).
+
 ## Running as a Service
 
 ```bash
@@ -133,6 +155,7 @@ cd ~/stt-service && ./install.sh --uninstall
 ## Features
 
 - **Real-time transcription** (40-200ms latency after warmup)
+- **System-wide auto-start**: Server on boot, client at login with tray icon
 - **Push-to-Talk**: Global hotkey (Ctrl+Super) or terminal (spacebar)
 - **Output modes**: stdout, type-to-window, clipboard
 - **Audio feedback**: Click sounds with container support

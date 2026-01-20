@@ -2,11 +2,11 @@
 #
 # STT Service Installer
 #
-# One-liner install (via jsDelivr CDN - faster):
-#   curl -fsSL https://cdn.jsdelivr.net/gh/AeyeOps/ai-essentials@main/packages/stt-service/install.sh | bash
+# One-liner install:
+#   curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
 #
 # Or with wget:
-#   wget -O- https://cdn.jsdelivr.net/gh/AeyeOps/ai-essentials@main/packages/stt-service/install.sh | bash
+#   wget -O- https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
 #
 # Options (via environment variables):
 #   STT_NONINTERACTIVE=1  - No prompts, use defaults
@@ -177,6 +177,37 @@ download_extract() {
     else
         die "Neither curl nor wget found. Install one with: sudo apt install curl"
     fi
+}
+
+# Ensure apt-get update has been run
+ensure_apt_updated() {
+    if [[ "$APT_UPDATED" != "1" ]]; then
+        sudo apt-get update
+        APT_UPDATED=1
+    fi
+}
+
+# Install autostart entry for AEO Push-to-Talk daemon
+install_autostart() {
+    info "Installing desktop dependencies..."
+    cd "$INSTALL_DIR"
+    uv sync --extra desktop
+
+    # Create autostart entry from template
+    mkdir -p "$HOME/.config/autostart"
+    sed "s|{{INSTALL_DIR}}|$INSTALL_DIR|g" \
+        "$INSTALL_DIR/scripts/aeo-ptt.desktop.template" \
+        > "$HOME/.config/autostart/aeo-ptt.desktop"
+
+    # Ensure xdotool is installed (for typing text at cursor)
+    if ! has_cmd xdotool; then
+        info "Installing xdotool..."
+        ensure_apt_updated
+        sudo apt-get install -y xdotool
+    fi
+
+    success "Auto-start enabled"
+    info "AEO Push-to-Talk will start automatically at login"
 }
 
 # Get available disk space in GB
@@ -948,6 +979,21 @@ show_completion() {
     fi
 
     # ─────────────────────────────────────────────────────────────────
+    # Offer: Auto-start PTT client at login (requires global hotkey + systemd)
+    # ─────────────────────────────────────────────────────────────────
+    if [[ "$in_container" == "0" ]] && [[ "$has_global_hotkey" == "1" ]] && service_exists; then
+        echo -e "${BOLD}Auto-Start Client${NC}"
+        echo -e "${DIM}Start AEO Push-to-Talk automatically at login (Ctrl+Super in any app)${NC}"
+        echo ""
+        if [[ $(ask "Enable AEO Push-to-Talk auto-start?" "y") == "y" ]]; then
+            install_autostart
+        else
+            info "Skipped. Start client manually when needed"
+        fi
+        echo ""
+    fi
+
+    # ─────────────────────────────────────────────────────────────────
     # Final instructions
     # ─────────────────────────────────────────────────────────────────
     if [[ "$needs_logout" == "1" ]]; then
@@ -1044,6 +1090,16 @@ uninstall() {
             sudo rm -f /etc/systemd/system/stt-service.service
             sudo systemctl daemon-reload
             success "Systemd service removed"
+            ((removed++))
+        fi
+    fi
+
+    # Remove autostart entry
+    if [[ -f "$HOME/.config/autostart/aeo-ptt.desktop" ]]; then
+        info "Found autostart entry"
+        if [[ $(ask "Remove autostart entry?" "y") == "y" ]]; then
+            rm -f "$HOME/.config/autostart/aeo-ptt.desktop"
+            success "Autostart entry removed"
             ((removed++))
         fi
     fi

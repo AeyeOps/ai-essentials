@@ -375,11 +375,22 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
 
     Uses EvdevHotkeyListener for production (global Ctrl+Super),
     falls back to TerminalHotkeyListener for Docker/SSH testing.
+
+    In daemon mode (--daemon):
+    - Retries server connection indefinitely with 5s delay
+    - Suppresses timing output (only outputs transcribed text)
+    - Requires display (checked in main())
+
+    With tray (--tray):
+    - Shows system tray indicator (gray/green/red states)
+    - Quit from tray menu or Ctrl+C to exit
     """
     from .ptt import PTTController, PTTState, TerminalHotkeyListener
 
     output_mode = args.output or settings.client.output_mode
     server_url = args.server or settings.client.server_url
+    daemon_mode = getattr(args, 'daemon', False)
+    tray_enabled = getattr(args, 'tray', False)
 
     # Try evdev first (production), fall back to terminal (Docker/no input access)
     listener = None
@@ -431,6 +442,26 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
     ptt = PTTController(listener=listener)
     client: Optional[PTTClient] = None
 
+    # Initialize tray indicator if requested
+    tray = None
+    if tray_enabled:
+        try:
+            from .tray import TrayIndicator, TrayState as TrayStateEnum
+
+            def on_tray_quit():
+                """Handle quit from tray menu."""
+                ptt.stop()
+
+            tray = TrayIndicator(on_quit=on_tray_quit)
+            tray.start()
+            logger.info("Tray indicator started")
+        except ImportError as e:
+            logger.warning(f"Tray dependencies not installed: {e}")
+            logger.warning("Continuing without tray indicator")
+        except Exception as e:
+            logger.warning(f"Could not start tray: {e}")
+            logger.warning("Continuing without tray indicator")
+
     # Set up safe print function (handles terminal raw mode)
     if hasattr(listener, 'print_normal'):
         print_fn = listener.print_normal
@@ -443,20 +474,57 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
     audio_chunks: list[np.ndarray] = []
 
     async def ensure_connected() -> bool:
-        """Ensure client is connected."""
+        """Ensure client is connected.
+
+        In daemon mode, retries indefinitely with 5s delay.
+        Updates tray state on connection status changes.
+        """
         nonlocal client
         if client and client.websocket:
             return True
 
-        client = PTTClient(server_url=server_url)
-        for attempt in range(settings.client.reconnect_attempts):
-            if await client.connect():
-                return True
-            logger.warning(f"Connection attempt {attempt + 1} failed...")
-            await asyncio.sleep(settings.client.reconnect_delay * (2 ** attempt))
+        # Set tray to disconnected while connecting
+        if tray:
+            try:
+                from .tray import TrayState as TrayStateEnum
+                tray.set_state(TrayStateEnum.DISCONNECTED)
+            except Exception:
+                pass
 
-        logger.error("Failed to connect to server")
-        return False
+        client = PTTClient(server_url=server_url)
+
+        if daemon_mode:
+            # Daemon mode: retry indefinitely
+            attempt = 0
+            while True:
+                attempt += 1
+                if await client.connect():
+                    # Connected - update tray to ready
+                    if tray:
+                        try:
+                            from .tray import TrayState as TrayStateEnum
+                            tray.set_state(TrayStateEnum.READY)
+                        except Exception:
+                            pass
+                    return True
+                logger.warning(f"Connection attempt {attempt} failed, retrying in 5s...")
+                await asyncio.sleep(5.0)
+        else:
+            # Normal mode: limited retries
+            for attempt in range(settings.client.reconnect_attempts):
+                if await client.connect():
+                    if tray:
+                        try:
+                            from .tray import TrayState as TrayStateEnum
+                            tray.set_state(TrayStateEnum.READY)
+                        except Exception:
+                            pass
+                    return True
+                logger.warning(f"Connection attempt {attempt + 1} failed...")
+                await asyncio.sleep(settings.client.reconnect_delay * (2 ** attempt))
+
+            logger.error("Failed to connect to server")
+            return False
 
     def audio_callback(indata, frames, time_info, status):
         """Sounddevice callback - collect audio chunks."""
@@ -468,8 +536,17 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
         """Start audio capture."""
         nonlocal stream, audio_chunks
 
+        # Update tray to recording state
+        if tray:
+            try:
+                from .tray import TrayState as TrayStateEnum
+                tray.set_state(TrayStateEnum.RECORDING)
+            except Exception:
+                pass
+
         if not await ensure_connected():
-            print_fn("[error] Failed to connect to server")
+            if not daemon_mode:
+                print_fn("[error] Failed to connect to server")
             ptt.state = PTTState.IDLE
             return
 
@@ -499,13 +576,22 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
             stream.close()
             stream = None
 
+        # Update tray to ready state (processing complete)
+        if tray:
+            try:
+                from .tray import TrayState as TrayStateEnum
+                tray.set_state(TrayStateEnum.READY)
+            except Exception:
+                pass
+
         if not client or not client.websocket:
             ptt.on_processing_complete()
             return
 
         # Concatenate audio
         if not audio_chunks:
-            print_fn("[0.0s → 0ms] (no audio)")
+            if not daemon_mode:
+                print_fn("[0.0s → 0ms] (no audio)")
             ptt.on_processing_complete()
             return
 
@@ -537,10 +623,12 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
                 text = msg.get("text", "")
                 latency_ms = (t_done - t_start) * 1000
 
-                # Output based on mode:
-                # - stdout: single line with timing + text (or timing + silence)
-                # - type/clipboard: print timing, send text via subprocess
-                if output_mode == "stdout":
+                # Daemon mode: suppress timing output, only send text
+                if daemon_mode:
+                    if text:
+                        output_text(text, output_mode)
+                # Normal mode: show timing info
+                elif output_mode == "stdout":
                     if text:
                         print_fn(f"[{duration:.1f}s → {latency_ms:.0f}ms] {text}")
                     else:
@@ -551,14 +639,22 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
                     if text:
                         output_text(text, output_mode)
             elif msg.get("type") == "error":
-                print_fn(f"[error] Server: {msg.get('message')}")
+                if not daemon_mode:
+                    print_fn(f"[error] Server: {msg.get('message')}")
+                logger.error(f"Server error: {msg.get('message')}")
             else:
-                print_fn(f"[error] Unexpected response type: {msg.get('type')}")
+                if not daemon_mode:
+                    print_fn(f"[error] Unexpected response type: {msg.get('type')}")
+                logger.error(f"Unexpected response type: {msg.get('type')}")
 
         except asyncio.TimeoutError:
-            print_fn("[error] Timeout waiting for transcription")
+            if not daemon_mode:
+                print_fn("[error] Timeout waiting for transcription")
+            logger.error("Timeout waiting for transcription")
         except Exception as e:
-            print_fn(f"[error] Transcription failed: {e}")
+            if not daemon_mode:
+                print_fn(f"[error] Transcription failed: {e}")
+            logger.error(f"Transcription failed: {e}")
 
         ptt.on_processing_complete()
 
@@ -588,21 +684,29 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
     ptt.set_callbacks(on_start=on_start, on_stop=on_stop)
 
     # Print startup message (hotkey_str set during listener selection above)
+    # Suppressed in daemon mode (runs silently with tray indicator)
     is_terminal_mode = isinstance(listener, TerminalHotkeyListener)
-    print(f"\n[PTT] Mode active. Hold [{hotkey_str}] to record, release to transcribe.")
-    print(f"   Output: {output_mode}")
-    print(f"   Server: {server_url}")
-    if is_terminal_mode:
-        print(f"   Press 'q', ESC, or Ctrl+C to exit.\n")
+    if not daemon_mode:
+        print(f"\n[PTT] Mode active. Hold [{hotkey_str}] to record, release to transcribe.")
+        print(f"   Output: {output_mode}")
+        print(f"   Server: {server_url}")
+        if is_terminal_mode:
+            print(f"   Press 'q', ESC, or Ctrl+C to exit.\n")
+        else:
+            print(f"   Press Ctrl+C to exit.\n")
     else:
-        print(f"   Press Ctrl+C to exit.\n")
+        logger.info(f"PTT daemon started: hotkey={hotkey_str}, output={output_mode}, server={server_url}")
 
     try:
         await ptt.run()
     except KeyboardInterrupt:
-        print("\n\nPTT mode stopped.")
+        if not daemon_mode:
+            print("\n\nPTT mode stopped.")
+        logger.info("PTT mode stopped by user")
     finally:
         ptt.stop()
+        if tray:
+            tray.stop()
         if client:
             await client.disconnect()
 
@@ -638,9 +742,31 @@ def main() -> None:
         action="store_true",
         help="Enable debug logging",
     )
+    parser.add_argument(
+        "--daemon",
+        action="store_true",
+        help="Daemon mode: wait for server indefinitely, require display, suppress timing output",
+    )
+    parser.add_argument(
+        "--tray",
+        action="store_true",
+        help="Show system tray indicator (requires --daemon and desktop dependencies)",
+    )
     args = parser.parse_args()
 
     setup_logging(args.verbose)
+
+    # Daemon mode requires a display (X11 or Wayland)
+    if args.daemon:
+        if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+            # Silent exit - no display available (e.g., SSH session)
+            logger.info("Daemon mode: no display available, exiting")
+            sys.exit(0)
+
+        # --tray requires --daemon
+        if args.tray and not args.ptt:
+            logger.error("--tray requires --ptt mode")
+            sys.exit(1)
 
     try:
         if args.ptt:

@@ -1,6 +1,6 @@
 [project]
 name = "ai-essentials"
-version = "0.0.10"
+version = "0.0.13"
 description = "AI development utilities, scripts, and services"
 readme = "README.md"
 license = "MIT"

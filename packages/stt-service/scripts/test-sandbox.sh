@@ -53,7 +53,7 @@ TESTING THE CURL INSTALLER:
     ./test-sandbox.sh
 
     # Inside container, run the one-liner:
-    curl -fsSL https://cdn.jsdelivr.net/gh/AeyeOps/ai-essentials@main/packages/stt-service/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
 
     # Test the service
     cd ~/stt-service
@@ -129,7 +129,7 @@ run_interactive() {
     info "Starting interactive sandbox..."
     echo ""
     warn "Run inside container:"
-    echo "  curl -fsSL https://cdn.jsdelivr.net/gh/AeyeOps/ai-essentials@main/packages/stt-service/install.sh | bash"
+    echo "  curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash"
     echo ""
 
     local uid=$(id -u)
