@@ -715,7 +715,7 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
 
 def main() -> None:
     """Main entry point for stt-client command."""
-    parser = argparse.ArgumentParser(description="STT Push-to-Talk Client")
+    parser = argparse.ArgumentParser(description="AEO Push-to-Talk Client")
     parser.add_argument(
         "--server",
         default=None,

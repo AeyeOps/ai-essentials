@@ -1,5 +1,5 @@
 [Unit]
-Description=STT Service - GPU-accelerated Speech-to-Text
+Description=AEO Push-to-Talk - GPU-accelerated speech-to-text
 After=network.target
 
 [Service]

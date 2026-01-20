@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# STT Service Installer
+# AEO Push-to-Talk Installer
 #
 # One-liner install:
 #   curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
@@ -628,7 +628,7 @@ install_uv() {
 # ═══════════════════════════════════════════════════════════════════
 
 download_package() {
-    step "Downloading STT Service..."
+    step "Downloading AEO Push-to-Talk..."
 
     # Always download from GitHub (curl installer path)
     # Local development should use git clone directly
@@ -889,7 +889,7 @@ setup_service() {
     # Generate service file
     cat > /tmp/stt-service.service << EOF
 [Unit]
-Description=STT Service - GPU-accelerated Speech-to-Text
+Description=AEO Push-to-Talk - GPU-accelerated speech-to-text
 After=network.target
 
 [Service]
@@ -1109,7 +1109,7 @@ show_completion() {
 
 usage() {
     cat << 'EOF'
-STT Service Installer - GPU-accelerated Speech-to-Text for NVIDIA GB10
+AEO Push-to-Talk Installer
 
 USAGE:
     install.sh [OPTIONS]
@@ -1118,7 +1118,7 @@ USAGE:
 OPTIONS:
     -h, --help      Show this help message
     -y, --yes       Non-interactive mode (accept all defaults)
-    --uninstall     Remove STT Service and optionally the systemd service
+    --uninstall     Remove AEO Push-to-Talk and optionally the systemd service
 
 ENVIRONMENT VARIABLES:
     STT_NONINTERACTIVE=1    No prompts, use defaults (same as -y)
@@ -1146,7 +1146,7 @@ uninstall() {
 
     echo ""
     echo -e "${BOLD}════════════════════════════════════════════════════════════${NC}"
-    echo -e "${BOLD}  STT Service Uninstaller${NC}"
+    echo -e "${BOLD}  AEO Push-to-Talk Uninstaller${NC}"
     echo -e "${BOLD}════════════════════════════════════════════════════════════${NC}"
     echo ""
 
@@ -1216,8 +1216,8 @@ main() {
     # Header
     echo ""
     echo -e "${BOLD}════════════════════════════════════════════════════════════${NC}"
-    echo -e "${BOLD}  STT Service Installer${NC}"
-    echo -e "${BOLD}  GPU-accelerated Speech-to-Text for NVIDIA GB10${NC}"
+    echo -e "${BOLD}  AEO Push-to-Talk Installer${NC}"
+    echo -e "${BOLD}  GPU-accelerated speech-to-text for NVIDIA GB10${NC}"
     echo -e "${BOLD}════════════════════════════════════════════════════════════${NC}"
     echo ""
 
@@ -1225,7 +1225,7 @@ main() {
     echo "This installer will:"
     echo "  • Check system requirements"
     echo "  • Install dependencies (uv, CUDA libs, PortAudio)"
-    echo "  • Download and configure STT Service"
+    echo "  • Download and configure AEO Push-to-Talk"
     echo "  • Optionally download the speech model (~1GB)"
     echo ""
     echo -e "Install location: ${BOLD}$INSTALL_DIR${NC}"

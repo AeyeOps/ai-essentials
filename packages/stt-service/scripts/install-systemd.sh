@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate and install systemd service for STT Service
+# Generate and install systemd service for AEO Push-to-Talk
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,7 +33,7 @@ if [[ -z "$UV_PATH" ]]; then
     exit 1
 fi
 
-echo "=== STT Service Systemd Installer ==="
+echo "=== AEO Push-to-Talk Systemd Installer ==="
 echo ""
 echo "Detected configuration:"
 echo "  User:        $USER"

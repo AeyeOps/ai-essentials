@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-download STT models for offline use
+# Pre-download speech models for AEO Push-to-Talk
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

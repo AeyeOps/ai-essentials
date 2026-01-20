@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Install STT service on NVIDIA GB10 (Grace Blackwell ARM64)
+# Install AEO Push-to-Talk on NVIDIA GB10 (Grace Blackwell ARM64)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 CURRENT_USER="$(whoami)"
 
-echo "=== STT Service GB10 Installer ==="
+echo "=== AEO Push-to-Talk GB10 Installer ==="
 echo "Project: $PROJECT_DIR"
 echo "User: $CURRENT_USER"
 

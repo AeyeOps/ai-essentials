@@ -7,7 +7,7 @@ Skip the setup grind. Get a complete AI development environment with one-line in
 ```mermaid
 graph LR
     subgraph "AI Essentials"
-        STT["🎤 STT Service<br/>Speech-to-Text"]
+        STT["🎤 AEO Push-to-Talk<br/>Speech-to-Text"]
         DEV["🛠️ Dev Stack<br/>Terminal + Tools"]
         CFG["⚙️ Configs<br/>GPU-Optimized"]
     end
@@ -23,13 +23,13 @@ graph LR
 
 | Component | What It Does | Install |
 |-----------|--------------|---------|
-| [**STT Service**](#-stt-service) | Dictate anywhere with Ctrl+Super | `curl ...install.sh \| bash` |
+| [**AEO Push-to-Talk**](#-aeo-push-to-talk) | Dictate anywhere with Ctrl+Super | `curl ...install.sh \| bash` |
 | [**Dev Stack**](#-ai-developer-stack) | Complete terminal environment | `./setup-ai-dev-stack.sh` |
 | [**Configs**](#-configuration-files) | OLED/4K-optimized dotfiles | Copy to `~/.config/` |
 
 ---
 
-## 🎤 STT Service
+## 🎤 AEO Push-to-Talk
 
 **Speak instead of type — in any application.**
 
@@ -180,7 +180,7 @@ Handles D-Bus sessions, GPU acceleration workarounds, and display server compati
 ```
 ai-essentials/
 ├── packages/
-│   └── stt-service/      # Speech-to-Text service
+│   └── stt-service/      # AEO Push-to-Talk
 ├── scripts/
 │   ├── setup-ai-dev-stack.sh
 │   ├── google-chrome-wsl2.sh

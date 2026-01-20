@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Test STT Service installer in a disposable Docker sandbox
+# Test AEO Push-to-Talk installer in a disposable Docker sandbox
 # GPU passthrough enabled - requires nvidia-container-toolkit
 #
 # Usage:
@@ -38,7 +38,7 @@ check_prerequisites() {
 
 show_help() {
     cat << 'EOF'
-STT Service Test Sandbox
+AEO Push-to-Talk Test Sandbox
 
 Creates a CUDA 13 Ubuntu 24.04 container with GPU access for testing the installer.
 The container is disposable - delete it anytime with --clean.

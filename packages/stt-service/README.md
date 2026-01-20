@@ -1,4 +1,4 @@
-# STT Service
+# AEO Push-to-Talk
 
 GPU-accelerated Speech-to-Text using NVIDIA Parakeet ONNX models with WebSocket streaming.
 
