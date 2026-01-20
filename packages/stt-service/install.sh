@@ -195,6 +195,10 @@ install_autostart() {
     cd "$INSTALL_DIR"
     uv sync --extra desktop
 
+    # Reinstall GPU wheel (uv sync removes packages not in lockfile)
+    info "Ensuring GPU runtime..."
+    uv pip install "$ONNX_WHEEL"
+
     # Create autostart entry from template
     mkdir -p "$HOME/.config/autostart"
     sed "s|{{INSTALL_DIR}}|$INSTALL_DIR|g" \

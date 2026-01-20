@@ -12,25 +12,27 @@ if ! command -v uv &>/dev/null; then
     exit 1
 fi
 
-# Find CUDA libraries (onnxruntime-gpu needs CUDA 12 compat libs)
+# Find CUDA 12 libraries (onnxruntime-gpu needs CUDA 12 compat libs)
+# GB10 has CUDA 13 as primary, but onnxruntime needs libcublas.so.12
 find_cuda_lib() {
     local paths=(
+        "/usr/local/cuda-12.6/targets/sbsa-linux/lib"  # GB10 CUDA 12 compat
+        "/usr/local/cuda-12/targets/sbsa-linux/lib"
+        "/usr/lib/aarch64-linux-gnu"
         "/usr/local/cuda/targets/sbsa-linux/lib"
         "/usr/local/cuda-13.0/targets/sbsa-linux/lib"
-        "/usr/local/cuda-12.6/targets/sbsa-linux/lib"
-        "/usr/local/cuda-12/targets/sbsa-linux/lib"
         "/usr/local/cuda/lib64"
-        "/usr/lib/aarch64-linux-gnu"
     )
     for p in "${paths[@]}"; do
-        if [[ -f "$p/libcublas.so.12" ]] || [[ -f "$p/libcublas.so" ]]; then
+        # MUST have libcublas.so.12 specifically
+        if [[ -f "$p/libcublas.so.12" ]]; then
             echo "$p"
             return 0
         fi
     done
     # Fallback search
     local found
-    found=$(find /usr -name "libcublas.so.12*" -type f 2>/dev/null | head -1)
+    found=$(find /usr -name "libcublas.so.12" -type f -o -name "libcublas.so.12" -type l 2>/dev/null | head -1)
     if [[ -n "$found" ]]; then
         dirname "$found"
         return 0
