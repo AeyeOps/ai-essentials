@@ -681,6 +681,11 @@ setup_python() {
     info "Installing GPU runtime..."
     uv pip install "$ONNX_WHEEL"
     success "GPU runtime installed"
+
+    # Install evdev for global hotkey support (Ctrl+Super)
+    info "Installing global hotkey support..."
+    uv pip install "evdev>=1.7.0"
+    success "Global hotkey support installed"
 }
 
 # ═══════════════════════════════════════════════════════════════════
@@ -880,14 +885,39 @@ show_completion() {
     echo -e "${GREEN}${BOLD}  ✓ Installation complete!${NC}"
     echo -e "${BOLD}════════════════════════════════════════════════════════════${NC}"
     echo ""
+
+    # Check if in Docker/container
+    local in_container=0
+    if [[ -f /.dockerenv ]] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
+        in_container=1
+    fi
+
+    # Check if user needs input group for global hotkey (non-container only)
+    local needs_input_group=0
+    if [[ "$in_container" == "0" ]] && ! groups | grep -q '\binput\b'; then
+        needs_input_group=1
+    fi
+
+    # Show required action if needed
+    if [[ "$needs_input_group" == "1" ]]; then
+        echo -e "${YELLOW}${BOLD}► One more step for global hotkey (Ctrl+Super):${NC}"
+        echo ""
+        echo -e "  ${BOLD}sudo usermod -a -G input \$USER${NC}"
+        echo ""
+        echo -e "  ${DIM}Then log out and back in. This grants access to keyboard${NC}"
+        echo -e "  ${DIM}events for the Ctrl+Super hotkey. Without it, PTT falls${NC}"
+        echo -e "  ${DIM}back to terminal mode (spacebar).${NC}"
+        echo ""
+    fi
+
     echo -e "${BOLD}Quick start:${NC}"
     echo ""
     echo "  # Load PATH (new terminal or first run)"
     echo -e "  ${DIM}source ~/.bashrc${NC}"
     echo ""
 
-    # Docker: show one-liner test option
-    if [[ -f /.dockerenv ]] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
+    # Docker: show one-liner test option with spacebar
+    if [[ "$in_container" == "1" ]]; then
         echo "  # Test in single terminal (Docker) - hold SPACE to record"
         echo -e "  ${DIM}cd $INSTALL_DIR && (./scripts/stt-server.sh &) && sleep 3 && ./scripts/stt-client.sh --ptt${NC}"
         echo ""
@@ -899,8 +929,17 @@ show_completion() {
     echo "  # In another terminal, run the client"
     echo -e "  ${DIM}cd $INSTALL_DIR && ./scripts/stt-client.sh --ptt${NC}"
     echo ""
-    echo -e "  ${DIM}PTT mode: Hold SPACE to record, release to transcribe.${NC}"
-    echo -e "  ${DIM}Press 'q' or ESC to exit.${NC}"
+
+    # Show appropriate hotkey based on environment
+    if [[ "$in_container" == "1" ]]; then
+        echo -e "  ${DIM}PTT mode: Hold SPACE to record, release to transcribe.${NC}"
+        echo -e "  ${DIM}Press 'q' or ESC to exit.${NC}"
+    elif [[ "$needs_input_group" == "1" ]]; then
+        echo -e "  ${DIM}PTT mode: Hold SPACE to record (Ctrl+Super after input group setup).${NC}"
+        echo -e "  ${DIM}Press 'q' or ESC to exit.${NC}"
+    else
+        echo -e "  ${DIM}PTT mode: Hold Ctrl+Super to record, release to transcribe.${NC}"
+    fi
     echo ""
 
     if systemctl is-active --quiet stt-service 2>/dev/null; then

@@ -211,6 +211,36 @@ Models are automatically downloaded on first use. For offline deployment:
 ./scripts/download-models.sh --list
 ```
 
+### Global Hotkey Mode (Desktop)
+
+By default, PTT uses **terminal mode** (spacebar) which works everywhere including Docker/SSH. For **global hotkey mode** (Ctrl+Super) on Linux desktops, additional setup is required:
+
+```bash
+# 1. Install evdev for global keyboard capture
+cd ~/stt-service
+uv pip install evdev
+
+# 2. Add yourself to the input group (required for /dev/input access)
+sudo usermod -a -G input $USER
+
+# 3. Log out and back in for group change to take effect
+
+# 4. Verify access
+ls -la /dev/input/event*  # Should be readable
+
+# 5. Run PTT - it auto-detects evdev and uses Ctrl+Super
+./scripts/stt-client.sh --ptt
+```
+
+The client automatically detects if evdev is available:
+- **evdev available**: Uses global hotkey (Ctrl+Super by default)
+- **evdev unavailable**: Falls back to terminal mode (spacebar)
+
+Customize the hotkey via environment variable:
+```bash
+export STT_PTT_HOTKEY='["LEFTCTRL", "LEFTALT"]'  # Ctrl+Alt instead
+```
+
 ### Server and Client Options
 
 ```bash
