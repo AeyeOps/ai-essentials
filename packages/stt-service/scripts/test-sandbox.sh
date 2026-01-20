@@ -98,8 +98,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create test user with matching UID/GID for PulseAudio socket access
-# Use existing group if GID already exists (common in base images)
-RUN (getent group $GID >/dev/null 2>&1 || groupadd -g $GID testuser) && \
+# Remove any existing user/group with target IDs (CUDA images often have ubuntu:1000)
+RUN (u=$(getent passwd $UID | cut -d: -f1) && userdel -r "$u" 2>/dev/null) || true && \
+    (g=$(getent group $GID | cut -d: -f1) && groupdel "$g" 2>/dev/null) || true && \
+    groupadd -g $GID testuser && \
     useradd -m -u $UID -g $GID -s /bin/bash -G audio testuser && \
     echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
