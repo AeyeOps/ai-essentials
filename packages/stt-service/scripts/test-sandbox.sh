@@ -98,7 +98,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create test user with matching UID/GID for PulseAudio socket access
-RUN groupadd -g $GID testuser && \
+# Use existing group if GID already exists (common in base images)
+RUN (getent group $GID >/dev/null 2>&1 || groupadd -g $GID testuser) && \
     useradd -m -u $UID -g $GID -s /bin/bash -G audio testuser && \
     echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
