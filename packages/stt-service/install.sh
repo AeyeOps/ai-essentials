@@ -190,14 +190,9 @@ ensure_apt_updated() {
 }
 
 # Install autostart entry for AEO Push-to-Talk daemon
+# Note: Python deps (pystray, pillow, evdev) already installed by setup_python()
 install_autostart() {
-    info "Installing desktop dependencies..."
     cd "$INSTALL_DIR"
-    uv sync --extra desktop
-
-    # Reinstall GPU wheel (uv sync removes packages not in lockfile)
-    info "Ensuring GPU runtime..."
-    uv pip install "$ONNX_WHEEL"
 
     # Create desktop entry from template (both autostart and applications)
     info "Creating desktop entries..."
@@ -718,23 +713,39 @@ setup_python() {
 
     cd "$INSTALL_DIR"
 
+    # Install evdev build dependencies FIRST (before uv sync)
+    # evdev requires build tools and kernel headers to compile
+    local evdev_deps=()
+    if ! has_cmd cc; then
+        evdev_deps+=(build-essential)
+    fi
+    if ! dpkg -s linux-libc-dev &> /dev/null; then
+        evdev_deps+=(linux-libc-dev)
+    fi
+    if [[ ${#evdev_deps[@]} -gt 0 ]]; then
+        info "Installing build dependencies for evdev: ${evdev_deps[*]}"
+        ensure_apt_updated
+        sudo apt-get install -y "${evdev_deps[@]}"
+    fi
+
     # Check if venv exists and is healthy
+    # Always use --extra desktop for tray + hotkey support (pystray, pillow, evdev)
     if [[ -d ".venv" ]] && [[ -f ".venv/bin/python" ]]; then
         if .venv/bin/python --version &> /dev/null; then
             success "Python environment exists"
             info "Updating dependencies..."
-            uv sync
+            uv sync --extra desktop
         else
             warn "Python environment corrupted, recreating..."
             rm -rf .venv
-            uv sync --python 3.12
+            uv sync --python 3.12 --extra desktop
         fi
     else
         info "Creating Python 3.12 environment..."
-        uv sync --python 3.12
+        uv sync --python 3.12 --extra desktop
     fi
 
-    success "Python dependencies installed"
+    success "Python dependencies installed (includes tray + hotkey support)"
 
     # Enable system-site-packages for PyGObject access (needed for tray on GNOME)
     # This allows the venv to access system-installed gi (gobject-introspection)
@@ -749,24 +760,6 @@ setup_python() {
     info "Installing GPU runtime..."
     uv pip install "$ONNX_WHEEL"
     success "GPU runtime installed"
-
-    # Install evdev for global hotkey support (Ctrl+Super)
-    # Requires build tools and kernel headers to compile evdev
-    local evdev_deps=()
-    if ! has_cmd cc; then
-        evdev_deps+=(build-essential)
-    fi
-    if ! dpkg -s linux-libc-dev &> /dev/null; then
-        evdev_deps+=(linux-libc-dev)
-    fi
-    if [[ ${#evdev_deps[@]} -gt 0 ]]; then
-        info "Installing build dependencies for evdev: ${evdev_deps[*]}"
-        ensure_apt_updated
-        sudo apt-get install -y "${evdev_deps[@]}"
-    fi
-    info "Installing global hotkey support..."
-    uv pip install "evdev>=1.7.0"
-    success "Global hotkey support installed"
 }
 
 # ═══════════════════════════════════════════════════════════════════
