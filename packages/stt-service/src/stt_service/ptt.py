@@ -624,15 +624,55 @@ class PTTController:
                 pad_i16, (unclick_tone * 32767).astype(np.int16), pad_i16
             ])
 
+            # Silent warmup sound (50ms of silence to establish audio connection)
+            warmup_f32 = np.zeros(int(sr * 0.05), dtype=np.float32)
+            warmup_i16 = np.zeros(int(sr * 0.05), dtype=np.int16)
+
             cls._sounds = {
                 "click": click_f32,
                 "unclick": unclick_f32,
                 "click_i16": click_i16,
                 "unclick_i16": unclick_i16,
+                "warmup": warmup_f32,
+                "warmup_i16": warmup_i16,
             }
+
+            # Play silent warmup to establish audio connection
+            # This prevents first real sound from being swallowed
+            cls._warmup_audio()
         except Exception as e:
             logger.debug(f"Could not initialize sounds: {e}")
             cls._sounds = {}
+
+    @classmethod
+    def _warmup_audio(cls) -> None:
+        """Play silent sound to establish audio connection.
+
+        PulseAudio/PipeWire have startup latency on first connection.
+        Playing silence during init ensures first real sound plays promptly.
+        """
+        if not cls._sounds or "warmup" not in cls._sounds:
+            return
+
+        try:
+            if cls._use_paplay:
+                import subprocess
+                proc = subprocess.Popen(
+                    ["paplay", "--raw", f"--rate={cls._sample_rate}",
+                     "--format=s16le", "--channels=1"],
+                    stdin=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                )
+                proc.stdin.write(cls._sounds["warmup_i16"].tobytes())
+                proc.stdin.close()
+                proc.wait()
+            else:
+                import sounddevice as sd
+                sd.play(cls._sounds["warmup"], cls._sample_rate)
+                sd.wait()
+            logger.debug("Audio warmup completed")
+        except Exception as e:
+            logger.debug(f"Audio warmup failed (non-fatal): {e}")
 
     def __init__(self, listener=None):
         """Initialize PTT controller.
