@@ -693,9 +693,6 @@ class PTTController:
         self._duration_check_task: Optional[asyncio.Task] = None
         self._watchdog_task: Optional[asyncio.Task] = None
 
-        # Initialize sounds on first instance
-        self._init_sounds()
-
     def _play_sound_sync(self, sound_type: str) -> None:
         """Synchronous sound playback (called from executor).
 
@@ -894,3 +891,8 @@ class PTTController:
             self._duration_check_task.cancel()
         if self._watchdog_task:
             self._watchdog_task.cancel()
+
+
+# Initialize sounds at module load time (before any PTTController instance)
+# This gives audio subsystem time to warm up before user presses hotkey
+PTTController._init_sounds()
