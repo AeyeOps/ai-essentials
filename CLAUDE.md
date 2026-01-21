@@ -104,6 +104,21 @@ STT_PTT_TERMINAL_HOTKEY=' '  # Spacebar for Docker/SSH
 - Scope in parentheses when applicable
 - No Co-Authored-By lines for AI
 
+### Change Discussion Protocol
+- Discuss approach with user BEFORE implementing changes
+- Do not commit/push until user confirms the approach
+- For multi-step changes, get approval at each decision point
+- Wait for explicit "go ahead" or similar before git operations
+
+### Before Modifying Files
+- Confirm which file to modify if multiple similar files exist
+- Ask before creating new files or scripts that duplicate existing functionality
+- Prefer minimal changes over comprehensive rewrites
+
+### Transparency
+- Explain what you're about to change and why BEFORE making edits
+- If discovering unexpected state (multiple files, existing implementations), stop and clarify
+
 ## Platform Notes
 
 - **Target**: NVIDIA GB10 (Grace Blackwell ARM64 + Blackwell GPU)
@@ -116,3 +131,9 @@ STT_PTT_TERMINAL_HOTKEY=' '  # Spacebar for Docker/SSH
 - Test actual functionality, not superficial checks (e.g., test audio capture, not just server connectivity)
 - Docker sandbox (`test-sandbox.sh`) tests the real curl installer path
 - Use spacebar (terminal hotkey) instead of Ctrl+Super when testing in containers
+
+## Installer Design
+
+- Interactive prompts over environment variables for user choices
+- Same curl command for all install modes - user picks options when prompted
+- Env vars acceptable only for CI/automation (`STT_NONINTERACTIVE=1`), not for feature selection

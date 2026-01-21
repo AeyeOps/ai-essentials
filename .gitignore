@@ -38,3 +38,4 @@ packages/*/models/*
 # Claude Code plugins
 commands/
 hooks/
+.claude/plans/
