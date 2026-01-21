@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "aeo-skill-marketplace",
+  "description": "Curated collection of AI development skills for Claude Code and compatible agents",
+  "owner": {
+    "name": "AeyeOps",
+    "email": "support@aeyeops.com",
+    "url": "https://github.com/AeyeOps"
+  },
+  "plugins": [
+    {
+      "name": "claude-agent-sdk",
+      "description": "Expert guidance for building autonomous AI agents using Anthropic's Claude Agent SDK (Python)",
+      "category": "development",
+      "source": "./claude-agent-sdk",
+      "homepage": "https://github.com/AeyeOps/aeo-skill-marketplace",
+      "tags": ["agent-sdk", "claude", "ai-agents", "python", "mcp"]
+    }
+  ]
+}
