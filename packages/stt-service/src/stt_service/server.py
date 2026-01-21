@@ -6,7 +6,10 @@ import logging
 import signal
 import sys
 import uuid
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from logging.handlers import QueueListener
 
 import numpy as np
 import websockets
@@ -273,8 +276,15 @@ class STTServer:
         self._shutdown_event.set()
 
 
+# Module-level variable for async logging shutdown
+_log_listener: "QueueListener | None" = None
+
+
 def setup_logging(verbose: bool = False) -> None:
-    """Configure logging to file with rotation (INFO level by default).
+    """Configure async logging to file with rotation (INFO level by default).
+
+    Uses QueueHandler/QueueListener for non-blocking log writes, ensuring
+    logging never delays request processing.
 
     Args:
         verbose: If True, use DEBUG level. All logs go to file only.
@@ -288,8 +298,10 @@ def setup_logging(verbose: bool = False) -> None:
         - Max size: 5MB per file
         - Keeps 3 backup files (server.log.1, server.log.2, server.log.3)
     """
+    global _log_listener
     import os
-    from logging.handlers import RotatingFileHandler
+    import queue
+    from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
     from pathlib import Path
 
     level = logging.DEBUG if verbose else logging.INFO
@@ -311,9 +323,29 @@ def setup_logging(verbose: bool = False) -> None:
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     ))
 
+    # Queue-based async logging (non-blocking)
+    log_queue: queue.Queue = queue.Queue(-1)  # Unbounded
+    queue_handler = QueueHandler(log_queue)
+
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
-    root_logger.addHandler(file_handler)
+    root_logger.addHandler(queue_handler)
+
+    # Listener processes queue in background thread
+    _log_listener = QueueListener(log_queue, file_handler, respect_handler_level=True)
+    _log_listener.start()
+
+    # atexit for normal exit
+    import atexit
+    atexit.register(stop_logging)
+
+
+def stop_logging() -> None:
+    """Stop the async log listener, flushing any buffered messages."""
+    global _log_listener
+    if _log_listener:
+        _log_listener.stop()
+        _log_listener = None
 
 
 def main() -> None:

@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -346,6 +347,75 @@ def setup_logging(verbose: bool = False) -> None:
     root_logger.addHandler(file_handler)
 
 
+def _takeover_from_old_instances() -> None:
+    """Kill any existing client daemon instances (kill-and-takeover pattern).
+
+    The newest instance always wins. This ensures:
+    - Updates apply immediately without manual restart
+    - Multiple gtk-launch invocations don't accumulate duplicates
+    """
+    result = subprocess.run(
+        ["pgrep", "-f", "stt-client.*--daemon"],
+        capture_output=True,
+    )
+
+    if result.returncode != 0:
+        logger.debug("No existing client instances found")
+        return
+
+    pids = result.stdout.decode().strip().split('\n')
+    other_pids = [int(p) for p in pids if p and int(p) != os.getpid()]
+
+    if not other_pids:
+        logger.debug("No other client instances to replace")
+        return
+
+    if len(other_pids) == 1:
+        logger.info(f"Replacing existing client instance (PID {other_pids[0]})")
+    else:
+        logger.warning(
+            f"Found {len(other_pids)} existing client instances "
+            f"(PIDs: {', '.join(map(str, other_pids))}). Replacing all."
+        )
+
+    for pid in other_pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+            logger.debug(f"Sent SIGTERM to PID {pid}")
+        except ProcessLookupError:
+            logger.debug(f"PID {pid} already exited")
+        except PermissionError:
+            logger.error(f"Permission denied killing PID {pid}. Running as different user?")
+
+    # Brief wait for graceful shutdown
+    time.sleep(0.5)
+
+    # Check if any survived, SIGKILL if needed
+    for pid in other_pids:
+        try:
+            os.kill(pid, 0)  # Check if still alive
+            logger.warning(f"PID {pid} didn't exit gracefully, sending SIGKILL")
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass  # Already dead, good
+        except PermissionError:
+            pass  # Already logged above
+
+
+def _setup_shutdown_handler(tray: "TrayIndicator | None") -> None:
+    """Setup graceful shutdown on SIGTERM.
+
+    Ensures killed instances clean up tray icon and exit cleanly.
+    """
+    def shutdown_handler(signum, frame):
+        logger.info("Received shutdown signal, cleaning up...")
+        if tray:
+            tray.stop()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, shutdown_handler)
+
+
 async def run_client(args: argparse.Namespace) -> int:
     """Run the PTT client (single recording mode)."""
     client = PTTClient(server_url=args.server)
@@ -417,6 +487,10 @@ async def run_ptt_mode(args: argparse.Namespace) -> int:
         except Exception as e:
             logger.warning(f"Could not start tray: {e}")
             logger.warning("Continuing without tray indicator")
+
+    # Set up graceful shutdown handler (for kill-and-takeover pattern)
+    if daemon_mode:
+        _setup_shutdown_handler(tray)
 
     # Device count callback for tray state (KVM switch support)
     def on_device_count_changed(count: int) -> None:
@@ -797,22 +871,8 @@ def main() -> None:
             logger.error("--tray requires --ptt mode")
             sys.exit(1)
 
-        # Singleton check: exit if another daemon is already running
-        import subprocess
-        result = subprocess.run(
-            ["pgrep", "-f", "stt-client.*--daemon"],
-            capture_output=True,
-        )
-        if result.returncode == 0:
-            # Found existing processes - check if it's not just us
-            pids = result.stdout.decode().strip().split('\n')
-            other_pids = [p for p in pids if p and int(p) != os.getpid()]
-            if other_pids:
-                logger.info(
-                    f"Client daemon started but another instance already running "
-                    f"(PID {other_pids[0]}). This instance exiting to avoid duplicates."
-                )
-                sys.exit(0)
+        # Kill-and-takeover: newest instance wins
+        _takeover_from_old_instances()
 
     try:
         if args.ptt:
