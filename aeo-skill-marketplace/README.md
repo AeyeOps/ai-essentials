@@ -58,14 +58,15 @@ Expert guidance for building autonomous AI agents.
 1. Create a directory at the marketplace root with your plugin name
 2. Add `.claude-plugin/plugin.json` with plugin metadata
 3. Add your components (skills, commands, agents, hooks)
-4. Update `marketplace.json` to include your plugin
+4. Update `.claude-plugin/marketplace.json` to include your plugin
 5. Submit a PR
 
 ## Structure
 
 ```
 aeo-skill-marketplace/
-├── marketplace.json              # Marketplace index
+├── .claude-plugin/
+│   └── marketplace.json          # Marketplace index
 ├── README.md
 ├── LICENSE
 └── claude-agent-sdk/             # Plugin: Claude Agent SDK
