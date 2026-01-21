@@ -1294,15 +1294,22 @@ main() {
     download_model
     setup_service
     show_completion
+
+    # Return to original directory (explicit, trap is backup for errors)
+    _return_to_original_dir
 }
 
 # ═══════════════════════════════════════════════════════════════════
 # Argument parsing
 # ═══════════════════════════════════════════════════════════════════
 
-# Save original directory to return to after install (avoids direnv errors)
+# Save original directory and restore on exit (avoids direnv errors)
 _ORIGINAL_DIR="$(pwd)"
 trap 'cd "$_ORIGINAL_DIR" 2>/dev/null || true' EXIT
+
+_return_to_original_dir() {
+    cd "$_ORIGINAL_DIR" 2>/dev/null || true
+}
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
