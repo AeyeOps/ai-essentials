@@ -37,6 +37,21 @@ class TestTakeoverFromOldInstances:
                 _takeover_from_old_instances()
                 mock_kill.assert_not_called()
 
+    def test_excludes_parent_process(self):
+        """When pgrep finds current and parent process (uv wrapper), no kill is attempted."""
+        from stt_service.client import _takeover_from_old_instances
+
+        current_pid = os.getpid()
+        parent_pid = os.getppid()
+
+        with mock.patch("subprocess.run") as mock_run:
+            mock_run.return_value = mock.Mock(
+                returncode=0, stdout=f"{current_pid}\n{parent_pid}\n".encode()
+            )
+            with mock.patch("os.kill") as mock_kill:
+                _takeover_from_old_instances()
+                mock_kill.assert_not_called()
+
     def test_kills_single_other_instance(self):
         """When one other instance exists, sends SIGTERM then checks for exit."""
         from stt_service.client import _takeover_from_old_instances

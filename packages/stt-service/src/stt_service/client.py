@@ -364,7 +364,10 @@ def _takeover_from_old_instances() -> None:
         return
 
     pids = result.stdout.decode().strip().split('\n')
-    other_pids = [int(p) for p in pids if p and int(p) != os.getpid()]
+    # Exclude both current process AND parent (uv wrapper has args in cmdline)
+    my_pid = os.getpid()
+    parent_pid = os.getppid()
+    other_pids = [int(p) for p in pids if p and int(p) not in (my_pid, parent_pid)]
 
     if not other_pids:
         logger.debug("No other client instances to replace")
