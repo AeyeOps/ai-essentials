@@ -1,6 +1,6 @@
 [project]
 name = "stt-service"
-version = "0.4.0"
+version = "0.4.1"
 description = "AEO Push-to-Talk - GPU-accelerated speech-to-text for Linux"
 readme = "README.md"
 license = "MIT"

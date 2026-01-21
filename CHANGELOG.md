@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-01-20
+
+### Added
+- Async logging for server with QueueHandler/QueueListener (non-blocking writes)
+- Audio warmup at module load to prevent first PTT beep from being swallowed
+
+### Changed
+- Installer always installs tray dependencies (pystray, pillow) via `--extra desktop`
+- Audio initialization moved to module load time for faster first sound
+- Client singleton now uses kill-and-takeover pattern (newest instance wins)
+
+### Fixed
+- Excluded parent PID in singleton check (fixes uv wrapper being killed)
+- Installer returns to original directory on completion (avoids direnv issues)
+- First PTT beep no longer lost due to PulseAudio startup latency
+
 ## [0.4.0] - 2026-01-20
 
 ### Changed
