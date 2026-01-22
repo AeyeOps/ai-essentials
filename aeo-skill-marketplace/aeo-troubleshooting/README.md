@@ -18,7 +18,7 @@ A 5-stage process (Context Gathering → Classification → Hypothesis Generatio
 
 ```bash
 # Install from marketplace
-/plugin install troubleshooting@aws-claude-code-plugins
+/plugin install aeo-troubleshooting@aeo-skill-marketplace
 ```
 
 ### Basic Usage
@@ -496,8 +496,8 @@ MIT-0 - See [LICENSE](../../LICENSE) for details.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/aws-samples/guidance-for-claude-code-with-amazon-bedrock/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/aws-samples/guidance-for-claude-code-with-amazon-bedrock/discussions)
+- **Issues**: [GitHub Issues](https://github.com/AeyeOps/aeo-skill-marketplace/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/AeyeOps/aeo-skill-marketplace/discussions)
 
 ## Related Plugins
 

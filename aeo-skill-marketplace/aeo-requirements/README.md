@@ -20,7 +20,7 @@ The Requirements Plugin provides two complementary slash commands for comprehens
 
 ```bash
 # Install from marketplace
-/plugin install requirements@aws-claude-code-plugins
+/plugin install aeo-requirements@aeo-skill-marketplace
 ```
 
 ### Basic Usage
@@ -376,8 +376,8 @@ MIT-0 - See [LICENSE](../../LICENSE) for details.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/aws-samples/guidance-for-claude-code-with-amazon-bedrock/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/aws-samples/guidance-for-claude-code-with-amazon-bedrock/discussions)
+- **Issues**: [GitHub Issues](https://github.com/AeyeOps/aeo-skill-marketplace/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/AeyeOps/aeo-skill-marketplace/discussions)
 - **Documentation**: [Full Documentation](../../docs/)
 
 ## Related Plugins
