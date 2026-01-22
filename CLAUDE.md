@@ -121,10 +121,17 @@ STT_PTT_TERMINAL_HOTKEY=' '  # Spacebar for Docker/SSH
 
 ## Platform Notes
 
-- **Target**: NVIDIA GB10 (Grace Blackwell ARM64 + Blackwell GPU)
-- **Architectures**: amd64 and arm64
+- **Target**: NVIDIA GB10 (Grace Blackwell ARM64 + Blackwell GPU) and x86_64 workstations
+- **Architectures**: x86_64 (amd64) and aarch64 (arm64)
+- **OS**: Ubuntu 22.04 LTS and 24.04 LTS
 - **ARM64 GPU**: Requires manual onnxruntime-gpu wheel (no PyPI wheels for aarch64)
 - **CUDA**: Wrapper scripts search for CUDA 12.x libraries in standard paths
+
+### WSL Troubleshooting
+
+- Never remove packages to fix WSL-specific issues (breaks real servers)
+- For broken package states: use `apt-mark hold <package>` or replace failing postinst scripts with `exit 0`
+- WSL lacks systemd by default - package postinst scripts calling systemctl will fail
 
 ## Testing Philosophy
 

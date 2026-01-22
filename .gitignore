@@ -39,3 +39,6 @@ packages/*/models/*
 commands/
 hooks/
 .claude/plans/
+
+# TTS audio cache
+.claude/audio/

@@ -132,8 +132,11 @@ fi
 # Set Zsh as default shell if not already
 if [[ "$SHELL" != *"zsh"* ]]; then
     info "Setting Zsh as default shell..."
-    chsh -s "$(which zsh)"
-    success "Zsh set as default shell (log out and back in to apply)"
+    if sudo chsh -s "$(which zsh)" "$USER" 2>/dev/null; then
+        success "Zsh set as default shell (log out and back in to apply)"
+    else
+        warn "Could not change default shell (run 'chsh -s $(which zsh)' manually)"
+    fi
 else
     warn "Zsh is already the default shell"
 fi
@@ -147,7 +150,8 @@ fi
 # Enable plugins in .zshrc
 if ! grep -q "zsh-autosuggestions" ~/.zshrc 2>/dev/null; then
     info "Enabling zsh plugins in .zshrc..."
-    sed -i 's/^plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc 2>/dev/null || true
+    # More robust: add plugins to existing plugins line regardless of current content
+    sed -i 's/^plugins=(\(.*\))/plugins=(\1 zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc 2>/dev/null || true
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -462,7 +466,7 @@ if [[ ! -x "$HOME/.bun/bin/bun" ]]; then
     curl -fsSL https://bun.sh/install | bash
     success "Bun installed"
 else
-    warn "Bun already installed: $($HOME/.bun/bin/bun --version)"
+    warn "Bun already installed: $("$HOME"/.bun/bin/bun --version)"
 fi
 
 # Ensure bun is in zshrc
@@ -503,7 +507,7 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════
 info "Checking Pop Shell..."
 POP_SHELL_DIR="$HOME/.local/share/gnome-shell/extensions/pop-shell@system76.com"
-if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]] && [[ ! -d "$POP_SHELL_DIR" ]]; then
+if [[ "${XDG_CURRENT_DESKTOP:-}" == *"GNOME"* ]] && [[ ! -d "$POP_SHELL_DIR" ]]; then
     info "Installing Pop Shell (GNOME tiling extension)..."
 
     # Install TypeScript dependency
@@ -532,7 +536,7 @@ if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]] && [[ ! -d "$POP_SHELL_DIR" ]]; the
     dconf write /org/gnome/shell/extensions/pop-shell/show-title false
 
     success "Pop Shell installed and configured"
-elif [[ "$XDG_CURRENT_DESKTOP" != *"GNOME"* ]]; then
+elif [[ "${XDG_CURRENT_DESKTOP:-}" != *"GNOME"* ]]; then
     warn "Pop Shell skipped (requires GNOME desktop)"
 else
     warn "Pop Shell already installed"

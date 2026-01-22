@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.14] - 2026-01-22
+
+### Fixed
+- setup-ai-dev-stack.sh: chsh now uses sudo and handles failure gracefully
+- setup-ai-dev-stack.sh: plugins sed is more robust (appends to any existing plugins)
+- setup-ai-dev-stack.sh: XDG_CURRENT_DESKTOP uses default empty value for WSL/headless
+
+### Changed
+- CLAUDE.md: Updated platform notes with explicit x86_64/aarch64 and Ubuntu 22/24 support
+- CLAUDE.md: Added WSL troubleshooting guidance
+
 ## [0.4.1] - 2026-01-20
 
 ### Added
