@@ -1,0 +1,10 @@
+{
+  "name": "aeo-ux-design",
+  "version": "1.0.0",
+  "description": "UX optimization and UI design tools with accessibility validation and WCAG compliance",
+  "author": {
+    "name": "AeyeOps",
+    "url": "https://github.com/AeyeOps"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "aeo-documentation",
+  "version": "1.0.0",
+  "description": "Complete Diataxis documentation framework with 12 specialized agents for tutorials, how-tos, references, explanations, and analysis",
+  "author": {
+    "name": "AeyeOps",
+    "url": "https://github.com/AeyeOps"
+  },
+  "license": "MIT"
+}

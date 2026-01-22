@@ -1,0 +1,10 @@
+{
+  "name": "aeo-architecture",
+  "version": "1.0.0",
+  "description": "Architecture design, review, and documentation with 10 specialized agents for C4 diagrams, ADRs, and quality analysis",
+  "author": {
+    "name": "AeyeOps",
+    "url": "https://github.com/AeyeOps"
+  },
+  "license": "MIT"
+}

@@ -13,8 +13,98 @@
       "description": "Expert guidance for building autonomous AI agents using Anthropic's Claude Agent SDK (Python)",
       "category": "development",
       "source": "./claude-agent-sdk",
-      "homepage": "https://github.com/AeyeOps/aeo-skill-marketplace",
       "tags": ["agent-sdk", "claude", "ai-agents", "python", "mcp"]
+    },
+    {
+      "name": "aeo-agile-tools",
+      "description": "Agile team roles: Scrum Master, Product Owner, Business Analyst, and Project Manager agents",
+      "category": "productivity",
+      "source": "./aeo-agile-tools",
+      "tags": ["agile", "scrum", "project-management"]
+    },
+    {
+      "name": "aeo-architecture",
+      "description": "Architecture design, review, and documentation with 10 specialized agents for C4 diagrams, ADRs, and quality analysis",
+      "category": "development",
+      "source": "./aeo-architecture",
+      "tags": ["architecture", "c4", "adr", "design"]
+    },
+    {
+      "name": "aeo-code-analysis",
+      "description": "Code archaeology and technology evaluation for legacy systems and technical debt assessment",
+      "category": "development",
+      "source": "./aeo-code-analysis",
+      "tags": ["code-analysis", "legacy", "technical-debt"]
+    },
+    {
+      "name": "aeo-deployment",
+      "description": "Deployment orchestration and compliance automation with progressive rollout strategies",
+      "category": "deployment",
+      "source": "./aeo-deployment",
+      "tags": ["deployment", "ci-cd", "rollout"]
+    },
+    {
+      "name": "aeo-documentation",
+      "description": "Complete Diataxis documentation framework with 12 specialized agents for tutorials, how-tos, references, explanations, and analysis",
+      "category": "development",
+      "source": "./aeo-documentation",
+      "tags": ["documentation", "diataxis", "technical-writing"]
+    },
+    {
+      "name": "aeo-epcc-workflow",
+      "description": "EPCC (Explore-Plan-Code-Commit) systematic development workflow with 12 specialized agents",
+      "category": "development",
+      "source": "./aeo-epcc-workflow",
+      "tags": ["workflow", "epcc", "development-process"]
+    },
+    {
+      "name": "aeo-performance",
+      "description": "Performance profiling, optimization, and monitoring with 5 specialized agents",
+      "category": "development",
+      "source": "./aeo-performance",
+      "tags": ["performance", "profiling", "optimization"]
+    },
+    {
+      "name": "aeo-requirements",
+      "description": "Product and technical requirements gathering with expert technology evaluation guidance",
+      "category": "productivity",
+      "source": "./aeo-requirements",
+      "tags": ["requirements", "product", "evaluation"]
+    },
+    {
+      "name": "aeo-security",
+      "description": "Security scanning, auditing, and compliance validation with 4 specialized agents",
+      "category": "security",
+      "source": "./aeo-security",
+      "tags": ["security", "audit", "compliance"]
+    },
+    {
+      "name": "aeo-tdd-workflow",
+      "description": "TDD workflow with 6 specialized agents for test-first development and red-green-refactor cycle",
+      "category": "testing",
+      "source": "./aeo-tdd-workflow",
+      "tags": ["tdd", "testing", "red-green-refactor"]
+    },
+    {
+      "name": "aeo-testing",
+      "description": "Testing, QA, and quality gates with 3 specialized agents for automated validation",
+      "category": "testing",
+      "source": "./aeo-testing",
+      "tags": ["testing", "qa", "quality-gates"]
+    },
+    {
+      "name": "aeo-troubleshooting",
+      "description": "Systematic debugging and problem-solving with ask-for-help mechanism",
+      "category": "development",
+      "source": "./aeo-troubleshooting",
+      "tags": ["debugging", "troubleshooting", "problem-solving"]
+    },
+    {
+      "name": "aeo-ux-design",
+      "description": "UX optimization and UI design tools with accessibility validation and WCAG compliance",
+      "category": "design",
+      "source": "./aeo-ux-design",
+      "tags": ["ux", "ui", "accessibility", "wcag"]
     }
   ]
 }

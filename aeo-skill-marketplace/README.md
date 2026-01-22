@@ -19,39 +19,28 @@ Curated collection of AI development skills for Claude Code and compatible agent
 Once the marketplace is added, install individual plugins:
 
 ```bash
-# Install the Claude Agent SDK skill
-/plugin install claude-agent-sdk@aeo-skill-marketplace
+# Install a specific plugin
+/plugin install aeo-architecture@aeo-skill-marketplace
 ```
 
 ## Available Plugins
 
 | Plugin | Category | Description |
 |--------|----------|-------------|
-| [claude-agent-sdk](./claude-agent-sdk) | development | Expert guidance for building autonomous AI agents using Anthropic's Claude Agent SDK (Python) |
-
-## Plugin Details
-
-### claude-agent-sdk
-
-Expert guidance for building autonomous AI agents.
-
-**Covers:**
-- Agent loop patterns (GTVR: gather context, take action, verify, repeat)
-- `ClaudeSDKClient` and `query()` APIs
-- Streaming vs single-mode execution
-- Custom tool design with `@tool` decorator
-- MCP server integration
-- Hooks for runtime control
-- Permission models
-- Authentication (API key vs subscription OAuth)
-- Production deployment patterns
-
-**Triggers when you ask about:**
-- Building custom agents with Claude Agent SDK
-- Designing effective tools and MCP servers
-- Implementing permission models and guardrails
-- Configuring authentication
-- Creating multi-agent systems
+| [claude-agent-sdk](./claude-agent-sdk) | development | Expert guidance for building autonomous AI agents using Anthropic's Claude Agent SDK |
+| [aeo-agile-tools](./aeo-agile-tools) | productivity | Agile team roles: Scrum Master, Product Owner, Business Analyst, and Project Manager agents |
+| [aeo-architecture](./aeo-architecture) | development | Architecture design with 10 specialized agents for C4 diagrams, ADRs, and quality analysis |
+| [aeo-code-analysis](./aeo-code-analysis) | development | Code archaeology and technology evaluation for legacy systems and technical debt |
+| [aeo-deployment](./aeo-deployment) | deployment | Deployment orchestration and compliance automation with progressive rollout strategies |
+| [aeo-documentation](./aeo-documentation) | development | Complete Diataxis documentation framework with 12 specialized agents |
+| [aeo-epcc-workflow](./aeo-epcc-workflow) | development | EPCC (Explore-Plan-Code-Commit) systematic development workflow |
+| [aeo-performance](./aeo-performance) | development | Performance profiling, optimization, and monitoring with 5 specialized agents |
+| [aeo-requirements](./aeo-requirements) | productivity | Product and technical requirements gathering with technology evaluation guidance |
+| [aeo-security](./aeo-security) | security | Security scanning, auditing, and compliance validation with 4 specialized agents |
+| [aeo-tdd-workflow](./aeo-tdd-workflow) | testing | TDD workflow with 6 specialized agents for test-first development |
+| [aeo-testing](./aeo-testing) | testing | Testing, QA, and quality gates with 3 specialized agents |
+| [aeo-troubleshooting](./aeo-troubleshooting) | development | Systematic debugging and problem-solving with ask-for-help mechanism |
+| [aeo-ux-design](./aeo-ux-design) | design | UX optimization and UI design tools with accessibility validation |
 
 ## Adding New Plugins
 
@@ -69,14 +58,20 @@ aeo-skill-marketplace/
 │   └── marketplace.json          # Marketplace index
 ├── README.md
 ├── LICENSE
-└── claude-agent-sdk/             # Plugin: Claude Agent SDK
-    ├── .claude-plugin/
-    │   └── plugin.json
-    └── skills/
-        └── claude-agent-sdk/
-            ├── SKILL.md
-            ├── references/
-            └── examples/
+├── claude-agent-sdk/             # Plugin: Claude Agent SDK
+├── aeo-agile-tools/              # Plugin: Agile Tools
+├── aeo-architecture/             # Plugin: Architecture
+├── aeo-code-analysis/            # Plugin: Code Analysis
+├── aeo-deployment/               # Plugin: Deployment
+├── aeo-documentation/            # Plugin: Documentation
+├── aeo-epcc-workflow/            # Plugin: EPCC Workflow
+├── aeo-performance/              # Plugin: Performance
+├── aeo-requirements/             # Plugin: Requirements
+├── aeo-security/                 # Plugin: Security
+├── aeo-tdd-workflow/             # Plugin: TDD Workflow
+├── aeo-testing/                  # Plugin: Testing
+├── aeo-troubleshooting/          # Plugin: Troubleshooting
+└── aeo-ux-design/                # Plugin: UX Design
 ```
 
 ## License
