@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.16] - 2026-01-25
+
+### Removed
+- Claude Code ultrareview commands (moved to user profile)
+  - `claude-code/` directory with ultrareview plugin
+  - `commands/` directory with ultrareview*.md slash commands
+  - `hooks/` directory with ultrareview-loop scripts
+- AEO Push-to-Talk / STT Service (migrated to separate repo)
+  - `packages/stt-service/` moved to `aeo-ptt-tts` repository
+  - `docs/stt-model-options.md` and `docs/stt-ptt-setup.md` moved
+  - `scripts/whisper-ptt.sh` moved
+  - See https://github.com/AeyeOps/aeo-ptt-tts for continued development
+
 ## [0.0.15] - 2026-01-24
 
 ### Added
@@ -39,78 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - CLAUDE.md: Updated platform notes with explicit x86_64/aarch64 and Ubuntu 22/24 support
 - CLAUDE.md: Added WSL troubleshooting guidance
-
-## [0.4.1] - 2026-01-20
-
-### Added
-- Async logging for server with QueueHandler/QueueListener (non-blocking writes)
-- Audio warmup at module load to prevent first PTT beep from being swallowed
-
-### Changed
-- Installer always installs tray dependencies (pystray, pillow) via `--extra desktop`
-- Audio initialization moved to module load time for faster first sound
-- Client singleton now uses kill-and-takeover pattern (newest instance wins)
-
-### Fixed
-- Excluded parent PID in singleton check (fixes uv wrapper being killed)
-- Installer returns to original directory on completion (avoids direnv issues)
-- First PTT beep no longer lost due to PulseAudio startup latency
-
-## [0.4.0] - 2026-01-20
-
-### Changed
-- Rebranded from "STT Service" to "AEO Push-to-Talk" across all user-facing surfaces
-- Updated installer banners, systemd description, and documentation
-- Internal identifiers (file paths, class names) unchanged for compatibility
-
-## [0.0.13] - 2026-01-19
-
-### Added
-- STT Service system-wide auto-start (AEO Push-to-Talk)
-  - XDG autostart desktop entry for automatic client launch at login
-  - System tray indicator with state colors (gray=connecting, green=ready, red=recording)
-  - Daemon mode (`--daemon`) for silent background operation
-  - `desktop` optional dependency group (evdev, pystray, pillow)
-  - Installer prompts for auto-start after systemd service setup
-  - Uninstaller cleanup for autostart entry
-
-### Changed
-- STT Service installer comments now use raw.githubusercontent.com instead of jsdelivr
-- Test sandbox script URLs updated to raw.githubusercontent.com
-
-## [0.0.12] - 2026-01-20
-
-### Added
-- STT Service Push-to-Talk (PTT) terminal mode for Docker/SSH environments
-  - Spacebar-based recording (hold to record, release to transcribe)
-  - Clean timing output format: `[2.1s → 45ms] transcribed text`
-  - 30-second auto-submit with seamless continuation
-  - Audio feedback (click/unclick sounds) with paplay fallback for containers
-  - Robust key release detection with two-phase timeout algorithm
-- STT Service test sandbox (`packages/stt-service/scripts/test-sandbox.sh`)
-  - CUDA 13 Ubuntu 24.04 container with GPU passthrough
-  - PulseAudio client configuration for audio output in Docker
-  - Automatic UID/GID matching for socket permissions
-
-### Changed
-- STT Service installer now always downloads from GitHub (removed local source detection)
-- STT Service logging moved to file-only (no console spam with -v flag)
-- Server and client logs written to `~/.local/state/stt-service/`
-
-### Fixed
-- PTT race condition where recording could be cancelled before WebSocket connection completed
-- Audio device selection now uses system default instead of first available device
-- Installer no longer deletes itself when run from within installation directory
-
-## [0.0.11] - 2026-01-19
-
-### Added
-- Claude Code ultrareview command suite (`claude-code/commands/ultrareview/`)
-  - `/ultrareview` - Deep validation of plans, code, and context
-  - `/ultrareview-fix` - Systematic resolution of ultrareview findings
-  - `/ultrareview-loop` - Automated validation loop (cycles until no findings)
-  - Session tokens for multi-user safety in shared projects
-  - Stop hook pattern following ralph-loop plugin architecture
 
 ## [0.0.10] - 2026-01-19
 

@@ -2,17 +2,15 @@
 
 **Production-ready tools for AI developers on Linux GPU workstations.**
 
-Skip the setup grind. Get a complete AI development environment with one-line installers: speech-to-text that works system-wide, a tuned terminal stack, and battle-tested configs for high-performance hardware.
+Skip the setup grind. Get a complete AI development environment with one-line installers: a tuned terminal stack and battle-tested configs for high-performance hardware.
 
 ```mermaid
 graph LR
     subgraph "AI Essentials"
-        STT["🎤 AEO Push-to-Talk<br/>Speech-to-Text"]
         DEV["🛠️ Dev Stack<br/>Terminal + Tools"]
         CFG["⚙️ Configs<br/>GPU-Optimized"]
     end
 
-    STT --> |"Ctrl+Super"| APP["Any App"]
     DEV --> |"one script"| ENV["Dev Environment"]
     CFG --> |"dotfiles"| TERM["Terminal"]
 ```
@@ -23,59 +21,8 @@ graph LR
 
 | Component | What It Does | Install |
 |-----------|--------------|---------|
-| [**AEO Push-to-Talk**](#-aeo-push-to-talk) | Dictate anywhere with Ctrl+Super | `curl ...install.sh \| bash` |
 | [**Dev Stack**](#-ai-developer-stack) | Complete terminal environment | `./setup-ai-dev-stack.sh` |
 | [**Configs**](#-configuration-files) | OLED/4K-optimized dotfiles | Copy to `~/.config/` |
-
----
-
-## 🎤 AEO Push-to-Talk
-
-**Speak instead of type — in any application.**
-
-GPU-accelerated speech-to-text using NVIDIA Parakeet models. Press a hotkey, talk, release — text appears at your cursor. Works in VS Code, browsers, Slack, terminals, everywhere.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/AeyeOps/ai-essentials/main/packages/stt-service/install.sh | bash
-```
-
-Answer yes to all prompts, log out and back in. Done.
-
-### How It Works
-
-```mermaid
-sequenceDiagram
-    participant U as You
-    participant T as Tray Icon
-    participant S as STT Server
-    participant A as Active Window
-
-    Note over T: 🟢 Ready
-    U->>T: Press Ctrl+Super
-    Note over T: 🔴 Recording
-    U->>S: Audio stream
-    U->>T: Release keys
-    S->>A: Type transcribed text
-    Note over T: 🟢 Ready
-```
-
-### Key Features
-
-| Feature | Description |
-|---------|-------------|
-| **System-wide hotkey** | Ctrl+Super works in any app (X11) |
-| **Auto-start** | Server on boot, client at login |
-| **Tray indicator** | Gray (connecting) → Green (ready) → Red (recording) |
-| **Fast** | 40-200ms latency after GPU warmup |
-| **Flexible output** | Type at cursor, copy to clipboard, or stdout |
-
-### Requirements
-
-- NVIDIA GPU with CUDA support
-- Ubuntu/Debian-based Linux
-- ~3GB disk space (model + dependencies)
-
-📖 [Full documentation](packages/stt-service/README.md)
 
 ---
 
@@ -216,8 +163,6 @@ Handles D-Bus sessions, GPU acceleration workarounds, and display server compati
 
 ```
 ai-essentials/
-├── packages/
-│   └── stt-service/      # AEO Push-to-Talk
 ├── scripts/
 │   ├── setup-ai-dev-stack.sh
 │   ├── google-chrome-wsl2.sh

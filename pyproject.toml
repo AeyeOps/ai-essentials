@@ -1,13 +1,7 @@
 [project]
 name = "ai-essentials"
-version = "0.0.15"
-description = "AI development utilities, scripts, and services"
+version = "0.0.16"
+description = "AI development utilities, scripts, and configurations"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12.3"
-
-[tool.uv]
-managed = true
-
-[tool.uv.workspace]
-members = ["packages/*"]

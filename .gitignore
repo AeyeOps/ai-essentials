@@ -23,10 +23,6 @@ dist/
 .python-version
 uv.lock
 
-# ONNX models (large files, download separately)
-packages/*/models/*
-!packages/*/models/.gitkeep
-
 # Local overrides (not tracked)
 .gitignore.local
 
@@ -35,10 +31,6 @@ packages/*/models/*
 .vscode/
 .history/
 
-# Claude Code plugins
-commands/
-hooks/
+# Claude Code local state
 .claude/plans/
-
-# TTS audio cache
 .claude/audio/
