@@ -64,11 +64,11 @@ fi
 
 # ─── Update apt cache ───────────────────────────────────────────────────────
 info "Updating package cache..."
-sudo apt-get update -qq
+sudo apt-get update
 
 # ─── Install base dependencies ──────────────────────────────────────────────
 info "Installing base dependencies..."
-sudo apt-get install -qq -y git curl unzip fontconfig
+sudo apt-get install -y git curl unzip fontconfig
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. ZSH + OH-MY-ZSH + POWERLEVEL10K + FONTS
@@ -81,10 +81,10 @@ FONT_DIR="$HOME/.local/share/fonts"
 if ! ls "$FONT_DIR"/MesloLGS* &>/dev/null; then
     info "Installing MesloLGS Nerd Font..."
     mkdir -p "$FONT_DIR"
-    curl -fsSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf" -o "$FONT_DIR/MesloLGS NF Regular.ttf"
-    curl -fsSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold.ttf" -o "$FONT_DIR/MesloLGS NF Bold.ttf"
-    curl -fsSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Italic.ttf" -o "$FONT_DIR/MesloLGS NF Italic.ttf"
-    curl -fsSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold%20Italic.ttf" -o "$FONT_DIR/MesloLGS NF Bold Italic.ttf"
+    curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf" -o "$FONT_DIR/MesloLGS NF Regular.ttf"
+    curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold.ttf" -o "$FONT_DIR/MesloLGS NF Bold.ttf"
+    curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Italic.ttf" -o "$FONT_DIR/MesloLGS NF Italic.ttf"
+    curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold%20Italic.ttf" -o "$FONT_DIR/MesloLGS NF Bold Italic.ttf"
     fc-cache -f
     success "MesloLGS Nerd Font installed"
 else
@@ -94,7 +94,7 @@ fi
 info "Checking Zsh..."
 if ! command_exists zsh; then
     info "Installing Zsh..."
-    sudo apt-get install -qq -y zsh
+    sudo apt-get install -y zsh
     success "Zsh installed"
 else
     warn "Zsh already installed: $(zsh --version)"
@@ -103,7 +103,7 @@ fi
 info "Checking Oh-My-Zsh..."
 if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
     info "Installing Oh-My-Zsh..."
-    RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"  # silent: output piped to sh
     success "Oh-My-Zsh installed"
 else
     warn "Oh-My-Zsh already installed"
@@ -211,7 +211,7 @@ info "Checking Mamba/Miniforge..."
 MINIFORGE_DIR="$HOME/miniforge3"
 if [[ ! -d "$MINIFORGE_DIR" ]]; then
     info "Installing Miniforge (includes Mamba)..."
-    curl -fsSL -o /tmp/miniforge.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${ARCH_ALT}.sh"
+    curl -fSL -o /tmp/miniforge.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${ARCH_ALT}.sh"
     bash /tmp/miniforge.sh -b -p "$MINIFORGE_DIR"
     rm /tmp/miniforge.sh
     success "Miniforge installed"
@@ -244,7 +244,7 @@ fi
 info "Checking Kitty..."
 if ! command_exists kitty; then
     info "Installing Kitty terminal..."
-    sudo apt-get install -qq -y kitty
+    sudo apt-get install -y kitty
     success "Kitty installed"
 
     # Configure Kitty (GPU-optimized for high-DPI/OLED displays)
@@ -345,8 +345,8 @@ fi
 info "Checking Yazi..."
 if ! command_exists yazi; then
     info "Installing Yazi..."
-    YAZI_VERSION=$(curl -s https://api.github.com/repos/sxyazi/yazi/releases/latest | grep -oP '"tag_name": "\K[^"]+')
-    curl -fsSL "https://github.com/sxyazi/yazi/releases/download/${YAZI_VERSION}/yazi-${ARCH_ALT}-unknown-linux-gnu.zip" -o /tmp/yazi.zip
+    YAZI_VERSION=$(curl --max-time 30 https://api.github.com/repos/sxyazi/yazi/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+    curl -fSL "https://github.com/sxyazi/yazi/releases/download/${YAZI_VERSION}/yazi-${ARCH_ALT}-unknown-linux-gnu.zip" -o /tmp/yazi.zip
     unzip -o /tmp/yazi.zip -d /tmp/yazi
     sudo mv /tmp/yazi/yazi-${ARCH_ALT}-unknown-linux-gnu/yazi /usr/local/bin/
     sudo mv /tmp/yazi/yazi-${ARCH_ALT}-unknown-linux-gnu/ya /usr/local/bin/ 2>/dev/null || true
@@ -364,7 +364,7 @@ fi
 info "Checking ripgrep..."
 if ! command_exists rg || [[ "$(which rg)" == *"claude"* ]]; then
     info "Installing ripgrep..."
-    sudo apt-get install -qq -y ripgrep
+    sudo apt-get install -y ripgrep
     success "ripgrep installed"
 else
     warn "ripgrep already installed"
@@ -374,7 +374,7 @@ fi
 info "Checking fd..."
 if ! command_exists fd && ! command_exists fdfind; then
     info "Installing fd..."
-    sudo apt-get install -qq -y fd-find
+    sudo apt-get install -y fd-find
     # Create fd symlink if fdfind is installed
     if command_exists fdfind && ! command_exists fd; then
         sudo ln -sf "$(which fdfind)" /usr/local/bin/fd
@@ -388,7 +388,7 @@ fi
 info "Checking fzf..."
 if ! command_exists fzf; then
     info "Installing fzf..."
-    sudo apt-get install -qq -y fzf
+    sudo apt-get install -y fzf
     success "fzf installed"
 else
     warn "fzf already installed"
@@ -398,7 +398,7 @@ fi
 info "Checking bat..."
 if ! command_exists bat && ! command_exists batcat; then
     info "Installing bat..."
-    sudo apt-get install -qq -y bat
+    sudo apt-get install -y bat
     # Create bat symlink if batcat is installed
     if command_exists batcat && ! command_exists bat; then
         sudo ln -sf "$(which batcat)" /usr/local/bin/bat
@@ -412,10 +412,10 @@ fi
 info "Checking eza..."
 if ! command_exists eza; then
     info "Installing eza..."
-    sudo apt-get install -qq -y eza || {
+    sudo apt-get install -y eza || {
         # Fallback: install from GitHub releases
-        EZA_VERSION=$(curl -s https://api.github.com/repos/eza-community/eza/releases/latest | grep -oP '"tag_name": "\K[^"]+')
-        curl -fsSL "https://github.com/eza-community/eza/releases/download/${EZA_VERSION}/eza_${ARCH_ALT}-unknown-linux-gnu.tar.gz" -o /tmp/eza.tar.gz
+        EZA_VERSION=$(curl --max-time 30 https://api.github.com/repos/eza-community/eza/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+        curl -fSL "https://github.com/eza-community/eza/releases/download/${EZA_VERSION}/eza_${ARCH_ALT}-unknown-linux-gnu.tar.gz" -o /tmp/eza.tar.gz
         sudo tar -xzf /tmp/eza.tar.gz -C /usr/local/bin/
         rm /tmp/eza.tar.gz
     }
@@ -428,9 +428,9 @@ fi
 info "Checking delta..."
 if ! command_exists delta; then
     info "Installing delta..."
-    DELTA_VERSION=$(curl -s https://api.github.com/repos/dandavison/delta/releases/latest | grep -oP '"tag_name": "\K[^"]+')
-    curl -fsSL "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/git-delta_${DELTA_VERSION}_${ARCH_DEB}.deb" -o /tmp/delta.deb
-    sudo dpkg -i /tmp/delta.deb || sudo apt-get install -qq -f -y
+    DELTA_VERSION=$(curl --max-time 30 https://api.github.com/repos/dandavison/delta/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+    curl -fSL "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/git-delta_${DELTA_VERSION}_${ARCH_DEB}.deb" -o /tmp/delta.deb
+    sudo dpkg -i /tmp/delta.deb || sudo apt-get install -f -y
     rm /tmp/delta.deb
     success "delta installed"
 else
@@ -441,11 +441,11 @@ fi
 info "Checking glow..."
 if ! command_exists glow; then
     info "Installing glow..."
-    GLOW_VERSION=$(curl -s https://api.github.com/repos/charmbracelet/glow/releases/latest | grep -oP '"tag_name": "v\K[^"]+')
+    GLOW_VERSION=$(curl --max-time 30 https://api.github.com/repos/charmbracelet/glow/releases/latest | grep -oP '"tag_name": "v\K[^"]+')
     # glow uses 'arm64' not 'aarch64' in release names
     GLOW_ARCH="${ARCH_ALT}"
     [[ "$ARCH" == "aarch64" ]] && GLOW_ARCH="arm64"
-    curl -fsSL "https://github.com/charmbracelet/glow/releases/download/v${GLOW_VERSION}/glow_${GLOW_VERSION}_Linux_${GLOW_ARCH}.tar.gz" -o /tmp/glow.tar.gz
+    curl -fSL "https://github.com/charmbracelet/glow/releases/download/v${GLOW_VERSION}/glow_${GLOW_VERSION}_Linux_${GLOW_ARCH}.tar.gz" -o /tmp/glow.tar.gz
     sudo tar -xzf /tmp/glow.tar.gz -C /usr/local/bin/ --strip-components=1 --wildcards "*/glow"
     rm /tmp/glow.tar.gz
     success "glow installed"
@@ -457,7 +457,7 @@ fi
 info "Checking btop..."
 if ! command_exists btop; then
     info "Installing btop..."
-    sudo apt-get install -qq -y btop
+    sudo apt-get install -y btop
     success "btop installed"
 else
     warn "btop already installed"
@@ -467,7 +467,7 @@ fi
 info "Checking ncdu..."
 if ! command_exists ncdu; then
     info "Installing ncdu..."
-    sudo apt-get install -qq -y ncdu
+    sudo apt-get install -y ncdu
     success "ncdu installed"
 else
     warn "ncdu already installed"
@@ -500,7 +500,7 @@ fi
 info "Checking httpie..."
 if ! command_exists http; then
     info "Installing httpie..."
-    sudo apt-get install -qq -y httpie
+    sudo apt-get install -y httpie
     success "httpie installed"
 else
     warn "httpie already installed"
@@ -533,7 +533,7 @@ fi
 info "Checking shellcheck..."
 if ! command_exists shellcheck; then
     info "Installing shellcheck..."
-    sudo apt-get install -qq -y shellcheck
+    sudo apt-get install -y shellcheck
     success "shellcheck installed"
 else
     warn "shellcheck already installed"
@@ -543,7 +543,7 @@ fi
 info "Checking p7zip..."
 if ! command_exists 7z; then
     info "Installing p7zip-full..."
-    sudo apt-get install -qq -y p7zip-full
+    sudo apt-get install -y p7zip-full
     success "p7zip-full installed"
 else
     warn "p7zip already installed"
@@ -555,8 +555,8 @@ fi
 info "Checking Zellij..."
 if ! command_exists zellij; then
     info "Installing Zellij..."
-    ZELLIJ_VERSION=$(curl -s https://api.github.com/repos/zellij-org/zellij/releases/latest | grep -oP '"tag_name": "\K[^"]+')
-    curl -fsSL "https://github.com/zellij-org/zellij/releases/download/${ZELLIJ_VERSION}/zellij-${ARCH_ALT}-unknown-linux-musl.tar.gz" -o /tmp/zellij.tar.gz
+    ZELLIJ_VERSION=$(curl --max-time 30 https://api.github.com/repos/zellij-org/zellij/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+    curl -fSL "https://github.com/zellij-org/zellij/releases/download/${ZELLIJ_VERSION}/zellij-${ARCH_ALT}-unknown-linux-musl.tar.gz" -o /tmp/zellij.tar.gz
     sudo tar -xzf /tmp/zellij.tar.gz -C /usr/local/bin/
     rm /tmp/zellij.tar.gz
     success "Zellij installed"
@@ -570,7 +570,7 @@ fi
 info "Checking Bun..."
 if [[ ! -x "$HOME/.bun/bin/bun" ]]; then
     info "Installing Bun..."
-    curl -fsSL https://bun.sh/install | bash
+    curl -fSL https://bun.sh/install | bash
     success "Bun installed"
 else
     warn "Bun already installed: $("$HOME"/.bun/bin/bun --version)"
@@ -593,7 +593,7 @@ fi
 info "Checking direnv..."
 if ! command_exists direnv; then
     info "Installing direnv..."
-    sudo apt-get install -qq -y direnv
+    sudo apt-get install -y direnv
     success "direnv installed"
 else
     warn "direnv already installed"
@@ -617,7 +617,7 @@ fi
 info "Checking ffmpeg..."
 if ! command_exists ffmpeg; then
     info "Installing ffmpeg..."
-    sudo apt-get install -qq -y ffmpeg
+    sudo apt-get install -y ffmpeg
     success "ffmpeg installed"
 else
     warn "ffmpeg already installed"
@@ -627,7 +627,7 @@ fi
 info "Checking mpv..."
 if ! command_exists mpv; then
     info "Installing mpv..."
-    sudo apt-get install -qq -y mpv
+    sudo apt-get install -y mpv
     success "mpv installed"
 else
     warn "mpv already installed"
@@ -637,7 +637,7 @@ fi
 info "Checking chafa..."
 if ! command_exists chafa; then
     info "Installing chafa..."
-    sudo apt-get install -qq -y chafa
+    sudo apt-get install -y chafa
     success "chafa installed"
 else
     warn "chafa already installed"
@@ -652,7 +652,7 @@ if [[ "${XDG_CURRENT_DESKTOP:-}" == *"GNOME"* ]] && [[ ! -d "$POP_SHELL_DIR" ]];
     info "Installing Pop Shell (GNOME tiling extension)..."
 
     # Install TypeScript dependency
-    sudo apt-get install -qq -y node-typescript
+    sudo apt-get install -y node-typescript
 
     # Clone and build Pop Shell
     TEMP_DIR=$(mktemp -d)
