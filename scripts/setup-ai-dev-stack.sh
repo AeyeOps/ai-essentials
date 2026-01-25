@@ -8,7 +8,7 @@
 #   - Mamba/Miniforge + 'dev' environment with AI packages
 #   - Kitty terminal (GPU-optimized for high-DPI/OLED)
 #   - Yazi file manager
-#   - CLI tools: fd, fzf, bat, eza, delta, ripgrep, glow
+#   - CLI tools: fd, fzf, bat, eza, delta, ripgrep, glow, btop, ncdu, duf, httpie, yq, shellcheck, p7zip
 #   - Zellij terminal multiplexer
 #   - bun (JS runtime) + direnv
 #   - Zsh + Oh-My-Zsh + Powerlevel10k
@@ -444,6 +444,88 @@ else
     warn "glow already installed"
 fi
 
+# btop (beautiful system monitor)
+info "Checking btop..."
+if ! command_exists btop; then
+    info "Installing btop..."
+    sudo apt-get install -qq -y btop
+    success "btop installed"
+else
+    warn "btop already installed"
+fi
+
+# ncdu (interactive disk usage analyzer)
+info "Checking ncdu..."
+if ! command_exists ncdu; then
+    info "Installing ncdu..."
+    sudo apt-get install -qq -y ncdu
+    success "ncdu installed"
+else
+    warn "ncdu already installed"
+fi
+
+# duf (modern df replacement)
+info "Checking duf..."
+if ! command_exists duf; then
+    info "Installing duf..."
+    DUF_VERSION=$(curl -s https://api.github.com/repos/muesli/duf/releases/latest | grep -oP '"tag_name": "v\K[^"]+')
+    # duf uses 'arm64' not 'aarch64' in release names
+    DUF_ARCH="${ARCH_ALT}"
+    [[ "$ARCH" == "aarch64" ]] && DUF_ARCH="arm64"
+    curl -fsSL "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_${DUF_ARCH}.tar.gz" -o /tmp/duf.tar.gz
+    sudo tar -xzf /tmp/duf.tar.gz -C /usr/local/bin/ duf
+    rm /tmp/duf.tar.gz
+    success "duf installed"
+else
+    warn "duf already installed"
+fi
+
+# httpie (human-friendly curl alternative)
+info "Checking httpie..."
+if ! command_exists http; then
+    info "Installing httpie..."
+    sudo apt-get install -qq -y httpie
+    success "httpie installed"
+else
+    warn "httpie already installed"
+fi
+
+# yq (YAML processor)
+info "Checking yq..."
+if ! command_exists yq; then
+    info "Installing yq..."
+    YQ_VERSION=$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+    # yq uses 'arm64' not 'aarch64' in release names
+    YQ_ARCH="${ARCH_ALT}"
+    [[ "$ARCH" == "aarch64" ]] && YQ_ARCH="arm64"
+    curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${YQ_ARCH}" -o /tmp/yq
+    chmod +x /tmp/yq
+    sudo mv /tmp/yq /usr/local/bin/yq
+    success "yq installed"
+else
+    warn "yq already installed"
+fi
+
+# Shellcheck (shell script linter)
+info "Checking shellcheck..."
+if ! command_exists shellcheck; then
+    info "Installing shellcheck..."
+    sudo apt-get install -qq -y shellcheck
+    success "shellcheck installed"
+else
+    warn "shellcheck already installed"
+fi
+
+# p7zip-full (7z archive support)
+info "Checking p7zip..."
+if ! command_exists 7z; then
+    info "Installing p7zip-full..."
+    sudo apt-get install -qq -y p7zip-full
+    success "p7zip-full installed"
+else
+    warn "p7zip already installed"
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 7. ZELLIJ TERMINAL MULTIPLEXER
 # ═══════════════════════════════════════════════════════════════════════════
@@ -645,6 +727,7 @@ if ! grep -q '# ─── AI Dev Stack Aliases' ~/.zshrc 2>/dev/null; then
     cat >> ~/.zshrc << 'EOF'
 
 # ─── AI Dev Stack Aliases ──────────────────────────────────────────────────────
+# Note: Some aliases shadow built-ins (ls, cat, df, top). Use \cmd for originals.
 alias ls='eza --icons'
 alias ll='eza -la --icons --git'
 alias la='eza -a --icons'
@@ -654,6 +737,10 @@ alias y='yazi'
 alias zj='zellij'
 alias mdv='glow'
 alias mpvk='mpv --profile=sw-fast --vo=kitty --vo-kitty-use-shm=yes --really-quiet'
+alias disk='ncdu'
+alias df='duf'
+alias top='btop'
+alias yaml='yq'
 EOF
 fi
 
@@ -672,7 +759,7 @@ echo "  - NVM + Node.js 22 LTS"
 echo "  - Mamba + 'dev' environment (anthropic, openai, httpx, rich, typer, pydantic)"
 echo "  - Kitty terminal (GPU-optimized, OLED theme, 4K ready)"
 echo "  - Yazi file manager"
-echo "  - CLI tools: ripgrep, fd, fzf, bat, eza, delta, glow"
+echo "  - CLI tools: ripgrep, fd, fzf, bat, eza, delta, glow, btop, ncdu, duf, httpie, yq, shellcheck, p7zip"
 echo "  - Terminal media: ffmpeg, mpv, chafa"
 echo "  - Zellij terminal multiplexer"
 echo "  - Bun JS runtime"
@@ -687,6 +774,10 @@ echo "  zellij / zj    - Terminal multiplexer"
 echo "  glow / mdv     - Render markdown in terminal"
 echo "  mpvk video.mp4  - Play video in Kitty terminal"
 echo "  mamba activate dev  - Activate AI dev environment"
+echo "  btop / top     - Beautiful system monitor"
+echo "  ncdu / disk    - Interactive disk usage"
+echo "  duf / df       - Modern disk free"
+echo "  yq / yaml      - YAML processor"
 echo ""
 echo -e "${YELLOW}NOTES:${NC}"
 echo "  - Log out and back in (or run 'exec zsh') to apply all changes"

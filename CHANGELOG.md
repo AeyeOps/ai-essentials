@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.15] - 2026-01-24
+
+### Added
+- Additional CLI tools to dev stack (`scripts/setup-ai-dev-stack.sh`)
+  - btop: Beautiful system monitor (replaces htop)
+  - ncdu: Interactive disk usage analyzer
+  - duf: Modern df replacement with visual output
+  - httpie: Human-friendly curl alternative
+  - yq: YAML processor (like jq for YAML)
+  - shellcheck: Shell script linter
+  - p7zip: 7z archive support
+  - Shell aliases: `disk` (ncdu), `df` (duf), `top` (btop), `yaml` (yq)
+
 ## [0.0.14] - 2026-01-24
 
 ### Added

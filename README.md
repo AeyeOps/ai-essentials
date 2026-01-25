@@ -108,7 +108,7 @@ graph TD
     end
 
     subgraph Tools
-        CLI[ripgrep, fd, fzf<br/>bat, eza, delta, glow]
+        CLI[ripgrep, fd, fzf, bat<br/>eza, delta, glow, btop<br/>ncdu, duf, httpie, yq]
         YAZI[Yazi File Manager]
         POP[Pop Shell Tiling]
     end
@@ -128,7 +128,7 @@ graph TD
 |----------|------------|
 | **Terminal** | Kitty (GPU-optimized), Zellij (multiplexer) |
 | **Shell** | Zsh, Oh-My-Zsh, Powerlevel10k, MesloLGS Nerd Font |
-| **CLI Tools** | ripgrep, fd, fzf, bat, eza, delta, glow |
+| **CLI Tools** | ripgrep, fd, fzf, bat, eza, delta, glow, btop, ncdu, duf, httpie, yq, shellcheck, p7zip |
 | **File Manager** | Yazi (Rust-based TUI with previews) |
 | **Tiling** | Pop Shell (GNOME extension) |
 | **Runtimes** | NVM + Node.js 22, Mamba + Python, Bun |
