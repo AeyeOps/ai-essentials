@@ -27,7 +27,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
 LOG_FILE="${SCRIPT_DIR}/${SCRIPT_NAME}.log"
-exec > >(stdbuf -oL tee -a "$LOG_FILE") 2>&1
+exec > >(stdbuf -oL tee "$LOG_FILE") 2>&1
 echo "══════════════════════════════════════════════════════════════════════════"
 echo "Log: $LOG_FILE | Started: $(date -Iseconds)"
 echo "══════════════════════════════════════════════════════════════════════════"
