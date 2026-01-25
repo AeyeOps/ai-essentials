@@ -506,24 +506,11 @@ else
     warn "httpie already installed"
 fi
 
-# yq (YAML processor)
+# yq (YAML processor - mikefarah/yq via snap, NOT the apt jq-wrapper)
 info "Checking yq..."
 if ! command_exists yq; then
-    info "Installing yq..."
-    info "  Fetching latest version from GitHub API..."
-    YQ_VERSION=$(curl --max-time 30 -sS https://api.github.com/repos/mikefarah/yq/releases/latest | grep -oP '"tag_name": "\K[^"]+')
-    if [[ -z "$YQ_VERSION" ]]; then
-        error "Failed to fetch yq version from GitHub API"
-    fi
-    info "  Version: $YQ_VERSION"
-    # yq uses 'arm64' not 'aarch64' in release names
-    YQ_ARCH="${ARCH_ALT}"
-    [[ "$ARCH" == "aarch64" ]] && YQ_ARCH="arm64"
-    YQ_URL="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${YQ_ARCH}"
-    info "  Downloading: $YQ_URL"
-    curl --max-time 60 -fSL "$YQ_URL" -o /tmp/yq
-    chmod +x /tmp/yq
-    sudo mv /tmp/yq /usr/local/bin/yq
+    info "Installing yq via snap..."
+    sudo snap install yq
     success "yq installed"
 else
     warn "yq already installed"
