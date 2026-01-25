@@ -30,7 +30,8 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
 LOG_FILE="${SCRIPT_DIR}/${SCRIPT_NAME}.log"
 
 # Tee all stdout and stderr to log file while preserving console output
-exec > >(tee -a "$LOG_FILE") 2>&1
+# Use stdbuf for line-buffered output (no delay in console)
+exec > >(stdbuf -oL tee -a "$LOG_FILE") 2>&1
 
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo "Log started: $(date -Iseconds)"
