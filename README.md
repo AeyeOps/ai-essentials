@@ -113,6 +113,10 @@ graph TD
         POP[Pop Shell Tiling]
     end
 
+    subgraph Media
+        MEDIA[ffmpeg, mpv, chafa<br/>Terminal Video + Images]
+    end
+
     subgraph Runtimes
         NODE[Node.js 22 via NVM]
         PY[Python via Mamba]
@@ -129,8 +133,41 @@ graph TD
 | **Tiling** | Pop Shell (GNOME extension) |
 | **Runtimes** | NVM + Node.js 22, Mamba + Python, Bun |
 | **Utilities** | direnv (per-project env vars) |
+| **Media** | ffmpeg, mpv (Kitty video playback), chafa (terminal images) |
+| **Auto-config** | Kitty as default terminal (GNOME), git delta as pager, fzf shell integration |
+
+### Auto-Configuration
+
+The script wires installed tools together as active defaults:
+
+| Config | What It Does |
+|--------|--------------|
+| **Kitty default terminal** | GNOME Ctrl+Alt+T opens Kitty instead of gnome-terminal |
+| **git delta pager** | `git diff`, `git log`, `git show` render with syntax highlighting and side-by-side view |
+| **fzf shell integration** | Ctrl+T (find files), Ctrl+R (search history), Alt+C (cd to directory) |
 
 Works on both **amd64** and **arm64** (including NVIDIA GB10/DGX Spark).
+
+### Terminal Media Playback
+
+The media tools turn Kitty into a visual workstation — video, images, and GIFs render directly in the terminal at full resolution using Kitty's GPU-accelerated graphics protocol.
+
+| Capability | How | Example |
+|------------|-----|---------|
+| **Play video in terminal** | mpv renders via Kitty graphics protocol | `mpvk video.mp4` |
+| **Preview images** | chafa auto-detects Kitty for pixel-perfect output | `chafa screenshot.png` |
+| **Browse visual files** | Yazi uses chafa for inline image previews | `y ~/Pictures` |
+| **Inspect video metadata** | ffprobe (bundled with ffmpeg) | `ffprobe -hide_banner clip.mp4` |
+| **Convert media** | ffmpeg for transcoding, extraction, format conversion | `ffmpeg -i input.mkv output.mp4` |
+
+**Why this matters for AI developers:** Model output visualization, dataset inspection, generated media review — all without leaving the terminal or opening a separate GUI app.
+
+**Cross-tool synergy:**
+
+- **Kitty + mpv** — `mpvk` uses shared memory (`--vo-kitty-use-shm`) to push frames at ~60fps locally, bypassing base64 encoding entirely. Full playback controls: seek, pause, subtitles, audio.
+- **Kitty + chafa** — chafa auto-detects Kitty's graphics protocol, falling back gracefully to sixel or Unicode block art in other terminals or over SSH.
+- **Yazi + chafa** — The file manager uses chafa as its image preview backend. Browse directories of images, screenshots, or model outputs with inline thumbnails.
+- **ffmpeg as foundation** — Provides the decode libraries that mpv uses, plus standalone tools (`ffmpeg`, `ffprobe`) for batch processing and inspection.
 
 ---
 

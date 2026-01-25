@@ -13,6 +13,8 @@
 #   - bun (JS runtime) + direnv
 #   - Zsh + Oh-My-Zsh + Powerlevel10k
 #   - Pop Shell (GNOME tiling extension)
+#   - Terminal media: ffmpeg, mpv (Kitty video playback), chafa
+#   - Post-install: Kitty default terminal, git delta pager, fzf integration
 #
 # Usage: ./setup-ai-dev-stack.sh
 #
@@ -503,7 +505,41 @@ EOF
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 10. POP SHELL (GNOME TILING EXTENSION)
+# 10. TERMINAL MEDIA TOOLS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ffmpeg (video processing foundation)
+info "Checking ffmpeg..."
+if ! command_exists ffmpeg; then
+    info "Installing ffmpeg..."
+    sudo apt-get install -qq -y ffmpeg
+    success "ffmpeg installed"
+else
+    warn "ffmpeg already installed"
+fi
+
+# mpv (video player with Kitty graphics protocol)
+info "Checking mpv..."
+if ! command_exists mpv; then
+    info "Installing mpv..."
+    sudo apt-get install -qq -y mpv
+    success "mpv installed"
+else
+    warn "mpv already installed"
+fi
+
+# chafa (terminal image/GIF renderer)
+info "Checking chafa..."
+if ! command_exists chafa; then
+    info "Installing chafa..."
+    sudo apt-get install -qq -y chafa
+    success "chafa installed"
+else
+    warn "chafa already installed"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 11. POP SHELL (GNOME TILING EXTENSION)
 # ═══════════════════════════════════════════════════════════════════════════
 info "Checking Pop Shell..."
 POP_SHELL_DIR="$HOME/.local/share/gnome-shell/extensions/pop-shell@system76.com"
@@ -543,7 +579,66 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 11. SHELL ALIASES FOR NEW TOOLS
+# 12. POST-INSTALL CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+# --- Kitty as default terminal (GNOME) ---
+if [[ "${XDG_CURRENT_DESKTOP:-}" == *"GNOME"* ]] && command_exists kitty; then
+    KITTY_PATH=$(which kitty)
+    CURRENT_TERMINAL=$(update-alternatives --query x-terminal-emulator 2>/dev/null | grep "^Value:" | cut -d' ' -f2)
+    if [[ "$CURRENT_TERMINAL" != "$KITTY_PATH" ]]; then
+        info "Setting Kitty as default terminal (GNOME)..."
+        sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator "$KITTY_PATH" 50
+        sudo update-alternatives --set x-terminal-emulator "$KITTY_PATH"
+        gsettings set org.gnome.desktop.default-applications.terminal exec 'kitty' 2>/dev/null || true
+        success "Kitty set as default terminal"
+    else
+        warn "Kitty already set as default terminal"
+    fi
+elif [[ "${XDG_CURRENT_DESKTOP:-}" != *"GNOME"* ]]; then
+    warn "Kitty default terminal skipped (requires GNOME desktop)"
+elif ! command_exists kitty; then
+    warn "Kitty default terminal skipped (kitty not installed)"
+fi
+
+# --- Git delta as default pager ---
+if command_exists delta; then
+    if [[ "$(git config --global --get core.pager 2>/dev/null)" != "delta" ]]; then
+        info "Configuring git delta as default pager..."
+        git config --global core.pager delta
+        git config --global interactive.diffFilter 'delta --color-only'
+        git config --global delta.navigate true
+        git config --global delta.dark true
+        git config --global merge.conflictStyle zdiff3
+        success "Git delta configured as default pager"
+    else
+        warn "Git delta already configured as pager"
+    fi
+else
+    warn "Git delta pager skipped (delta not installed)"
+fi
+
+# --- fzf Zsh integration ---
+FZF_KEYBINDINGS="/usr/share/doc/fzf/examples/key-bindings.zsh"
+if [[ -f "$FZF_KEYBINDINGS" ]]; then
+    if ! grep -q 'fzf Integration' ~/.zshrc 2>/dev/null; then
+        info "Adding fzf Zsh integration (Ctrl+T, Ctrl+R, Alt+C)..."
+        cat >> ~/.zshrc << 'EOF'
+
+# ─── fzf Integration ─────────────────────────────────────────────────────────
+[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ] && source /usr/share/doc/fzf/examples/key-bindings.zsh
+[ -f /usr/share/doc/fzf/examples/completion.zsh ] && source /usr/share/doc/fzf/examples/completion.zsh
+EOF
+        success "fzf Zsh keybindings and completion enabled"
+    else
+        warn "fzf Zsh integration already configured"
+    fi
+else
+    warn "fzf Zsh integration skipped (keybindings file not found)"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 13. SHELL ALIASES FOR NEW TOOLS
 # ═══════════════════════════════════════════════════════════════════════════
 if ! grep -q '# ─── AI Dev Stack Aliases' ~/.zshrc 2>/dev/null; then
     info "Adding tool aliases to .zshrc..."
@@ -558,6 +653,7 @@ alias cat='bat --paging=never'
 alias y='yazi'
 alias zj='zellij'
 alias mdv='glow'
+alias mpvk='mpv --profile=sw-fast --vo=kitty --vo-kitty-use-shm=yes --really-quiet'
 EOF
 fi
 
@@ -577,16 +673,19 @@ echo "  - Mamba + 'dev' environment (anthropic, openai, httpx, rich, typer, pyda
 echo "  - Kitty terminal (GPU-optimized, OLED theme, 4K ready)"
 echo "  - Yazi file manager"
 echo "  - CLI tools: ripgrep, fd, fzf, bat, eza, delta, glow"
+echo "  - Terminal media: ffmpeg, mpv, chafa"
 echo "  - Zellij terminal multiplexer"
 echo "  - Bun JS runtime"
 echo "  - direnv"
 echo "  - Pop Shell (GNOME tiling - if GNOME detected)"
+echo "  - Post-install config: Kitty default terminal, git delta, fzf integration"
 echo ""
 echo "Quick start commands:"
 echo "  kitty          - Launch Kitty terminal"
 echo "  yazi / y       - File manager"
 echo "  zellij / zj    - Terminal multiplexer"
 echo "  glow / mdv     - Render markdown in terminal"
+echo "  mpvk video.mp4  - Play video in Kitty terminal"
 echo "  mamba activate dev  - Activate AI dev environment"
 echo ""
 echo -e "${YELLOW}NOTES:${NC}"

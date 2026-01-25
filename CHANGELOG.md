@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.14] - 2026-01-22
+## [0.0.14] - 2026-01-24
+
+### Added
+- Terminal media tools to dev stack (`scripts/setup-ai-dev-stack.sh`)
+  - ffmpeg for video processing, format conversion, and ffprobe inspection
+  - mpv with Kitty graphics protocol support (`--vo=kitty`) for terminal video playback
+  - chafa for terminal image and animated GIF rendering with auto-detected protocol support
+  - Shell alias: `mpvk` for convenient Kitty-native video playback with optimized flags
+- Post-install configuration for dev stack
+  - Set Kitty as default terminal on GNOME (update-alternatives priority 50 + gsettings)
+  - Configure git delta as default pager with navigate and dark mode
+  - fzf Zsh keybindings (Ctrl+T, Ctrl+R, Alt+C) and fuzzy completion
 
 ### Fixed
 - setup-ai-dev-stack.sh: chsh now uses sudo and handles failure gracefully
