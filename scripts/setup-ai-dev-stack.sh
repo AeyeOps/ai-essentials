@@ -23,6 +23,20 @@
 
 set -euo pipefail
 
+# ─── Logging Setup ──────────────────────────────────────────────────────────
+# Log file uses same name as script with .log extension
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
+LOG_FILE="${SCRIPT_DIR}/${SCRIPT_NAME}.log"
+
+# Tee all stdout and stderr to log file while preserving console output
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo "Log started: $(date -Iseconds)"
+echo "Log file: $LOG_FILE"
+echo "═══════════════════════════════════════════════════════════════════════════"
+
 # ─── Colors ─────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
