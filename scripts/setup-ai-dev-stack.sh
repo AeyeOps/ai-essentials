@@ -345,8 +345,12 @@ fi
 info "Checking Yazi..."
 if ! command_exists yazi; then
     info "Installing Yazi..."
+    info "  Fetching latest version from GitHub API..."
     YAZI_VERSION=$(curl --max-time 30 https://api.github.com/repos/sxyazi/yazi/releases/latest | grep -oP '"tag_name": "\K[^"]+')
-    curl -fSL "https://github.com/sxyazi/yazi/releases/download/${YAZI_VERSION}/yazi-${ARCH_ALT}-unknown-linux-gnu.zip" -o /tmp/yazi.zip
+    info "  Version: $YAZI_VERSION"
+    YAZI_URL="https://github.com/sxyazi/yazi/releases/download/${YAZI_VERSION}/yazi-${ARCH_ALT}-unknown-linux-gnu.zip"
+    info "  Downloading: $YAZI_URL"
+    curl -fSL "$YAZI_URL" -o /tmp/yazi.zip
     unzip -o /tmp/yazi.zip -d /tmp/yazi
     sudo mv /tmp/yazi/yazi-${ARCH_ALT}-unknown-linux-gnu/yazi /usr/local/bin/
     sudo mv /tmp/yazi/yazi-${ARCH_ALT}-unknown-linux-gnu/ya /usr/local/bin/ 2>/dev/null || true
@@ -428,8 +432,12 @@ fi
 info "Checking delta..."
 if ! command_exists delta; then
     info "Installing delta..."
+    info "  Fetching latest version from GitHub API..."
     DELTA_VERSION=$(curl --max-time 30 https://api.github.com/repos/dandavison/delta/releases/latest | grep -oP '"tag_name": "\K[^"]+')
-    curl -fSL "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/git-delta_${DELTA_VERSION}_${ARCH_DEB}.deb" -o /tmp/delta.deb
+    info "  Version: $DELTA_VERSION"
+    DELTA_URL="https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/git-delta_${DELTA_VERSION}_${ARCH_DEB}.deb"
+    info "  Downloading: $DELTA_URL"
+    curl -fSL "$DELTA_URL" -o /tmp/delta.deb
     sudo dpkg -i /tmp/delta.deb || sudo apt-get install -f -y
     rm /tmp/delta.deb
     success "delta installed"
@@ -441,11 +449,15 @@ fi
 info "Checking glow..."
 if ! command_exists glow; then
     info "Installing glow..."
+    info "  Fetching latest version from GitHub API..."
     GLOW_VERSION=$(curl --max-time 30 https://api.github.com/repos/charmbracelet/glow/releases/latest | grep -oP '"tag_name": "v\K[^"]+')
+    info "  Version: $GLOW_VERSION"
     # glow uses 'arm64' not 'aarch64' in release names
     GLOW_ARCH="${ARCH_ALT}"
     [[ "$ARCH" == "aarch64" ]] && GLOW_ARCH="arm64"
-    curl -fSL "https://github.com/charmbracelet/glow/releases/download/v${GLOW_VERSION}/glow_${GLOW_VERSION}_Linux_${GLOW_ARCH}.tar.gz" -o /tmp/glow.tar.gz
+    GLOW_URL="https://github.com/charmbracelet/glow/releases/download/v${GLOW_VERSION}/glow_${GLOW_VERSION}_Linux_${GLOW_ARCH}.tar.gz"
+    info "  Downloading: $GLOW_URL"
+    curl -fSL "$GLOW_URL" -o /tmp/glow.tar.gz
     sudo tar -xzf /tmp/glow.tar.gz -C /usr/local/bin/ --strip-components=1 --wildcards "*/glow"
     rm /tmp/glow.tar.gz
     success "glow installed"
@@ -542,8 +554,12 @@ fi
 info "Checking Zellij..."
 if ! command_exists zellij; then
     info "Installing Zellij..."
+    info "  Fetching latest version from GitHub API..."
     ZELLIJ_VERSION=$(curl --max-time 30 https://api.github.com/repos/zellij-org/zellij/releases/latest | grep -oP '"tag_name": "\K[^"]+')
-    curl -fSL "https://github.com/zellij-org/zellij/releases/download/${ZELLIJ_VERSION}/zellij-${ARCH_ALT}-unknown-linux-musl.tar.gz" -o /tmp/zellij.tar.gz
+    info "  Version: $ZELLIJ_VERSION"
+    ZELLIJ_URL="https://github.com/zellij-org/zellij/releases/download/${ZELLIJ_VERSION}/zellij-${ARCH_ALT}-unknown-linux-musl.tar.gz"
+    info "  Downloading: $ZELLIJ_URL"
+    curl -fSL "$ZELLIJ_URL" -o /tmp/zellij.tar.gz
     sudo tar -xzf /tmp/zellij.tar.gz -C /usr/local/bin/
     rm /tmp/zellij.tar.gz
     success "Zellij installed"
