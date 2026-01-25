@@ -23,6 +23,15 @@
 
 set -euo pipefail
 
+# ─── Logging Setup ──────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
+LOG_FILE="${SCRIPT_DIR}/${SCRIPT_NAME}.log"
+exec > >(stdbuf -oL tee -a "$LOG_FILE") 2>&1
+echo "══════════════════════════════════════════════════════════════════════════"
+echo "Log: $LOG_FILE | Started: $(date -Iseconds)"
+echo "══════════════════════════════════════════════════════════════════════════"
+
 # ─── Colors ─────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -468,11 +477,18 @@ fi
 info "Checking duf..."
 if ! command_exists duf; then
     info "Installing duf..."
-    DUF_VERSION=$(curl -s https://api.github.com/repos/muesli/duf/releases/latest | grep -oP '"tag_name": "v\K[^"]+')
+    info "  Fetching latest version from GitHub API..."
+    DUF_VERSION=$(curl --max-time 30 -sS https://api.github.com/repos/muesli/duf/releases/latest | grep -oP '"tag_name": "v\K[^"]+')
+    if [[ -z "$DUF_VERSION" ]]; then
+        error "Failed to fetch duf version from GitHub API"
+    fi
+    info "  Version: $DUF_VERSION"
     # duf uses 'arm64' not 'aarch64' in release names
     DUF_ARCH="${ARCH_ALT}"
     [[ "$ARCH" == "aarch64" ]] && DUF_ARCH="arm64"
-    curl -fsSL "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_${DUF_ARCH}.tar.gz" -o /tmp/duf.tar.gz
+    DUF_URL="https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_${DUF_ARCH}.tar.gz"
+    info "  Downloading: $DUF_URL"
+    curl --max-time 60 -fSL "$DUF_URL" -o /tmp/duf.tar.gz
     sudo tar -xzf /tmp/duf.tar.gz -C /usr/local/bin/ duf
     rm /tmp/duf.tar.gz
     success "duf installed"
@@ -494,11 +510,18 @@ fi
 info "Checking yq..."
 if ! command_exists yq; then
     info "Installing yq..."
-    YQ_VERSION=$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+    info "  Fetching latest version from GitHub API..."
+    YQ_VERSION=$(curl --max-time 30 -sS https://api.github.com/repos/mikefarah/yq/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+    if [[ -z "$YQ_VERSION" ]]; then
+        error "Failed to fetch yq version from GitHub API"
+    fi
+    info "  Version: $YQ_VERSION"
     # yq uses 'arm64' not 'aarch64' in release names
     YQ_ARCH="${ARCH_ALT}"
     [[ "$ARCH" == "aarch64" ]] && YQ_ARCH="arm64"
-    curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${YQ_ARCH}" -o /tmp/yq
+    YQ_URL="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${YQ_ARCH}"
+    info "  Downloading: $YQ_URL"
+    curl --max-time 60 -fSL "$YQ_URL" -o /tmp/yq
     chmod +x /tmp/yq
     sudo mv /tmp/yq /usr/local/bin/yq
     success "yq installed"
