@@ -15,6 +15,7 @@
 #   - Pop Shell (GNOME tiling extension)
 #   - Terminal media: ffmpeg, mpv (Kitty video playback), chafa
 #   - Post-install: Kitty default terminal, git delta pager, fzf integration
+#   - WSL2 environment setup (Wayland workaround, Mesa, D-Bus, display server)
 #
 # Usage: ./setup-ai-dev-stack.sh
 #
@@ -57,6 +58,13 @@ case "$ARCH" in
 esac
 info "Detected architecture: $ARCH ($ARCH_DEB)"
 
+# ─── WSL Detection ─────────────────────────────────────────────────────────
+IS_WSL=false
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    IS_WSL=true
+    info "WSL2 detected - will apply WSL-specific configuration"
+fi
+
 # ─── Ensure sudo available ──────────────────────────────────────────────────
 if ! command_exists sudo; then
     error "sudo is required but not installed"
@@ -69,6 +77,44 @@ sudo apt-get update
 # ─── Install base dependencies ──────────────────────────────────────────────
 info "Installing base dependencies..."
 sudo apt-get install -y git curl unzip fontconfig
+
+# ═══════════════════════════════════════════════════════════════════════════
+# WSL2 ENVIRONMENT SETUP
+# ═══════════════════════════════════════════════════════════════════════════
+if $IS_WSL; then
+    info "Configuring WSL2 environment for GUI/Kitty support..."
+
+    # --- Kitty Wayland workaround (current session) ---
+    export KITTY_DISABLE_WAYLAND=1
+
+    # --- DISPLAY fallback (current session only) ---
+    # WSLg (Win11) sets DISPLAY automatically via /mnt/wslg
+    # Only set fallback if WSLg is not present and DISPLAY is unset
+    if [[ ! -d /mnt/wslg ]] && [[ -z "${DISPLAY:-}" ]]; then
+        export DISPLAY=:0
+        info "Set DISPLAY=:0 (no WSLg detected)"
+    fi
+
+    # --- mesa-utils for OpenGL diagnostics ---
+    if ! command_exists glxinfo; then
+        info "Installing mesa-utils (OpenGL diagnostics)..."
+        sudo apt-get install -y mesa-utils
+        success "mesa-utils installed"
+    else
+        warn "mesa-utils already installed"
+    fi
+
+    # --- dbus-x11 for D-Bus session support ---
+    if ! dpkg -s dbus-x11 &>/dev/null; then
+        info "Installing dbus-x11 (D-Bus session support)..."
+        sudo apt-get install -y dbus-x11
+        success "dbus-x11 installed"
+    else
+        warn "dbus-x11 already installed"
+    fi
+
+    success "WSL2 environment configured"
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. ZSH + OH-MY-ZSH + POWERLEVEL10K + FONTS
@@ -337,6 +383,14 @@ EOF
     fi
 else
     warn "Kitty already installed"
+fi
+
+# WSL2: force X11 display server in Kitty config
+if $IS_WSL && [[ -f ~/.config/kitty/kitty.conf ]]; then
+    if ! grep -q 'linux_display_server' ~/.config/kitty/kitty.conf; then
+        echo -e '\n# WSL2: force X11 display server\nlinux_display_server x11' >> ~/.config/kitty/kitty.conf
+        success "Kitty configured for WSL2 (linux_display_server x11)"
+    fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -770,6 +824,22 @@ alias yaml='yq'
 EOF
 fi
 
+# ─── WSL2 Environment (persisted to modular env files) ───────────────────────
+if $IS_WSL; then
+    for _env_file in ~/.bashrc_env ~/.zshrc_env; do
+        if [[ -f "$_env_file" ]] && ! grep -q 'KITTY_DISABLE_WAYLAND' "$_env_file"; then
+            info "Adding KITTY_DISABLE_WAYLAND=1 to $_env_file..."
+            cat >> "$_env_file" << 'WSLEOF'
+
+# Kitty WSL2 Wayland workaround
+export KITTY_DISABLE_WAYLAND=1
+WSLEOF
+            success "Updated $_env_file"
+        fi
+    done
+    unset _env_file
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════
@@ -810,3 +880,12 @@ echo "  - Log out and back in (or run 'exec zsh') to apply all changes"
 echo "  - On first Zsh launch, Powerlevel10k will run its configuration wizard"
 echo "  - Set your terminal font to 'MesloLGS NF' for proper icons"
 echo ""
+if $IS_WSL; then
+    echo -e "${YELLOW}WSL2-SPECIFIC:${NC}"
+    echo "  - KITTY_DISABLE_WAYLAND=1 set (prevents Wayland errors)"
+    echo "  - Kitty configured with linux_display_server x11"
+    echo "  - mesa-utils and dbus-x11 installed for GUI support"
+    echo "  - D-Bus startup warnings from Kitty are harmless (no systemd in WSL)"
+    echo "  - snap commands may require systemd (enable in /etc/wsl.conf if needed)"
+    echo ""
+fi
