@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.17] - 2026-02-03
+
+### Fixed
+- Claude Code version detection in `scripts/update_cli_ubuntu.sh`
+  - Check official install location (`~/.local/bin/claude`) before PATH lookup
+  - Prevents stale versions from alternative install methods being reported
+  - Post-install version check now uses the correct binary
+  - Displays detected binary path for easier debugging
+
 ## [0.0.16] - 2026-01-25
 
 ### Removed

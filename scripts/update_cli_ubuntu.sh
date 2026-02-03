@@ -218,9 +218,12 @@ handle_claude_code() {
   tmpfile=$(mktemp)
   set +e
 
-  if command -v claude &>/dev/null; then
+  if [[ -x "$HOME/.local/bin/claude" ]]; then
+    local_version=$("$HOME/.local/bin/claude" --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+    echo -e "${GREEN}Detected Claude Code version: $local_version ($HOME/.local/bin/claude)${NC}"
+  elif command -v claude &>/dev/null; then
     local_version=$(claude --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
-    echo -e "${GREEN}Detected Claude Code version: $local_version${NC}"
+    echo -e "${GREEN}Detected Claude Code version: $local_version ($(command -v claude))${NC}"
   else
     echo -e "${YELLOW}Claude Code is not installed.${NC}"
     local_version="none"
@@ -243,7 +246,7 @@ handle_claude_code() {
     echo -e "${BLUE}Updating Claude Code from $local_version to $remote_version ...${NC}"
     if curl -fsSL https://claude.ai/install.sh -o /tmp/claude_install.sh; then
       if bash -x /tmp/claude_install.sh latest 2>&1 | tee "$tmpfile"; then
-        new_version=$(claude --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+        new_version=$( ("$HOME/.local/bin/claude" --version 2>/dev/null || claude --version 2>/dev/null) | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
         record_summary "Claude Code" "Updated from $local_version to $new_version"
       else
         record_summary "Claude Code" "Update failed: $(tail -20 "$tmpfile")"
