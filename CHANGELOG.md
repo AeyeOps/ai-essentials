@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.18] - 2026-02-06
+
+### Fixed
+- Oh-My-Zsh install now fully non-interactive (`KEEP_ZSHRC=yes` prevents .zshrc overwrite prompt)
+- Powerlevel10k wizard no longer runs unexpectedly on first Zsh launch
+
+### Added
+- Interactive AEO Powerlevel10k theme preset prompt during dev stack install
+  - Deploys `configs/zsh/p10k-aeo.zsh` → `~/.p10k.zsh` for instant themed prompt
+  - Prepends p10k instant prompt cache block to top of `.zshrc`
+  - Appends `source ~/.p10k.zsh` as last line in `.zshrc` (after all other appends)
+  - EOF-safe read with graceful fallback for non-interactive invocations
+  - Preserves `.zshrc` file permissions via `mktemp` + `chmod --reference`
+  - Fully idempotent with `grep -q` guards on all modifications
+- Conditional install summary: shows "pre-configured" or "wizard will run" based on user choice
+
 ## [0.0.17] - 2026-02-03
 
 ### Fixed

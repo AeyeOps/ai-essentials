@@ -149,7 +149,7 @@ fi
 info "Checking Oh-My-Zsh..."
 if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
     info "Installing Oh-My-Zsh..."
-    RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"  # silent: output piped to sh
+    RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"  # silent: output piped to sh
     success "Oh-My-Zsh installed"
 else
     warn "Oh-My-Zsh already installed"
@@ -209,6 +209,50 @@ if ! grep -q "zsh-autosuggestions" ~/.zshrc 2>/dev/null; then
     info "Enabling zsh plugins in .zshrc..."
     # More robust: add plugins to existing plugins line regardless of current content
     sed -i 's/^plugins=(\(.*\))/plugins=(\1 zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc 2>/dev/null || true
+fi
+
+# --- Apply AEO Powerlevel10k preset (skip wizard on first launch) ---
+P10K_PRESET_APPLIED=false
+P10K_PRESET_SRC="$SCRIPT_DIR/../configs/zsh/p10k-aeo.zsh"
+if [[ -f "$P10K_PRESET_SRC" ]]; then
+    echo ""
+    echo -e "${BLUE}Powerlevel10k Configuration${NC}"
+    echo "  The AEO preset provides a ready-to-use terminal prompt theme."
+    echo "  If you skip this, the p10k configuration wizard will run on first Zsh launch."
+    echo ""
+    read -r -p "Apply AEO Powerlevel10k theme preset? [Y/n] " p10k_answer || p10k_answer="n"
+    if [[ "${p10k_answer,,}" != "n" ]]; then
+        # Deploy p10k config (skip if user already has one)
+        if [[ ! -f "$HOME/.p10k.zsh" ]]; then
+            cp "$P10K_PRESET_SRC" "$HOME/.p10k.zsh"
+            success "Copied AEO p10k preset → ~/.p10k.zsh"
+        else
+            warn "~/.p10k.zsh already exists (keeping existing config)"
+        fi
+
+        # Prepend instant prompt cache block to top of .zshrc (p10k requirement)
+        if ! grep -q 'Enable Powerlevel10k instant prompt' ~/.zshrc 2>/dev/null; then
+            info "Adding Powerlevel10k instant prompt to top of .zshrc..."
+            INSTANT_PROMPT_BLOCK='# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+'
+            # Prepend to .zshrc (preserve permissions)
+            _tmpfile=$(mktemp)
+            printf '%s' "$INSTANT_PROMPT_BLOCK" | cat - ~/.zshrc > "$_tmpfile"
+            chmod --reference="$HOME/.zshrc" "$_tmpfile"
+            mv "$_tmpfile" ~/.zshrc
+            success "Instant prompt block added to top of .zshrc"
+        fi
+
+        P10K_PRESET_APPLIED=true
+        success "AEO Powerlevel10k theme preset applied"
+    else
+        info "Skipped AEO preset — p10k wizard will run on first Zsh launch"
+    fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -840,6 +884,19 @@ WSLEOF
     unset _env_file
 fi
 
+# --- p10k source line (must be last in .zshrc, after all other appends) ---
+if $P10K_PRESET_APPLIED; then
+    if ! grep -q 'source ~/.p10k.zsh' ~/.zshrc 2>/dev/null; then
+        info "Adding p10k source line to end of .zshrc..."
+        cat >> ~/.zshrc << 'EOF'
+
+# ─── Powerlevel10k Config ─────────────────────────────────────────────────────
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+EOF
+        success "p10k source line added to .zshrc"
+    fi
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════
@@ -877,7 +934,11 @@ echo "  yq / yaml      - YAML processor"
 echo ""
 echo -e "${YELLOW}NOTES:${NC}"
 echo "  - Log out and back in (or run 'exec zsh') to apply all changes"
-echo "  - On first Zsh launch, Powerlevel10k will run its configuration wizard"
+if $P10K_PRESET_APPLIED; then
+    echo "  - AEO Powerlevel10k theme pre-configured (no wizard needed)"
+else
+    echo "  - On first Zsh launch, Powerlevel10k will run its configuration wizard"
+fi
 echo "  - Set your terminal font to 'MesloLGS NF' for proper icons"
 echo ""
 if $IS_WSL; then
