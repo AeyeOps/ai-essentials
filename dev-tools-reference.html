@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Dev Stack - Quick Reference</title>
+<style>
+:root {
+  --bg: #0a0a0a;
+  --card-bg: #1a1a1a;
+  --text: #e0e0e0;
+  --accent: #d7af00;
+  --border: #333;
+  --code-bg: #252525;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 20px;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+h1 {
+  color: var(--accent);
+  margin-bottom: 30px;
+  font-size: 2.5em;
+  text-align: center;
+}
+
+.search-box {
+  margin-bottom: 30px;
+  position: sticky;
+  top: 10px;
+  z-index: 100;
+  background: var(--bg);
+  padding: 10px 0;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 12px 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 16px;
+  border-radius: 8px;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.tool-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.tool-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(215, 175, 0, 0.2);
+}
+
+.tool-header {
+  padding: 15px 20px;
+  background: linear-gradient(135deg, #2a2a2a, #1f1f1f);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tool-header:hover {
+  background: linear-gradient(135deg, #333, #252525);
+}
+
+.tool-name {
+  font-size: 1.3em;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.tool-brief {
+  font-size: 0.9em;
+  color: #999;
+  margin-top: 4px;
+}
+
+.expand-icon {
+  color: #666;
+  transition: transform 0.3s;
+  font-size: 1.2em;
+}
+
+.tool-card.expanded .expand-icon {
+  transform: rotate(180deg);
+}
+
+.tool-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.tool-card.expanded .tool-content {
+  max-height: 800px;
+  overflow-y: auto;
+}
+
+.tool-section {
+  padding: 15px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.section-title {
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 10px;
+  font-size: 1.1em;
+}
+
+.command-box {
+  background: var(--code-bg);
+  padding: 10px 15px;
+  border-radius: 4px;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  margin: 5px 0;
+  position: relative;
+  word-break: break-all;
+}
+
+.command-box:hover {
+  background: #2a2a2a;
+}
+
+.copy-btn {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.command-box:hover .copy-btn {
+  opacity: 1;
+}
+
+.copy-btn:hover {
+  background: #f0c000;
+}
+
+.example {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: #1f1f1f;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tag {
+  background: #2a2a2a;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  color: #aaa;
+  border: 1px solid #3a3a3a;
+}
+
+.floating-menu {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  gap: 10px;
+  z-index: 1000;
+}
+
+.menu-btn {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  transition: transform 0.2s;
+}
+
+.menu-btn:hover {
+  transform: scale(1.05);
+  background: #f0c000;
+}
+
+@media (max-width: 768px) {
+  .tools-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🚀 AI Dev Stack Quick Reference</h1>
+  
+  <div class="search-box">
+    <input type="text" id="search" placeholder="🔍 Search tools, commands, or features..." />
+  </div>
+  
+  <div class="tools-grid" id="toolsGrid">
+    <!-- Terminal & Shell Tools -->
+    <div class="tool-card" data-search="kitty terminal gpu oled 4k">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🖥️ Kitty</div>
+          <div class="tool-brief">GPU-accelerated terminal emulator</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Basic Usage</div>
+          <div class="command-box">kitty<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">kitty --session mysession.conf<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Key Shortcuts</div>
+          <div class="example">Ctrl+Shift+T - New tab</div>
+          <div class="example">Ctrl+Shift+Enter - New window</div>
+          <div class="example">Ctrl+= / Ctrl+- - Zoom in/out</div>
+          <div class="example">Ctrl+Shift+F - Search scrollback</div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Advanced Features</div>
+          <div class="command-box">kitty +kitten icat image.png<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">kitty +kitten diff file1 file2<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="tags">
+            <span class="tag">GPU accelerated</span>
+            <span class="tag">Image support</span>
+            <span class="tag">Ligatures</span>
+            <span class="tag">Unicode</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="zellij terminal multiplexer tmux screen">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🪟 Zellij</div>
+          <div class="tool-brief">Modern terminal multiplexer</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Quick Commands</div>
+          <div class="command-box">zellij<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">zellij attach mysession<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">zellij list-sessions<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">zj<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Key Bindings</div>
+          <div class="example">Ctrl+p - Pane mode</div>
+          <div class="example">Ctrl+t - Tab mode</div>
+          <div class="example">Ctrl+n - Resize mode</div>
+          <div class="example">Ctrl+s - Scroll mode</div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Layout Commands</div>
+          <div class="command-box">zellij --layout welcome<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">zellij setup --dump-layout default<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- File Management -->
+    <div class="tool-card" data-search="yazi file manager ranger explorer">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">📁 Yazi</div>
+          <div class="tool-brief">Blazing fast terminal file manager</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Launch & Navigation</div>
+          <div class="command-box">yazi<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">y<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Key Commands</div>
+          <div class="example">h/j/k/l - Navigate (vim-like)</div>
+          <div class="example">Enter - Open file/directory</div>
+          <div class="example">Space - Select/toggle</div>
+          <div class="example">y - Yank (copy)</div>
+          <div class="example">p - Paste</div>
+          <div class="example">d - Delete</div>
+          <div class="example">r - Rename</div>
+          <div class="example">/ - Search</div>
+          <div class="example">z h - Show hidden files</div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Advanced</div>
+          <div class="example">Tab - Preview file</div>
+          <div class="example">Ctrl+c - Cancel operation</div>
+          <div class="example">~ - Go to home</div>
+          <div class="example">@ - Go to root</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="eza ls list files directory colors icons">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">📋 Eza</div>
+          <div class="tool-brief">Modern ls replacement with colors & icons</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Common Commands</div>
+          <div class="command-box">ls<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">ll<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">la<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">lt<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Advanced Usage</div>
+          <div class="command-box">eza --tree --level=3<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">eza --long --header --git<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">eza --sort=modified --reverse<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Aliases Setup</div>
+          <div class="example">ls='eza --icons'</div>
+          <div class="example">ll='eza -la --icons --git'</div>
+          <div class="example">lt='eza --tree --icons --level=2'</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search & Find Tools -->
+    <div class="tool-card" data-search="ripgrep rg grep search find pattern regex">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🔍 Ripgrep</div>
+          <div class="tool-brief">Lightning fast code search tool</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Basic Search</div>
+          <div class="command-box">rg "pattern"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">rg -i "case_insensitive"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">rg -w "whole_word"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Advanced Options</div>
+          <div class="command-box">rg -t py "def.*function"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">rg --files-with-matches "TODO"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">rg -C 3 "context_lines"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">rg -g "*.js" -g "!node_modules" "import"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Replace Operations</div>
+          <div class="command-box">rg "old" --replace "new"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="fd find files directory search locate">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🎯 fd</div>
+          <div class="tool-brief">Simple, fast alternative to find</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Find Files</div>
+          <div class="command-box">fd pattern<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">fd -e py<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">fd -t f "\.js$"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Advanced Usage</div>
+          <div class="command-box">fd -H "hidden_files"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">fd -E node_modules "package.json"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">fd -x chmod 644<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Type Filters</div>
+          <div class="example">-t f - Files only</div>
+          <div class="example">-t d - Directories only</div>
+          <div class="example">-t l - Symlinks</div>
+          <div class="example">-t x - Executables</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="fzf fuzzy finder interactive search select">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🎛️ fzf</div>
+          <div class="tool-brief">Fuzzy finder for everything</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Interactive Usage</div>
+          <div class="command-box">fzf<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">find . | fzf<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">history | fzf<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Shell Integration</div>
+          <div class="example">Ctrl+T - File picker</div>
+          <div class="example">Ctrl+R - Command history</div>
+          <div class="example">Alt+C - Directory navigator</div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Advanced Examples</div>
+          <div class="command-box">git log --oneline | fzf --preview 'git show {1}'<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">kill -9 $(ps aux | fzf | awk '{print $2}')<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Text & Code Tools -->
+    <div class="tool-card" data-search="bat cat syntax highlighting pager viewer">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🦇 Bat</div>
+          <div class="tool-brief">Cat with syntax highlighting & Git integration</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">View Files</div>
+          <div class="command-box">bat file.py<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">bat -n file.txt<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">bat --style=plain file<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Advanced Features</div>
+          <div class="command-box">bat -A file<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">bat --diff file1 file2<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">bat --paging=never file<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Themes & Languages</div>
+          <div class="command-box">bat --list-themes<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">bat --list-languages<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="delta git diff pager syntax highlight">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🔺 Delta</div>
+          <div class="tool-brief">Beautiful Git diff viewer</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Git Integration</div>
+          <div class="command-box">git diff<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">git show<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">git log -p<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Configuration</div>
+          <div class="command-box">git config --global core.pager delta<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">git config --global delta.navigate true<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Standalone Usage</div>
+          <div class="command-box">diff -u file1 file2 | delta<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">delta --side-by-side file1 file2<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="glow markdown md viewer renderer terminal">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">✨ Glow</div>
+          <div class="tool-brief">Render markdown in the terminal</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">View Markdown</div>
+          <div class="command-box">glow README.md<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">glow -p README.md<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">mdv file.md<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Browse & Search</div>
+          <div class="command-box">glow<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">glow -a<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Styling</div>
+          <div class="command-box">glow -s dark README.md<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">glow -w 80 README.md<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Monitoring -->
+    <div class="tool-card" data-search="btop htop top system monitor cpu memory process">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">📊 Btop</div>
+          <div class="tool-brief">Beautiful resource monitor</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Launch</div>
+          <div class="command-box">btop<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">top<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Key Bindings</div>
+          <div class="example">Esc/q - Quit</div>
+          <div class="example">h - Help</div>
+          <div class="example">m - Menu</div>
+          <div class="example">1-4 - CPU cores view</div>
+          <div class="example">p - Toggle program view</div>
+          <div class="example">f - Filter processes</div>
+          <div class="example">k - Kill process</div>
+          <div class="example">Space - Pause</div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Sorting</div>
+          <div class="example">P - Sort by PID</div>
+          <div class="example">M - Sort by memory</div>
+          <div class="example">T - Sort by time</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="ncdu disk usage space analyzer storage">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">💾 ncdu</div>
+          <div class="tool-brief">Interactive disk usage analyzer</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Analyze Disk</div>
+          <div class="command-box">ncdu<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">ncdu /path/to/analyze<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">disk<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Navigation</div>
+          <div class="example">Arrow keys - Navigate</div>
+          <div class="example">Enter - Enter directory</div>
+          <div class="example">d - Delete selected</div>
+          <div class="example">n - Sort by name</div>
+          <div class="example">s - Sort by size</div>
+          <div class="example">g - Show graph</div>
+          <div class="example">q - Quit</div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Export/Import</div>
+          <div class="command-box">ncdu -o report.json<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">ncdu -f report.json<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="duf df disk free space filesystem mount">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">📈 duf</div>
+          <div class="tool-brief">Modern df alternative</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Show Disk Usage</div>
+          <div class="command-box">duf<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">df<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Filtering</div>
+          <div class="command-box">duf --only local<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">duf --hide special<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">duf --json<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Options</div>
+          <div class="example">--theme dark/light</div>
+          <div class="example">--sort size/used</div>
+          <div class="example">--width 120</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Development Tools -->
+    <div class="tool-card" data-search="httpie http curl api rest client">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🌐 HTTPie</div>
+          <div class="tool-brief">Human-friendly HTTP client</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Basic Requests</div>
+          <div class="command-box">http GET httpbin.org/get<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">http POST httpbin.org/post name=John<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Headers & Auth</div>
+          <div class="command-box">http GET api.github.com Authorization:"Bearer TOKEN"<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">http --auth user:pass GET example.org<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">JSON & Files</div>
+          <div class="command-box">http PUT httpbin.org/put < data.json<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">http --form POST httpbin.org/post file@~/photo.jpg<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="yq yaml json processor jq query">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🔧 yq</div>
+          <div class="tool-brief">YAML/JSON processor</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Query YAML</div>
+          <div class="command-box">yq '.field' file.yaml<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">yq '.array[0].name' file.yaml<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">yaml '.field' file.yaml<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Modify YAML</div>
+          <div class="command-box">yq '.field = "new value"' file.yaml<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">yq 'del(.field)' file.yaml<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Convert Formats</div>
+          <div class="command-box">yq -o json file.yaml<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">yq -p json -o yaml file.json<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="shellcheck bash shell script linter check validate">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🐚 ShellCheck</div>
+          <div class="tool-brief">Shell script static analyzer</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Check Scripts</div>
+          <div class="command-box">shellcheck script.sh<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">shellcheck -s bash script<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Options</div>
+          <div class="command-box">shellcheck -e SC2034 script.sh<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">shellcheck --format=json script.sh<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Severity Levels</div>
+          <div class="example">-S error - Only errors</div>
+          <div class="example">-S warning - Errors and warnings</div>
+          <div class="example">-S info - All issues</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Media Tools -->
+    <div class="tool-card" data-search="ffmpeg video audio media convert encode">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🎬 ffmpeg</div>
+          <div class="tool-brief">Media processing powerhouse</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Convert Formats</div>
+          <div class="command-box">ffmpeg -i input.mp4 output.avi<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">ffmpeg -i input.wav output.mp3<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Extract/Trim</div>
+          <div class="command-box">ffmpeg -i video.mp4 -ss 00:01:00 -t 00:00:30 clip.mp4<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">ffmpeg -i video.mp4 -vn audio.mp3<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Resize & Compress</div>
+          <div class="command-box">ffmpeg -i input.mp4 -vf scale=1280:720 output.mp4<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">ffmpeg -i input.mp4 -crf 28 compressed.mp4<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="mpv video player media kitty terminal">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">▶️ mpv</div>
+          <div class="tool-brief">Terminal video player</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Play Media</div>
+          <div class="command-box">mpv video.mp4<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">mpvk video.mp4<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Keyboard Controls</div>
+          <div class="example">Space - Pause/Play</div>
+          <div class="example">← → - Seek 5s</div>
+          <div class="example">↑ ↓ - Seek 60s</div>
+          <div class="example">9/0 - Volume down/up</div>
+          <div class="example">m - Mute</div>
+          <div class="example">f - Fullscreen</div>
+          <div class="example">q - Quit</div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Options</div>
+          <div class="command-box">mpv --start=00:01:30 video.mp4<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">mpv --loop video.mp4<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="chafa image gif ascii art terminal graphics">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🖼️ Chafa</div>
+          <div class="tool-brief">Terminal image/GIF viewer</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">View Images</div>
+          <div class="command-box">chafa image.jpg<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">chafa --size=80x40 image.png<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Animation</div>
+          <div class="command-box">chafa animation.gif<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">chafa --duration=5 animation.gif<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Styles</div>
+          <div class="command-box">chafa --colors=256 image.jpg<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">chafa --symbols=ascii image.jpg<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Package Managers -->
+    <div class="tool-card" data-search="nvm node nodejs npm version manager">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">📦 NVM</div>
+          <div class="tool-brief">Node Version Manager</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Version Management</div>
+          <div class="command-box">nvm install 22<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">nvm use 22<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">nvm alias default 22<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">List & Info</div>
+          <div class="command-box">nvm ls<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">nvm ls-remote --lts<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">nvm current<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="mamba conda miniforge python environment package">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🐍 Mamba</div>
+          <div class="tool-brief">Fast Python package manager</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Environment Management</div>
+          <div class="command-box">mamba activate dev<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">mamba create -n myenv python=3.12<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">mamba env list<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Package Operations</div>
+          <div class="command-box">mamba install numpy pandas<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">mamba update --all<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">mamba clean --all<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Dev Environment</div>
+          <div class="example">Pre-installed: anthropic, openai, httpx, rich, typer, pydantic</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-card" data-search="bun javascript runtime package manager fast">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🥟 Bun</div>
+          <div class="tool-brief">Fast all-in-one JavaScript runtime</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Run & Execute</div>
+          <div class="command-box">bun run script.js<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">bun run dev<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">bunx create-react-app myapp<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Package Management</div>
+          <div class="command-box">bun install<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">bun add express<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">bun remove lodash<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Archive Tools -->
+    <div class="tool-card" data-search="7z 7zip p7zip archive compress extract zip rar">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🗜️ 7-Zip</div>
+          <div class="tool-brief">Universal archive tool</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Extract Archives</div>
+          <div class="command-box">7z x archive.zip<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">7z x archive.7z -oOutputDir<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Create Archives</div>
+          <div class="command-box">7z a archive.7z files/*<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">7z a -tzip archive.zip folder/<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Advanced</div>
+          <div class="command-box">7z a -mx9 archive.7z files/<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">7z l archive.zip<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Environment Tools -->
+    <div class="tool-card" data-search="direnv environment variables .envrc project">
+      <div class="tool-header" onclick="toggleCard(this)">
+        <div>
+          <div class="tool-name">🔐 direnv</div>
+          <div class="tool-brief">Per-directory environment variables</div>
+        </div>
+        <span class="expand-icon">▼</span>
+      </div>
+      <div class="tool-content">
+        <div class="tool-section">
+          <div class="section-title">Setup</div>
+          <div class="command-box">echo 'export API_KEY=secret' > .envrc<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">direnv allow<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Management</div>
+          <div class="command-box">direnv status<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">direnv reload<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+          <div class="command-box">direnv deny<button class="copy-btn" onclick="copyText(this)">Copy</button></div>
+        </div>
+        <div class="tool-section">
+          <div class="section-title">Integration</div>
+          <div class="example">Auto-loads .envrc when entering directory</div>
+          <div class="example">Unloads when leaving directory</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="floating-menu">
+    <button class="menu-btn" onclick="expandAll()">Expand All</button>
+    <button class="menu-btn" onclick="collapseAll()">Collapse All</button>
+  </div>
+</div>
+
+<script>
+function toggleCard(header) {
+  const card = header.parentElement;
+  card.classList.toggle('expanded');
+}
+
+function expandAll() {
+  document.querySelectorAll('.tool-card').forEach(card => {
+    card.classList.add('expanded');
+  });
+}
+
+function collapseAll() {
+  document.querySelectorAll('.tool-card').forEach(card => {
+    card.classList.remove('expanded');
+  });
+}
+
+function copyText(btn) {
+  const codeBox = btn.parentElement;
+  const text = codeBox.textContent.replace('Copy', '').trim();
+  navigator.clipboard.writeText(text);
+  btn.textContent = 'Copied!';
+  setTimeout(() => btn.textContent = 'Copy', 2000);
+}
+
+// Search functionality
+document.getElementById('search').addEventListener('input', function(e) {
+  const searchTerm = e.target.value.toLowerCase();
+  const cards = document.querySelectorAll('.tool-card');
+  
+  cards.forEach(card => {
+    const searchData = card.getAttribute('data-search').toLowerCase();
+    const content = card.textContent.toLowerCase();
+    
+    if (searchData.includes(searchTerm) || content.includes(searchTerm)) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    collapseAll();
+  }
+  if (e.ctrlKey && e.key === 'f') {
+    e.preventDefault();
+    document.getElementById('search').focus();
+  }
+});
+</script>
+</body>
+</html>
