@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.19] - 2026-02-11
+
+### Added
+- tmux configuration (`configs/tmux/tmux.conf`) optimized for AI-assisted development
+  - `Ctrl+Space` prefix to avoid conflict with Claude Code's `Ctrl+b`
+  - Zero escape-time, true color, Vi copy mode, OSC 52 clipboard
+  - 3-row color-coded status bar with inline keyboard reference
+  - Live window list (right-aligned) with active window highlighting
+  - `Prefix + J`: Interactive join-pane menu to merge panes across windows or break to new window
+  - `Prefix + M`: Merge all detached sessions into current session
+  - `Prefix + T`: Set pane title
+  - Catppuccin Mocha color scheme for status bar and pane borders
+- Helper script `configs/tmux/scripts/join-pane-menu.sh` for the join-pane menu
+- README for tmux configuration with installation instructions
+
 ## [0.0.18] - 2026-02-06
 
 ### Fixed
