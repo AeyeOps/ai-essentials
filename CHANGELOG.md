@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.22] - 2026-02-13
+
+### Added
+- Add create operations to tmux navigator: break pane to new window (C-t), break pane to new session (C-y), move window to new session (C-r)
+- Add single-pane guards for break operations with user-visible messages
+
+### Removed
+- Remove `w` (list) and `f` (find) from tmux status bar and prefix table — superseded by navigator
+
 ## [0.0.21] - 2026-02-13
 
 ### Added

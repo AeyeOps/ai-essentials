@@ -1,4 +1,41 @@
 #!/bin/bash
+if [ "${1:-}" = "__fn" ]; then
+    _break_to_window() {
+        local pane_count
+        pane_count=$(tmux display-message -p '#{window_panes}')
+        if [ "$pane_count" -eq 1 ]; then
+            tmux display-message "Only one pane in window"
+            return
+        fi
+        tmux break-pane
+    }
+
+    _break_to_session() {
+        local pane_count
+        pane_count=$(tmux display-message -p '#{window_panes}')
+        if [ "$pane_count" -eq 1 ]; then
+            tmux display-message "Only one pane in window"
+            return
+        fi
+        local target new_s
+        target=$(tmux break-pane -dP -F '#{session_name}:#{window_index}')
+        new_s=$(tmux new-session -dP -F '#{session_name}')
+        tmux move-window -s "$target" -t "$new_s"
+        tmux kill-window -t "${new_s}:1" 2>/dev/null
+        tmux switch-client -t "$new_s"
+    }
+
+    _window_to_session() {
+        local src_window new_s
+        src_window=$(tmux display-message -p '#{session_name}:#{window_index}')
+        new_s=$(tmux new-session -dP -F '#{session_name}')
+        tmux move-window -s "$src_window" -t "$new_s"
+        tmux kill-window -t "${new_s}:1" 2>/dev/null
+        tmux switch-client -t "$new_s"
+    }
+
+    return 0 2>/dev/null || exit 0
+fi
 stty -ixon 2>/dev/null
 current="$(tmux display-message -p '#{session_name}:#{window_index}.#{pane_index}')"
 
@@ -43,10 +80,12 @@ bg=$'\033[48;2;49;50;68m'        # surface0 #313244
 hi=$'\033[1;38;2;137;180;250m'   # bold #89b4fa (fg only)
 lo=$'\033[22;38;2;108;112;134m'  # #6c7086 (fg only, unbold)
 bar=$'\033[22;38;2;69;71;90m'    # #45475a (fg only)
+hi2=$'\033[1;38;2;250;179;135m'  # bold #fab387 (peach)
 r=$'\033[0m'
 pad=$(printf '%80s' '')
 
 legend="${bg}  ${hi}Enter ${lo}jump       ${bar}│  ${hi}C-o ${lo}bring pane   ${bar}│  ${hi}C-s ${lo}send pane    ${bar}│  ${hi}C-g ${lo}bring win    ${bar}│  ${hi}C-x ${lo}swap${pad}${r}"
+legend2="${bg}  ${hi2}C-t ${lo}new win      ${bar}│  ${hi2}C-y ${lo}new session   ${bar}│  ${hi2}C-r ${lo}win→session${pad}${r}"
 
 result=$(printf '%s\n' "$data" | \
 fzf --no-sort --ansi \
@@ -54,12 +93,16 @@ fzf --no-sort --ansi \
     --with-nth=1 \
     --header="
 $legend
+$legend2
 
 $header" \
     --prompt="Nav > " \
     --pointer="▶" \
     --layout=reverse \
-    --expect=ctrl-o,ctrl-s,ctrl-g,ctrl-x)
+    --expect=ctrl-o,ctrl-s,ctrl-g,ctrl-x \
+    --bind "ctrl-t:execute-silent(bash -c '. ~/.config/tmux/scripts/navigator.sh __fn && _break_to_window')+abort" \
+    --bind "ctrl-y:execute-silent(bash -c '. ~/.config/tmux/scripts/navigator.sh __fn && _break_to_session')+abort" \
+    --bind "ctrl-r:execute-silent(bash -c '. ~/.config/tmux/scripts/navigator.sh __fn && _window_to_session')+abort")
 
 [ -z "$result" ] && exit 0
 

@@ -64,6 +64,14 @@ Action keys (shown in fzf header):
 | `Ctrl-G` | Bring selected window into current session | `move-window -s S:W` |
 | `Ctrl-X` | Swap current pane with selected pane | `swap-pane -t S:W.P` |
 
+**Create actions** (peach legend bar):
+
+| Key | Action | Notes |
+|-----|--------|-------|
+| `Ctrl-T` | Break current pane to new window | Single-pane guard: shows "Only one pane in window" if only one pane exists |
+| `Ctrl-Y` | Break current pane to new session | Single-pane guard; creates new session and switches to it |
+| `Ctrl-R` | Move current window to new session | Captures source window explicitly before move; switches to new session |
+
 Selecting the current pane (`*`) with any action key (except Enter) shows "Already here".
 
 ## Requirements
