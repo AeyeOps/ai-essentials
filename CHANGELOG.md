@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.23] - 2026-02-13
+
+### Added
+- Add terminal-aware tab spawning for navigator create-session operations (C-y, C-r)
+  - Detects host terminal (Windows Terminal via WSL, Kitty) and opens new tab attached to new session
+  - Kitty handler with `kitten @` remote control and new-instance fallback
+- Enable Kitty remote control (`allow_remote_control socket-only`) for tab spawning support
+
+### Changed
+- Navigator C-y/C-r now open new terminal tab instead of switching client away from current session
+
 ## [0.0.22] - 2026-02-13
 
 ### Added

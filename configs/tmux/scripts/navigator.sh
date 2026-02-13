@@ -22,7 +22,7 @@ if [ "${1:-}" = "__fn" ]; then
         new_s=$(tmux new-session -dP -F '#{session_name}')
         tmux move-window -s "$target" -t "$new_s"
         tmux kill-window -t "${new_s}:1" 2>/dev/null
-        tmux switch-client -t "$new_s"
+        ~/.config/tmux/scripts/terminal-tab.sh "$new_s"
     }
 
     _window_to_session() {
@@ -31,7 +31,7 @@ if [ "${1:-}" = "__fn" ]; then
         new_s=$(tmux new-session -dP -F '#{session_name}')
         tmux move-window -s "$src_window" -t "$new_s"
         tmux kill-window -t "${new_s}:1" 2>/dev/null
-        tmux switch-client -t "$new_s"
+        ~/.config/tmux/scripts/terminal-tab.sh "$new_s"
     }
 
     return 0 2>/dev/null || exit 0

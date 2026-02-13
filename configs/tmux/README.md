@@ -69,10 +69,27 @@ Action keys (shown in fzf header):
 | Key | Action | Notes |
 |-----|--------|-------|
 | `Ctrl-T` | Break current pane to new window | Single-pane guard: shows "Only one pane in window" if only one pane exists |
-| `Ctrl-Y` | Break current pane to new session | Single-pane guard; creates new session and switches to it |
-| `Ctrl-R` | Move current window to new session | Captures source window explicitly before move; switches to new session |
+| `Ctrl-Y` | Break current pane to new session | Single-pane guard; creates new session in a new terminal tab |
+| `Ctrl-R` | Move current window to new session | Captures source window explicitly before move; opens new terminal tab |
 
 Selecting the current pane (`*`) with any action key (except Enter) shows "Already here".
+
+### `scripts/terminal-tab.sh`
+
+Spawns a new terminal tab attached to a given tmux session. Used by navigator's `C-y` and `C-r` to open the newly created session in a separate tab instead of switching the current client away.
+
+```
+terminal-tab.sh <session-name>
+```
+
+**Supported terminals:**
+
+| Terminal | Detection | Method |
+|----------|-----------|--------|
+| Windows Terminal (WSL) | `WT_SESSION` in tmux env | `wt.exe -w 0 nt` with correct WSL distro |
+| Kitty | `KITTY_WINDOW_ID` in tmux env | `kitten @ launch --type=tab` (requires `allow_remote_control socket-only` in kitty.conf), falls back to new kitty instance |
+
+Terminal detection uses `tmux show-environment -g` to read variables reliably from fzf subshells. Unsupported terminals get a `tmux display-message` fallback.
 
 ## Requirements
 
