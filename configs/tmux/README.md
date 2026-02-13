@@ -17,7 +17,7 @@ Opinionated tmux configuration optimized for AI-assisted development workflows (
 |-----|--------|
 | `\|` / `-` | Split panes (horizontal/vertical) in current directory |
 | `T` | Set pane title |
-| `J` | Interactive menu to join a pane from another window or break to new window |
+| `Tab` | Navigator popup — fzf-powered view/jump/move for all panes across sessions |
 | `M` | Merge all detached sessions into current session |
 | `r` | Reload config |
 
@@ -27,7 +27,7 @@ A built-in keyboard reference across three color-coded rows:
 
 - **Row 1 (blue)** - Window operations + live window list (right-aligned, active window highlighted)
 - **Row 2 (green)** - Pane operations and layout controls
-- **Row 3 (pink)** - Session management with prefix indicator
+- **Row 3 (pink)** - Session management with prefix indicator, current `session:window.pane`, and pane title
 
 ### Pane Borders
 
@@ -50,11 +50,24 @@ tmux source-file ~/.tmux.conf
 
 ## Scripts
 
-### `scripts/join-pane-menu.sh`
+### `scripts/navigator.sh`
 
-Interactive `display-menu` triggered by `Prefix + J`. Presents a list of windows (excluding the current one) to pull a pane from, plus a "New window" option that breaks the current pane out via `break-pane`.
+Fzf-powered navigator popup triggered by `Prefix + Tab`. Lists every pane across all sessions with auto-sized columns: target (`session:window.pane`), window name, pane title, current command, and attach status. The current pane is marked with `*`.
+
+Action keys (shown in fzf header):
+
+| Key | Action | tmux command |
+|-----|--------|-------------|
+| `Enter` | Jump to selected pane | `switch-client -t S:W.P` |
+| `Ctrl-O` | Bring selected pane into current window | `join-pane -s S:W.P` |
+| `Ctrl-S` | Send current pane to selected pane's window | `join-pane -t S:W` |
+| `Ctrl-G` | Bring selected window into current session | `move-window -s S:W` |
+| `Ctrl-X` | Swap current pane with selected pane | `swap-pane -t S:W.P` |
+
+Selecting the current pane (`*`) with any action key (except Enter) shows "Already here".
 
 ## Requirements
 
-- tmux 3.2+ (for `status-format`, `display-menu`, `allow-passthrough`)
+- tmux 3.2+ (for `status-format`, `display-menu`, `display-popup`, `allow-passthrough`)
+- `fzf` (for the navigator popup)
 - A terminal with true color and OSC 52 clipboard support (e.g., Windows Terminal, Kitty, iTerm2)

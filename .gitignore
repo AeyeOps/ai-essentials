@@ -34,3 +34,4 @@ uv.lock
 # Claude Code local state
 .claude/plans/
 .claude/audio/
+.claude/nous/

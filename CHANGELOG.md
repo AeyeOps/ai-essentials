@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.21] - 2026-02-13
+
+### Added
+- Tmux navigator popup (`Prefix + Tab`) replacing separate overview and join-pane tools
+  - Fzf-powered unified view of all panes across sessions with action key dispatch
+  - Enter: jump, C-o: bring pane, C-s: send pane, C-g: bring window, C-x: swap
+  - Detached session rows dimmed; send/swap to detached targets blocked
+  - No-op guards with descriptive messages for redundant actions
+  - Catppuccin-styled action legend bar in fzf header
+- Glow markdown renderer configuration (`configs/glow/glow.yml`)
+
+### Removed
+- `scripts/overview.sh` and `scripts/join-pane-menu.sh` replaced by navigator
+- `Prefix + J` and `Prefix + i` bindings replaced by `Prefix + Tab`
+
+## [0.0.20] - 2026-02-11
+
+### Removed
+- Kiro CLI support disabled in update script (`scripts/update_cli_ubuntu.sh`)
+
 ## [0.0.19] - 2026-02-11
 
 ### Added
