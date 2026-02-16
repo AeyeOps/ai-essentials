@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 set -euo pipefail
 
 # update_cli_ubuntu.sh
@@ -50,6 +50,17 @@ declare -a SUMMARY
 ##########
 # HELPER #
 ##########
+
+# Source nvm if available so npm/node resolve to the nvm-managed versions
+# rather than the (often stale) system packages.
+if [[ -n "${NVM_DIR:-}" && -s "$NVM_DIR/nvm.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$NVM_DIR/nvm.sh"
+  nvm use --silent default 2>/dev/null \
+    || nvm use --silent 22 2>/dev/null \
+    || nvm use --silent 20 2>/dev/null \
+    || true
+fi
 run_as_root() {
   if [[ $EUID -eq 0 ]]; then
     "$@"
