@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.25] - 2026-02-17
+
+### Added
+- Bulk git gc script (`scripts/git-bulk-gc.sh`) for running `git gc` across all repos under a directory tree
+  - Parallel execution with configurable `-j N` (default: nproc/2)
+  - Dry-run mode for read-only audit with object/pack statistics
+  - Aggressive gc mode (`--aggressive`) for deeper repacking
+  - Resume support via existing CSV progress files
+  - Live progress display with per-tree bars, active worker status, and ESC-to-cancel
+  - CSV output for success/failure tracking with per-repo logs
+  - macOS/Linux portable (nproc + sysctl fallback, EPOCHREALTIME guard)
+
 ## [0.0.24] - 2026-02-13
 
 ### Changed
