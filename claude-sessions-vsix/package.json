@@ -1,0 +1,133 @@
+{
+  "name": "aeo-vsc-cc-sessions",
+  "displayName": "AEO VSC Claude Sessions",
+  "description": "Real-time state monitoring for Claude Code terminal sessions in VS Code",
+  "version": "0.1.0",
+  "publisher": "AeyeOps",
+  "license": "MIT",
+  "engines": { "vscode": "^1.110.0" },
+  "categories": ["Other", "Visualization"],
+  "keywords": [
+    "claude",
+    "claude code",
+    "ai",
+    "sessions",
+    "terminal",
+    "monitoring",
+    "anthropic"
+  ],
+  "pricing": "Free",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1a1a2e",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AeyeOps/ai-essentials"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "viewsContainers": {
+      "panel": [{
+        "id": "aeoVscCcSessionsPanel",
+        "title": "Claude Sessions",
+        "icon": "$(terminal)"
+      }]
+    },
+    "views": {
+      "aeoVscCcSessionsPanel": [
+        {
+          "id": "aeoVscCcSessions",
+          "name": "Sessions",
+          "when": "aeoVscCcSessions.viewMode != 'rich'"
+        },
+        {
+          "id": "aeoVscCcSessionsRich",
+          "type": "webview",
+          "name": "Sessions",
+          "when": "aeoVscCcSessions.viewMode == 'rich'"
+        }
+      ]
+    },
+    "viewsWelcome": [{
+      "view": "aeoVscCcSessions",
+      "contents": "No Claude Code sessions found.\nStart a Claude Code session in the terminal to see it here."
+    }],
+    "commands": [
+      {
+        "command": "aeoVscCcSessions.refresh",
+        "title": "Refresh Claude Sessions",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "aeoVscCcSessions.showTreeView",
+        "title": "Tree View",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "aeoVscCcSessions.showRichView",
+        "title": "Rich View",
+        "icon": "$(open-preview)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "aeoVscCcSessions.showRichView",
+          "when": "view == aeoVscCcSessions",
+          "group": "navigation@1"
+        },
+        {
+          "command": "aeoVscCcSessions.showTreeView",
+          "when": "view == aeoVscCcSessionsRich",
+          "group": "navigation@1"
+        },
+        {
+          "command": "aeoVscCcSessions.refresh",
+          "when": "view == aeoVscCcSessions || view == aeoVscCcSessionsRich",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AEO VSC Claude Sessions",
+      "properties": {
+        "aeoVscCcSessions.refreshInterval": {
+          "type": "number",
+          "default": 3000,
+          "description": "TreeView refresh debounce interval (ms)"
+        },
+        "aeoVscCcSessions.sortByActivity": {
+          "type": "boolean",
+          "default": true,
+          "description": "Sort active sessions before idle"
+        },
+        "aeoVscCcSessions.showExited": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show exited sessions in the list"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "npm-run-all -s check-types esbuild",
+    "check-types": "tsc --noEmit",
+    "esbuild": "node esbuild.js",
+    "watch": "npm-run-all -p watch:esbuild watch:tsc",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --preserveWatchOutput",
+    "package": "npm-run-all -s check-types \"esbuild -- --production\"",
+    "vscode:prepublish": "npm run package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.110.0",
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0",
+    "npm-run-all": "^4.1.5",
+    "@vscode/vsce": "^3.2.0"
+  }
+}
