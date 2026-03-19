@@ -1,0 +1,101 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  color: var(--vscode-editor-foreground);
+  background-color: var(--vscode-editor-background);
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  padding: 16px;
+  overflow: hidden;
+}
+
+body.vscode-high-contrast {
+  --chart-line: #fff;
+  --chart-fill-start: rgba(255, 255, 255, 0.3);
+  --chart-fill-end: rgba(255, 255, 255, 0.05);
+  --chart-grid: rgba(255, 255, 255, 0.2);
+  --chart-label: #fff;
+  --chart-threshold: #ff0;
+}
+
+body.vscode-light {
+  --chart-line: #0066cc;
+  --chart-fill-start: rgba(0, 102, 204, 0.25);
+  --chart-fill-end: rgba(0, 102, 204, 0.02);
+  --chart-grid: rgba(0, 0, 0, 0.1);
+  --chart-label: rgba(0, 0, 0, 0.6);
+  --chart-threshold: #cc3300;
+}
+
+body.vscode-dark {
+  --chart-line: #3794ff;
+  --chart-fill-start: rgba(55, 148, 255, 0.3);
+  --chart-fill-end: rgba(55, 148, 255, 0.02);
+  --chart-grid: rgba(255, 255, 255, 0.1);
+  --chart-label: rgba(255, 255, 255, 0.5);
+  --chart-threshold: #f14c4c;
+}
+
+body.vscode-reduce-motion * {
+  transition: none !important;
+  animation: none !important;
+}
+
+#header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+#header h2 {
+  font-size: 1.2em;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+}
+
+#stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stat-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+
+.stat-badge.warn {
+  background-color: var(--vscode-inputValidation-warningBackground, #5a5000);
+  color: var(--vscode-inputValidation-warningForeground, #cca700);
+}
+
+.stat-badge.critical {
+  background-color: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+  color: var(--vscode-inputValidation-errorForeground, #f48771);
+}
+
+#chart-container {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 90px);
+  min-height: 200px;
+}
+
+#chart {
+  width: 100%;
+  height: 100%;
+}

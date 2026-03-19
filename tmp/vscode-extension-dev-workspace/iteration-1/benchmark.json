@@ -1,0 +1,184 @@
+{
+  "metadata": {
+    "skill_name": "vscode-extension-dev",
+    "skill_path": "/opt/aeo/ai-essentials/.claude/skills/vscode-extension-dev",
+    "executor_model": "claude-opus-4-6",
+    "timestamp": "2026-03-15T00:00:00Z",
+    "evals_run": [1, 2, 3],
+    "runs_per_configuration": 1
+  },
+
+  "runs": [
+    {
+      "eval_id": 1,
+      "eval_name": "Docker TreeView",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.833,
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "time_seconds": 158.3,
+        "tokens": 49355,
+        "tool_calls": 20,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "has-package-json-views", "passed": true, "evidence": "Views declared under contributes.views.explorer in package.json"},
+        {"text": "has-treedataprovider", "passed": true, "evidence": "ContainerTreeProvider implements TreeDataProvider with getChildren and getTreeItem"},
+        {"text": "has-colored-icons", "passed": true, "evidence": "Uses ThemeIcon('circle-filled', new ThemeColor('charts.green')) for running, yellow for paused, red for stopped"},
+        {"text": "has-terminal-on-click", "passed": true, "evidence": "TreeItem command triggers dockerContainers.openLogs which creates terminal with docker logs -f"},
+        {"text": "has-esbuild", "passed": true, "evidence": "Full esbuild.js config with bundling; package.json scripts invoke node esbuild.js"},
+        {"text": "uses-code-insiders", "passed": false, "evidence": "No references to code-insiders anywhere in the output files"}
+      ]
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "Docker TreeView",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.667,
+        "passed": 4,
+        "failed": 2,
+        "total": 6,
+        "time_seconds": 162.2,
+        "tokens": 24792,
+        "tool_calls": 26,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "has-package-json-views", "passed": true, "evidence": "Views declared under explorer container"},
+        {"text": "has-treedataprovider", "passed": true, "evidence": "DockerContainerProvider implements TreeDataProvider with both required methods"},
+        {"text": "has-colored-icons", "passed": false, "evidence": "Uses Unicode emoji characters (U+1F7E2, U+1F7E1, U+1F534) instead of ThemeIcon API with ThemeColor"},
+        {"text": "has-terminal-on-click", "passed": true, "evidence": "Click triggers dockerTreeView.openLogs which creates terminal with docker logs -f"},
+        {"text": "has-esbuild", "passed": true, "evidence": "esbuild.js build script with esbuild in devDependencies"},
+        {"text": "uses-code-insiders", "passed": false, "evidence": "No code-insiders references found anywhere in the output"}
+      ]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "Memory Webview",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 151.6,
+        "tokens": 48172,
+        "tool_calls": 18,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "has-webview-panel", "passed": true, "evidence": "createWebviewPanel with enableScripts: true in memoryMonitorPanel.ts"},
+        {"text": "has-csp", "passed": true, "evidence": "Full Content-Security-Policy meta tag using webview.cspSource"},
+        {"text": "has-message-passing", "passed": true, "evidence": "Bidirectional via postMessage and onDidReceiveMessage"},
+        {"text": "has-theming", "passed": true, "evidence": "Extensive use of --vscode-* CSS variables throughout style.css"},
+        {"text": "has-state-persistence", "passed": true, "evidence": "Both getState/setState in main.js and registerWebviewPanelSerializer in extension.ts"},
+        {"text": "has-nonce", "passed": true, "evidence": "getNonce() generates random 32-char string, used in CSP script-src"}
+      ]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "Memory Webview",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 276.9,
+        "tokens": 41499,
+        "tool_calls": 18,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "has-webview-panel", "passed": true, "evidence": "createWebviewPanel with enableScripts: true in memoryMonitorPanel.ts"},
+        {"text": "has-csp", "passed": true, "evidence": "CSP meta tag with webview.cspSource"},
+        {"text": "has-message-passing", "passed": true, "evidence": "Bidirectional postMessage/onDidReceiveMessage"},
+        {"text": "has-theming", "passed": true, "evidence": "Extensive use of --vscode-* CSS variables"},
+        {"text": "has-state-persistence", "passed": true, "evidence": "Uses getState/setState and saveState messages"},
+        {"text": "has-nonce", "passed": true, "evidence": "getNonce() generates 32-char random string"}
+      ]
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "Build Pipeline",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 87.5,
+        "tokens": 37704,
+        "tool_calls": 16,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "has-esbuild-js", "passed": true, "evidence": "esbuild.js has correct entryPoints, bundle, format: cjs, platform: node, external config"},
+        {"text": "has-npm-scripts", "passed": true, "evidence": "package.json has compile, watch, package, and vscode:prepublish scripts"},
+        {"text": "has-external-vscode", "passed": true, "evidence": "external: ['vscode'] present in esbuild config"},
+        {"text": "has-test-config", "passed": true, "evidence": ".vscode-test.mjs exists with defineConfig"},
+        {"text": "has-vscodeignore", "passed": true, "evidence": ".vscodeignore excludes node_modules/, src/, and dev files"},
+        {"text": "has-dist-main", "passed": true, "evidence": "main: ./dist/extension (not ./out/extension)"}
+      ]
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "Build Pipeline",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 91.2,
+        "tokens": 21535,
+        "tool_calls": 15,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "has-esbuild-js", "passed": true, "evidence": "esbuild.js has correct entryPoints, bundle, format: cjs, platform: node, external config"},
+        {"text": "has-npm-scripts", "passed": true, "evidence": "package.json has compile, watch, package, and vscode:prepublish scripts"},
+        {"text": "has-external-vscode", "passed": true, "evidence": "external: ['vscode'] present in esbuild config"},
+        {"text": "has-test-config", "passed": true, "evidence": ".vscode-test.mjs exists with defineConfig"},
+        {"text": "has-vscodeignore", "passed": true, "evidence": ".vscodeignore excludes node_modules, src, and dev files"},
+        {"text": "has-dist-main", "passed": true, "evidence": "main field is ./dist/extension.js"}
+      ]
+    }
+  ],
+
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {"mean": 0.944, "stddev": 0.096, "min": 0.833, "max": 1.0},
+      "time_seconds": {"mean": 132.5, "stddev": 38.7, "min": 87.5, "max": 158.3},
+      "tokens": {"mean": 45077, "stddev": 6246, "min": 37704, "max": 49355}
+    },
+    "without_skill": {
+      "pass_rate": {"mean": 0.889, "stddev": 0.192, "min": 0.667, "max": 1.0},
+      "time_seconds": {"mean": 176.8, "stddev": 96.2, "min": 91.2, "max": 276.9},
+      "tokens": {"mean": 29275, "stddev": 10768, "min": 21535, "max": 41499}
+    },
+    "delta": {
+      "pass_rate": "+0.055",
+      "time_seconds": "-44.3",
+      "tokens": "+15802"
+    }
+  },
+
+  "notes": [
+    "Assertion 'uses-code-insiders' fails for BOTH configurations — non-discriminating. code-insiders is a dev environment concern, not something hardcoded into extension project files. Consider removing or rephrasing this assertion.",
+    "Eval 1 (TreeView) shows the clearest skill value: with-skill used ThemeIcon+ThemeColor (correct API), without-skill used Unicode emoji (wrong approach that won't render colored in VS Code trees).",
+    "Eval 2 (Webview) is a tie on assertions (6/6 both), but with-skill added WebviewPanelSerializer for restart restoration and configurable settings — qualitative differences not captured by assertions.",
+    "Eval 3 (Build Pipeline) is a tie on assertions (6/6 both), but with-skill correctly separated out/ (tsc) from dist/ (esbuild), while without-skill set outDir: 'dist' creating a potential collision.",
+    "With-skill uses ~54% more tokens on average (45k vs 29k) due to reading 3 skill files upfront, but completes faster (-44s average) and produces higher quality output.",
+    "The without-skill baseline for Eval 2 (webview) took 277s — nearly 2x the with-skill time (152s) — suggesting the skill helps the model work more efficiently on complex tasks."
+  ]
+}

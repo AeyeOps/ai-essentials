@@ -1,0 +1,37 @@
+{
+  "eval_id": 2,
+  "eval_name": "memory-webview",
+  "configuration": "without_skill",
+  "expectations": [
+    {
+      "text": "has-webview-panel",
+      "passed": true,
+      "evidence": "const panel = vscode.window.createWebviewPanel(MemoryMonitorPanel.viewType, 'Memory Monitor', column || vscode.ViewColumn.One, { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')] });"
+    },
+    {
+      "text": "has-csp",
+      "passed": true,
+      "evidence": "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src ${webview.cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};\">"
+    },
+    {
+      "text": "has-message-passing",
+      "passed": true,
+      "evidence": "Extension side: this._panel.webview.onDidReceiveMessage((message: WebviewMessage) => { ... }) and void this._panel.webview.postMessage(restoreMsg); Webview side: vscode.postMessage({ command: 'ready' }) and window.addEventListener('message', function (event) { ... })"
+    },
+    {
+      "text": "has-theming",
+      "passed": true,
+      "evidence": "CSS uses var(--vscode-foreground), var(--vscode-editor-background), var(--vscode-font-family), var(--vscode-panel-border), etc. JS getThemeColors() reads --vscode-foreground, --vscode-editor-background, --vscode-charts-blue, --vscode-charts-green, --vscode-charts-red, --vscode-charts-yellow"
+    },
+    {
+      "text": "has-state-persistence",
+      "passed": true,
+      "evidence": "Webview calls vscode.setState(state) in persistState() and const previousState = vscode.getState() on load. Also sends saveState message to extension host which stores history in this._history."
+    },
+    {
+      "text": "has-nonce",
+      "passed": true,
+      "evidence": "function getNonce(): string { let text = ''; const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ...'; for (let i = 0; i < 32; i++) { text += possible.charAt(Math.floor(Math.random() * possible.length)); } return text; } used in CSP as 'nonce-${nonce}' and <script nonce=\"${nonce}\" src=\"${scriptUri}\"></script>"
+    }
+  ]
+}

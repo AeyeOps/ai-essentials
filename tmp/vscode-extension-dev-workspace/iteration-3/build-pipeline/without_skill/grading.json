@@ -1,0 +1,10 @@
+{"eval_id":3,"eval_name":"build-pipeline","configuration":"without_skill","expectations":[
+{"text":"has-esbuild-js","passed":true,"evidence":"esbuild.js with correct config"},
+{"text":"has-npm-scripts","passed":true,"evidence":"compile, watch, package, vscode:prepublish present"},
+{"text":"has-external-vscode","passed":true,"evidence":"external: ['vscode'] in esbuild config"},
+{"text":"has-test-config","passed":true,"evidence":".vscode-test.mjs exists with defineConfig"},
+{"text":"has-vscodeignore","passed":true,"evidence":".vscodeignore exists"},
+{"text":"has-dist-main","passed":true,"evidence":"main: ./dist/extension.js"},
+{"text":"has-separate-outdir","passed":false,"evidence":"tsconfig outDir: dist - same as esbuild output dir, tsc and esbuild would collide"},
+{"text":"has-parallel-watch","passed":true,"evidence":"npm-run-all -p watch:* in package.json"}
+]}

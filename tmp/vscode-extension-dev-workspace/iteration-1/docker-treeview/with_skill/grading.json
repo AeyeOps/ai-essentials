@@ -1,0 +1,37 @@
+{
+  "eval_id": 1,
+  "eval_name": "docker-treeview",
+  "configuration": "with_skill",
+  "expectations": [
+    {
+      "text": "has-package-json-views",
+      "passed": true,
+      "evidence": "package.json contributes.views.explorer: [{\"id\": \"dockerContainers\", \"name\": \"Docker Containers\"}]"
+    },
+    {
+      "text": "has-treedataprovider",
+      "passed": true,
+      "evidence": "containerTreeProvider.ts: 'export class ContainerTreeProvider implements vscode.TreeDataProvider<ContainerTreeItem>' with 'async getChildren(_element?: ContainerTreeItem): Promise<ContainerTreeItem[]>' and 'getTreeItem(element: ContainerTreeItem): vscode.TreeItem'"
+    },
+    {
+      "text": "has-colored-icons",
+      "passed": true,
+      "evidence": "containerTreeProvider.ts iconForState: new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('charts.green')) for running, new vscode.ThemeColor('charts.yellow') for paused, new vscode.ThemeColor('charts.red') for stopped"
+    },
+    {
+      "text": "has-terminal-on-click",
+      "passed": true,
+      "evidence": "ContainerTreeItem sets this.command = { command: 'dockerContainers.openLogs', ... }; extension.ts registers that command creating a terminal via vscode.window.createTerminal() and sends 'docker logs -f --tail 200 ${container.id}'"
+    },
+    {
+      "text": "has-esbuild",
+      "passed": true,
+      "evidence": "esbuild.js exists with full esbuild config (entryPoints, bundle: true, outfile: 'dist/extension.js'); package.json scripts use 'node esbuild.js' for compile/watch/package"
+    },
+    {
+      "text": "uses-code-insiders",
+      "passed": false,
+      "evidence": "No references to 'code-insiders' found in any output file. launch.json uses standard extensionHost, no CLI invocations of 'code' or 'code-insiders' present."
+    }
+  ]
+}

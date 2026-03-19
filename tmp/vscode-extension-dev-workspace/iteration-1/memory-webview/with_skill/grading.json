@@ -1,0 +1,37 @@
+{
+  "eval_id": 2,
+  "eval_name": "memory-webview",
+  "configuration": "with_skill",
+  "expectations": [
+    {
+      "text": "has-webview-panel",
+      "passed": true,
+      "evidence": "memoryMonitorPanel.ts line 58-68: vscode.window.createWebviewPanel(MemoryMonitorPanel.viewType, 'Memory Monitor', vscode.ViewColumn.Beside, { enableScripts: true, localResourceRoots: [...], retainContextWhenHidden: true })"
+    },
+    {
+      "text": "has-csp",
+      "passed": true,
+      "evidence": "webviewContent.ts line 20-25: <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} data:; font-src ${webview.cspSource};\">"
+    },
+    {
+      "text": "has-message-passing",
+      "passed": true,
+      "evidence": "Extension->webview: memoryMonitorPanel.ts line 192: this.panel.webview.postMessage({ type: 'snapshot', data: snapshot }); Webview->extension: main.js line 33: vscode.postMessage({ type: isPaused ? 'pause' : 'resume' }); Extension receives: memoryMonitorPanel.ts line 90: this.panel.webview.onDidReceiveMessage(...)"
+    },
+    {
+      "text": "has-theming",
+      "passed": true,
+      "evidence": "style.css uses extensive VS Code CSS variables: var(--vscode-editor-foreground), var(--vscode-editor-background), var(--vscode-button-secondaryBackground), var(--vscode-foreground), var(--vscode-descriptionForeground), var(--vscode-sideBar-background), etc."
+    },
+    {
+      "text": "has-state-persistence",
+      "passed": true,
+      "evidence": "main.js line 10-13: const previousState = vscode.getState(); if (previousState) { snapshots = previousState.snapshots || []; isPaused = previousState.isPaused || false; } and line 111: vscode.setState({ snapshots: snapshots, isPaused: isPaused }); Also extension.ts line 9: vscode.window.registerWebviewPanelSerializer(MemoryMonitorPanel.viewType, { async deserializeWebviewPanel(panel, state) { MemoryMonitorPanel.revive(panel, context, state); } })"
+    },
+    {
+      "text": "has-nonce",
+      "passed": true,
+      "evidence": "webviewContent.ts line 13: const nonce = getNonce(); line 23: script-src 'nonce-${nonce}'; line 62: <script nonce=\"${nonce}\" src=\"${scriptUri}\"></script>; getNonce() function at line 67-74 generates a 32-char random string"
+    }
+  ]
+}

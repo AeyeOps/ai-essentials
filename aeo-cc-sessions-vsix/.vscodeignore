@@ -1,0 +1,15 @@
+.vscode/**
+src/**
+out/**
+node_modules/**
+tsconfig.json
+esbuild.js
+.gitignore
+.eslintrc*
+**/*.ts
+**/*.map
+media/gen-icon.py
+media/icon-128.png
+scripts/**
+Makefile
+.github/**

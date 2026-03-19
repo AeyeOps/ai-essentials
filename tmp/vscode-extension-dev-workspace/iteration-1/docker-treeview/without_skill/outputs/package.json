@@ -1,0 +1,60 @@
+{
+  "name": "docker-treeview",
+  "displayName": "Docker Container Tree View",
+  "description": "Shows running Docker containers in the Explorer sidebar with colored status dots. Click to open container logs.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": []
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "dockerContainers",
+          "name": "Docker Containers"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "dockerTreeView.refresh",
+        "title": "Refresh Docker Containers",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dockerTreeView.openLogs",
+        "title": "Open Container Logs"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "dockerTreeView.refresh",
+          "when": "view == dockerContainers",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.3.3"
+  }
+}

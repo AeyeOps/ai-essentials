@@ -1,0 +1,37 @@
+{
+  "eval_id": 3,
+  "eval_name": "build-pipeline",
+  "configuration": "without_skill",
+  "expectations": [
+    {
+      "text": "has-esbuild-js",
+      "passed": true,
+      "evidence": "esbuild.js contains: entryPoints: [\"src/extension.ts\"], bundle: true, format: \"cjs\", platform: \"node\", external: [\"vscode\"], outfile: \"dist/extension.js\""
+    },
+    {
+      "text": "has-npm-scripts",
+      "passed": true,
+      "evidence": "package.json scripts: \"compile\": \"npm run check-types && node esbuild.js\", \"watch\": \"npm-run-all -p watch:*\", \"package\": \"npm run check-types && node esbuild.js --production\", \"vscode:prepublish\": \"npm run package\""
+    },
+    {
+      "text": "has-external-vscode",
+      "passed": true,
+      "evidence": "esbuild.js line 41: external: [\"vscode\"]"
+    },
+    {
+      "text": "has-test-config",
+      "passed": true,
+      "evidence": ".vscode-test.mjs exists with: import { defineConfig } from \"@vscode/test-cli\"; export default defineConfig([...])"
+    },
+    {
+      "text": "has-vscodeignore",
+      "passed": true,
+      "evidence": ".vscodeignore excludes node_modules/**, src/**, and dev files (esbuild.js, tsconfig.json, .vscode-test.mjs, **/*.ts, **/*.map)"
+    },
+    {
+      "text": "has-dist-main",
+      "passed": true,
+      "evidence": "package.json line 18: \"main\": \"./dist/extension.js\""
+    }
+  ]
+}

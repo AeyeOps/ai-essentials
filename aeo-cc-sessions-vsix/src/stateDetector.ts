@@ -1,0 +1,334 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type * as vscode from 'vscode';
+import type { SessionState } from './types.js';
+
+export interface Log {
+  trace(message: string, ...args: any[]): void;
+  debug(message: string, ...args: any[]): void;
+  info(message: string, ...args: any[]): void;
+  warn(message: string, ...args: any[]): void;
+  error(error: string | Error, ...args: any[]): void;
+}
+
+type StateChangeCallback = (sessionId: string, state: SessionState, toolName?: string, toolDetail?: string) => void;
+
+const IGNORED_TYPES = new Set([
+  'file-history-snapshot', 'last-prompt', 'custom-title', 'agent-name',
+]);
+
+const SYSTEM_STATE_MAP: Record<string, SessionState> = {
+  turn_duration: 'idle',
+  compact_boundary: 'compact',
+  microcompact_boundary: 'compact',
+  api_error: 'error',
+};
+
+type JsonRecord = Record<string, unknown>;
+type ContentBlock = { type?: string; name?: string; input?: JsonRecord; [k: string]: unknown };
+
+// ---------------------------------------------------------------------------
+// Record handlers (progress is batched in doRead, not dispatched here)
+// ---------------------------------------------------------------------------
+
+type HandlerContext = {
+  prefix: string;
+  emit: (state: SessionState, toolName?: string, toolDetail?: string) => void;
+  log: Log;
+};
+
+function recTs(record: JsonRecord): string {
+  const t = record['timestamp'] as string | undefined;
+  return t ? t.slice(11, 23) : '?';
+}
+
+function resolveMessage(record: JsonRecord): JsonRecord | undefined {
+  return (record['message'] ?? (record['data'] as JsonRecord | undefined)?.['message']) as JsonRecord | undefined;
+}
+
+function resolveContent(record: JsonRecord): unknown {
+  return resolveMessage(record)?.['content'];
+}
+
+function handleSystem(record: JsonRecord, ctx: HandlerContext): void {
+  const subtype = record['subtype'] as string ?? 'unknown';
+  const state = SYSTEM_STATE_MAP[subtype];
+  if (state) {
+    ctx.log.info(`${ctx.prefix} system/${subtype} → ${state}  (rec=${recTs(record)})`);
+    ctx.emit(state);
+  } else {
+    ctx.log.debug(`${ctx.prefix} system/${subtype} (no state change)  (rec=${recTs(record)})`);
+  }
+}
+
+function handleQueueOp(record: JsonRecord, ctx: HandlerContext): void {
+  const op = (record['operation'] ?? record['action'] ?? '?') as string;
+  ctx.log.debug(`${ctx.prefix} queue-op/${op}  (rec=${recTs(record)})`);
+}
+
+function handleUser(record: JsonRecord, ctx: HandlerContext): void {
+  const content = resolveContent(record);
+
+  if (Array.isArray(content)) {
+    const types = (content as ContentBlock[]).map(b => b.type ?? '?');
+    const hasToolResult = types.includes('tool_result');
+    if (hasToolResult) {
+      ctx.log.info(`${ctx.prefix} user/tool_result → thinking  blocks=[${types}]  (rec=${recTs(record)})`);
+      ctx.emit('thinking');
+      return;
+    }
+    ctx.log.info(`${ctx.prefix} user/array → thinking  blocks=[${types}]  (rec=${recTs(record)})`);
+    ctx.emit('thinking');
+    return;
+  }
+
+  if (typeof content === 'string') {
+    ctx.log.info(`${ctx.prefix} user/text → thinking  len=${content.length}  (rec=${recTs(record)})`);
+    ctx.emit('thinking');
+  } else {
+    ctx.log.debug(`${ctx.prefix} user/unknown  content_type=${typeof content}  (rec=${recTs(record)})`);
+  }
+}
+
+function handleAssistant(record: JsonRecord, ctx: HandlerContext): void {
+  const message = resolveMessage(record);
+  const content = message?.['content'];
+  const stopReason = message?.['stop_reason'] as string | undefined;
+
+  if (!Array.isArray(content)) {
+    ctx.log.debug(`${ctx.prefix} assistant/no-content  stop=${stopReason ?? '?'}  (rec=${recTs(record)})`);
+    return;
+  }
+
+  const blocks = content as ContentBlock[];
+  const toolUses = blocks.filter(b => b.type === 'tool_use');
+  const blockTypes = blocks.map(b => b.type ?? '?');
+
+  if (toolUses.length > 0) {
+    const names = toolUses.map(t => t.name as string);
+    const first = toolUses[0];
+    const toolName = first.name as string;
+    const input = first.input as JsonRecord | undefined;
+    const detail = extractToolDetail(toolName, input);
+    const parallel = toolUses.length > 1 ? ` +${toolUses.length - 1} parallel` : '';
+    ctx.log.info(`${ctx.prefix} assistant/tool → tool  tools=[${names}]${parallel}  stop=${stopReason ?? '?'}  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
+    ctx.emit('tool', toolName, detail);
+  } else {
+    ctx.log.info(`${ctx.prefix} assistant/text → thinking  stop=${stopReason ?? '?'}  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
+    ctx.emit('thinking');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Handler dispatch table
+// ---------------------------------------------------------------------------
+
+const HANDLERS: Record<string, (record: JsonRecord, ctx: HandlerContext) => void> = {
+  system: handleSystem,
+  'queue-operation': handleQueueOp,
+  user: handleUser,
+  assistant: handleAssistant,
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function extractToolDetail(name: string, input: JsonRecord | undefined): string | undefined {
+  if (!input) return undefined;
+  switch (name) {
+    case 'Read':
+    case 'Edit':
+    case 'Write':
+      return typeof input['file_path'] === 'string' ? path.basename(input['file_path']) : undefined;
+    case 'Bash':
+      return typeof input['command'] === 'string' ? (input['command'] as string).slice(0, 40) : undefined;
+    case 'Grep':
+    case 'Glob':
+      return typeof input['pattern'] === 'string' ? input['pattern'] as string : undefined;
+    case 'Agent':
+      return typeof input['prompt'] === 'string' ? (input['prompt'] as string).slice(0, 30) : undefined;
+    case 'WebSearch':
+      return typeof input['query'] === 'string' ? input['query'] as string : undefined;
+    default:
+      return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// StateDetector
+// ---------------------------------------------------------------------------
+
+export class StateDetector implements vscode.Disposable {
+  private readonly filePath: string;
+  private byteOffset = 0;
+  private lastSize = 0;
+  private lastIno = 0;
+  private fsWatcher: fs.FSWatcher | undefined;
+  private pollInterval: ReturnType<typeof setInterval> | undefined;
+  private windowStateDisposable: vscode.Disposable | undefined;
+  private disposed = false;
+  private reading = false;
+  private watchRetryLogged = false;
+
+  private readonly ctx: HandlerContext;
+
+  constructor(filePath: string, sessionId: string, pid: number, onStateChange: StateChangeCallback, log: Log) {
+    this.filePath = filePath;
+
+    const project = path.basename(path.dirname(filePath));
+    const prefix = `[${project}] ${sessionId.slice(0, 8)} pid=${pid}`;
+
+    this.ctx = {
+      prefix,
+      emit: (state, toolName, toolDetail) => onStateChange(sessionId, state, toolName, toolDetail),
+      log,
+    };
+  }
+
+  start(): void {
+    this.ctx.log.info(`${this.ctx.prefix} started  path=${this.filePath}`);
+    this.tryWatch();
+
+    this.pollInterval = setInterval(() => {
+      if (!this.disposed) {
+        this.tryWatch();
+        void this.readNewData();
+      }
+    }, 3_000);
+
+    const vscode = require('vscode') as typeof import('vscode');
+    this.windowStateDisposable = vscode.window.onDidChangeWindowState((e: { focused: boolean }) => {
+      if (!this.disposed && e.focused) void this.readNewData();
+    });
+
+    void this.readNewData();
+  }
+
+  private tryWatch(): void {
+    if (this.fsWatcher || this.disposed) return;
+    try {
+      this.fsWatcher = fs.watch(this.filePath, () => {
+        if (!this.disposed) void this.readNewData();
+      });
+      this.fsWatcher.on('error', () => {
+        this.fsWatcher?.close();
+        this.fsWatcher = undefined;
+      });
+      this.watchRetryLogged = false;
+      this.ctx.log.info(`${this.ctx.prefix} watch_ok`);
+    } catch {
+      if (!this.watchRetryLogged) {
+        this.ctx.log.debug(`${this.ctx.prefix} watch_pending (file not ready)`);
+        this.watchRetryLogged = true;
+      }
+    }
+  }
+
+  private async readNewData(): Promise<void> {
+    if (this.disposed || this.reading) return;
+    this.reading = true;
+    try {
+      await this.doRead();
+    } finally {
+      this.reading = false;
+    }
+  }
+
+  private async doRead(): Promise<void> {
+    if (this.disposed) return;
+
+    let stat: fs.Stats;
+    try {
+      stat = await fs.promises.stat(this.filePath);
+    } catch {
+      return;
+    }
+
+    this.tryWatch();
+
+    if (stat.ino !== this.lastIno && this.lastIno !== 0) {
+      this.byteOffset = 0;
+    } else if (stat.size < this.lastSize) {
+      this.byteOffset = 0;
+    }
+    this.lastIno = stat.ino;
+    this.lastSize = stat.size;
+
+    if (stat.size <= this.byteOffset) return;
+
+    const chunks: Buffer[] = [];
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const stream = fs.createReadStream(this.filePath, {
+          start: this.byteOffset,
+          end: stat.size - 1,
+        });
+        stream.on('data', (chunk: Buffer | string) => chunks.push(Buffer.from(chunk)));
+        stream.on('end', resolve);
+        stream.on('error', reject);
+      });
+    } catch {
+      return;
+    }
+
+    this.byteOffset = stat.size;
+    if (this.disposed) return;
+
+    const raw = Buffer.concat(chunks).toString('utf-8');
+    const lines = raw.split('\n').filter(l => l.length > 0);
+    this.ctx.log.debug(`${this.ctx.prefix} read ${raw.length}B, ${lines.length} lines`);
+
+    let progressCount = 0;
+    for (const line of lines) {
+      if (this.disposed) return;
+      if (this.processLine(line)) progressCount++;
+    }
+    if (progressCount > 0) {
+      this.ctx.log.debug(`${this.ctx.prefix} progress: ${progressCount} records`);
+    }
+  }
+
+  /** Returns true if the line was a progress record (batched by doRead). */
+  private processLine(line: string): boolean {
+    // Fast path: skip JSON.parse for progress records (~43% of JSONL)
+    if (line.startsWith('{"type":"progress"')) return true;
+
+    let record: JsonRecord;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      this.ctx.log.warn(`${this.ctx.prefix} PARSE_ERROR  line=${line.slice(0, 80)}`);
+      return false;
+    }
+
+    const type = record['type'] as string | undefined;
+    if (!type) {
+      this.ctx.log.warn(`${this.ctx.prefix} NO_TYPE  keys=${Object.keys(record).join(',')}`);
+      return false;
+    }
+
+    if (type === 'progress') return true;
+
+    if (IGNORED_TYPES.has(type)) {
+      this.ctx.log.debug(`${this.ctx.prefix} ignored/${type}  (rec=${recTs(record)})`);
+      return false;
+    }
+
+    const handler = HANDLERS[type];
+    if (handler) {
+      handler(record, this.ctx);
+    } else {
+      this.ctx.log.warn(`${this.ctx.prefix} UNHANDLED type=${type}  (rec=${recTs(record)})`);
+    }
+    return false;
+  }
+
+  dispose(): void {
+    this.ctx.log.info(`${this.ctx.prefix} disposed`);
+    this.disposed = true;
+    if (this.fsWatcher) { this.fsWatcher.close(); this.fsWatcher = undefined; }
+    if (this.pollInterval) { clearInterval(this.pollInterval); this.pollInterval = undefined; }
+    if (this.windowStateDisposable) { this.windowStateDisposable.dispose(); this.windowStateDisposable = undefined; }
+  }
+}

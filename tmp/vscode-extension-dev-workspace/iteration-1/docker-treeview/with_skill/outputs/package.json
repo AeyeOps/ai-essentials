@@ -1,0 +1,146 @@
+{
+  "name": "docker-container-treeview",
+  "displayName": "Docker Container TreeView",
+  "description": "Tree view in the Explorer sidebar showing running Docker containers with colored status dots. Click to open logs.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.110.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "docker",
+    "containers",
+    "treeview",
+    "logs"
+  ],
+  "main": "./dist/extension",
+  "activationEvents": [],
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "dockerContainers",
+          "name": "Docker Containers"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "dockerContainers.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)",
+        "category": "Docker Containers"
+      },
+      {
+        "command": "dockerContainers.openLogs",
+        "title": "Open Logs",
+        "icon": "$(output)",
+        "category": "Docker Containers"
+      },
+      {
+        "command": "dockerContainers.start",
+        "title": "Start Container",
+        "icon": "$(play)",
+        "category": "Docker Containers"
+      },
+      {
+        "command": "dockerContainers.stop",
+        "title": "Stop Container",
+        "icon": "$(debug-stop)",
+        "category": "Docker Containers"
+      },
+      {
+        "command": "dockerContainers.restart",
+        "title": "Restart Container",
+        "icon": "$(debug-restart)",
+        "category": "Docker Containers"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "dockerContainers.refresh",
+          "when": "view == dockerContainers",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "dockerContainers.openLogs",
+          "when": "view == dockerContainers",
+          "group": "inline@1"
+        },
+        {
+          "command": "dockerContainers.start",
+          "when": "view == dockerContainers && viewItem == stopped",
+          "group": "inline@2"
+        },
+        {
+          "command": "dockerContainers.stop",
+          "when": "view == dockerContainers && viewItem == running",
+          "group": "inline@2"
+        },
+        {
+          "command": "dockerContainers.restart",
+          "when": "view == dockerContainers && viewItem =~ /running|paused/",
+          "group": "context@1"
+        },
+        {
+          "command": "dockerContainers.start",
+          "when": "view == dockerContainers && viewItem == stopped",
+          "group": "context@1"
+        },
+        {
+          "command": "dockerContainers.stop",
+          "when": "view == dockerContainers && viewItem =~ /running|paused/",
+          "group": "context@2"
+        },
+        {
+          "command": "dockerContainers.openLogs",
+          "when": "view == dockerContainers",
+          "group": "context@3"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "dockerContainers",
+        "contents": "No Docker containers found.\nMake sure Docker is running.\n[Refresh](command:dockerContainers.refresh)"
+      }
+    ],
+    "configuration": {
+      "title": "Docker Container TreeView",
+      "properties": {
+        "dockerContainers.refreshInterval": {
+          "type": "number",
+          "default": 5000,
+          "description": "Auto-refresh interval in milliseconds (0 to disable)"
+        },
+        "dockerContainers.showAllContainers": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show all containers including stopped ones"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "npm run check-types && node esbuild.js",
+    "check-types": "tsc --noEmit",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && node esbuild.js --production",
+    "vscode:prepublish": "npm run package"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.110.0",
+    "esbuild": "^0.24.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.7.0"
+  }
+}

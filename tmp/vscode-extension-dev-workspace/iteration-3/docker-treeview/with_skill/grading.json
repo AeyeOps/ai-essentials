@@ -1,0 +1,10 @@
+{"eval_id":1,"eval_name":"docker-treeview","configuration":"with_skill","expectations":[
+{"text":"has-package-json-views","passed":true,"evidence":"package.json declares view in explorer container"},
+{"text":"has-treedataprovider","passed":true,"evidence":"ContainerTreeProvider implements TreeDataProvider with getChildren and getTreeItem"},
+{"text":"has-colored-icons","passed":true,"evidence":"ThemeIcon('circle-filled', ThemeColor('charts.green')) for running, charts.yellow for paused, charts.red for stopped"},
+{"text":"has-terminal-on-click","passed":true,"evidence":"createTerminal + docker logs -f in extension.ts"},
+{"text":"has-esbuild","passed":true,"evidence":"esbuild.js exists with bundling config"},
+{"text":"has-context-menus","passed":true,"evidence":"package.json has view/item/context menu entries"},
+{"text":"has-welcome-content","passed":true,"evidence":"package.json has viewsWelcome section"},
+{"text":"has-configurable-settings","passed":true,"evidence":"package.json has configuration section"}
+]}
