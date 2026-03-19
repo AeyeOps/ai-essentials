@@ -2,7 +2,7 @@
   "name": "aeo-vsc-cc-sessions",
   "displayName": "AEO VSC CC Sessions",
   "description": "Real-time state monitoring for Claude Code terminal sessions in VS Code",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "AeyeOps",
   "license": "MIT",
   "engines": {

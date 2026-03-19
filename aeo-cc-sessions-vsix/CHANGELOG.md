@@ -5,6 +5,14 @@ All notable changes to the AEO VSC CC Sessions extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-03-19
+
+### Changed
+
+- CI release script validates tag consistency against both local and remote refs before releasing
+- Replace simple tag-exists check with SHA-aware guard that detects tag/HEAD mismatches and fails explicitly
+- Reuse existing local tag when it already points at HEAD instead of re-creating it
+
 ## [0.1.4] - 2026-03-19
 
 ### Changed

@@ -9,12 +9,31 @@ make package
 VERSION="$(node -p "require('./package.json').version")"
 TAG="v${VERSION}"
 BRANCH="$(git branch --show-current)"
+HEAD_SHA="$(git rev-parse HEAD)"
 echo ""
 echo "=== CI: Version check — ${TAG} ==="
 
-if git tag -l "$TAG" | grep -q "$TAG"; then
-  echo "Tag ${TAG} already exists — version unchanged, nothing to release."
-  exit 0
+LOCAL_TAG_SHA=""
+if git rev-parse -q --verify "${TAG}^{commit}" >/dev/null 2>&1; then
+  LOCAL_TAG_SHA="$(git rev-parse "${TAG}^{commit}")"
+fi
+
+REMOTE_TAG_SHA="$(git ls-remote --tags origin "${TAG}^{}" | awk '{print $1}')"
+
+if [[ -n "$REMOTE_TAG_SHA" ]]; then
+  if [[ "$REMOTE_TAG_SHA" == "$HEAD_SHA" ]]; then
+    echo "Remote tag ${TAG} already points at HEAD — version already released."
+    exit 0
+  fi
+
+  echo "FAIL: Remote tag ${TAG} already exists on a different commit (${REMOTE_TAG_SHA})." >&2
+  echo "Current HEAD is ${HEAD_SHA}." >&2
+  exit 1
+fi
+
+if [[ -n "$LOCAL_TAG_SHA" && "$LOCAL_TAG_SHA" != "$HEAD_SHA" ]]; then
+  echo "FAIL: Local tag ${TAG} points at ${LOCAL_TAG_SHA}, not HEAD ${HEAD_SHA}." >&2
+  exit 1
 fi
 
 echo "New version detected: ${VERSION}"
@@ -34,7 +53,11 @@ git push origin "$BRANCH"
 
 echo ""
 echo "=== CI: Tagging & pushing ==="
-git tag -a "$TAG" -m "Release ${TAG}"
+if [[ -z "$LOCAL_TAG_SHA" ]]; then
+  git tag -a "$TAG" -m "Release ${TAG}"
+else
+  echo "Local tag ${TAG} already exists on HEAD — reusing it."
+fi
 git push origin "$TAG"
 
 echo ""
