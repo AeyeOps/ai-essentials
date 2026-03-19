@@ -5,6 +5,17 @@ All notable changes to the AEO VSC CC Sessions extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-03-19
+
+### Changed
+
+- Simplify CI changelog generation by delegating file insertion to Claude instead of shell-based section splicing
+- Bump version to 0.1.2
+
+### Fixed
+
+- Remove stray triple-backtick fence after `[0.1.1]` section in CHANGELOG.md
+
 ## [0.1.1] - 2026-03-19
 
 ### Changed
@@ -28,7 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Manual refresh command (`aeoVscCcSessions.refresh`) — periodic refresh handles updates
-```
 
 ## [0.1.0] - 2026-03-15
 
