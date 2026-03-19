@@ -103,6 +103,15 @@ export class TerminalMapper implements vscode.Disposable {
     if (changed) this._onDidMatch.fire();
   }
 
+  getActiveSessionId(): string | undefined {
+    const active = vscode.window.activeTerminal;
+    if (!active) return undefined;
+    for (const [id, terminal] of this.sessionTerminals) {
+      if (terminal === active) return id;
+    }
+    return undefined;
+  }
+
   async focusSession(sessionId: string): Promise<void> {
     const cached = this.sessionTerminals.get(sessionId);
     if (cached) {

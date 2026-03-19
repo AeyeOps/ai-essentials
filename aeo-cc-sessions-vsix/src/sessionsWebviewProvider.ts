@@ -18,14 +18,14 @@ function getNonce(): string {
 }
 
 const CSS = `
-body { margin:0; padding:0; font-family: var(--vscode-font-family, system-ui); background: var(--vscode-sideBar-background, #181818); color: var(--vscode-foreground, #ccc); overflow-x:hidden; }
+body { margin:0; padding:0; font-family: var(--vscode-font-family, system-ui); font-size:13px; background: var(--vscode-sideBar-background, #181818); color: var(--vscode-foreground, #ccc); overflow-x:hidden; }
 .row { padding:3px 6px 3px 0; cursor:pointer; border-left:3px solid transparent; line-height:1.2; }
 .row:hover { background: var(--vscode-list-hoverBackground, #2a2d30); }
-.r1 { display:flex; align-items:center; gap:5px; font-size:11px; padding-left:4px; }
+.r1 { display:flex; align-items:center; gap:5px; padding-left:4px; }
 .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
 .name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.status { margin-left:16px; font-size:10px; line-height:1.2; }
-.empty { padding:12px; font-size:11px; color: var(--vscode-descriptionForeground, #888); }
+.status { margin-left:16px; font-size:0.9em; line-height:1.2; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+.empty { padding:12px; color: var(--vscode-descriptionForeground, #888); }
 
 .s-idle .dot { background:#3fb950; box-shadow:0 0 3px #3fb95055; }
 .s-idle .status { color:#3fb950; }
@@ -54,6 +54,8 @@ body { margin:0; padding:0; font-family: var(--vscode-font-family, system-ui); b
 .s-exited .dot { background:#484f58; }
 .s-exited .status { color:#484f58; }
 .s-exited { border-left-color:#484f58; }
+
+.active { font-weight:600; }
 
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 `;
@@ -102,10 +104,12 @@ export class SessionsWebviewProvider implements vscode.WebviewViewProvider, vsco
     const sessions = getFilteredSortedSessions(this.discovery, this.terminalMapper);
     const nonce = getNonce();
 
+    const activeId = this.terminalMapper?.getActiveSessionId();
     const rows = sessions.map(s => {
       const name = escapeHtml(s.slug ?? path.basename(s.cwd));
       const status = escapeHtml(getStatusText(s));
-      return `<div class="row s-${s.state}" data-sid="${s.sessionId}">
+      const active = s.sessionId === activeId ? ' active' : '';
+      return `<div class="row s-${s.state}${active}" data-sid="${s.sessionId}">
   <div class="r1"><span class="dot"></span><span class="name">${name}</span></div>
   <div class="status">${status}</div>
 </div>`;

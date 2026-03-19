@@ -5,6 +5,29 @@ All notable changes to the AEO VSC CC Sessions extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-03-19
+
+### Added
+
+- Transcript handoff tracking across `/clear`, resume flows, and related session handoffs via new `TranscriptResolver` module
+- Active terminal highlighting in both TreeView (bold label) and WebviewView (font-weight 600)
+- Configurable transcript detection poll interval (`aeoVscCcSessions.detectorPollInterval`)
+- `--resume` cmdline parsing and task-fd resolution as separate discovery strategies
+- Agent tool detail now prefers `description` or `name` fields over raw prompt text
+
+### Changed
+
+- Shorten sidebar panel title from "AEO VSC CC Sessions" to "AEO CC Sessions"
+- State detector accepts a path-resolver function instead of a static file path, enabling live transcript switching
+- Sort sessions by terminal group, then by state and recency within each group
+- Recognize `end_turn` stop reason on text-only assistant records as idle transition
+- Remove truncation limits on Bash command and Agent tool detail strings
+- Webview status text wraps naturally instead of clipping on narrow panels
+
+### Fixed
+
+- Refresh view on active terminal change so highlighting updates immediately
+
 ## [0.1.2] - 2026-03-19
 
 ### Changed

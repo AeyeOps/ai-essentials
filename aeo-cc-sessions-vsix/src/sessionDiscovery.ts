@@ -9,7 +9,22 @@ export function getTranscriptPath(cwd: string, sessionId: string): string {
   return path.join(os.homedir(), '.claude', 'projects', encoded, `${sessionId}.jsonl`);
 }
 
-export function resolveActiveSessionId(pid: number): string | undefined {
+/** Parse --resume <uuid> from /proc/<pid>/cmdline. */
+export function resolveConversationFromCmdline(pid: number): string | undefined {
+  try {
+    const raw = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf-8');
+    const args = raw.split('\0');
+    const idx = args.indexOf('--resume');
+    if (idx !== -1 && idx + 1 < args.length) {
+      const uuid = args[idx + 1];
+      if (uuid.length >= 36) return uuid;
+    }
+  } catch { /* /proc not available */ }
+  return undefined;
+}
+
+/** Find active task UUID from /proc/<pid>/fd/ symlinks into ~/.claude/tasks/. */
+export function resolveTaskFromFd(pid: number): string | undefined {
   try {
     const fdDir = `/proc/${pid}/fd`;
     const entries = fs.readdirSync(fdDir);
@@ -27,15 +42,21 @@ export function resolveActiveSessionId(pid: number): string | undefined {
         continue;
       }
     }
-  } catch {
-    // /proc not available or permission denied
-  }
+  } catch { /* /proc not available */ }
   return undefined;
 }
 
+/**
+ * Resolve the transcript path for a session, trying in order:
+ * 1. --resume <uuid> from cmdline (conversation ID)
+ * 2. Active task from /proc/fd/ (plan mode)
+ * 3. Registry sessionId (original conversation)
+ */
 export function resolveTranscriptPath(pid: number, cwd: string, registrySessionId: string): string {
-  const activeId = resolveActiveSessionId(pid);
-  return getTranscriptPath(cwd, activeId ?? registrySessionId);
+  const conversationId = resolveConversationFromCmdline(pid)
+    ?? resolveTaskFromFd(pid)
+    ?? registrySessionId;
+  return getTranscriptPath(cwd, conversationId);
 }
 
 function isPidAlive(pid: number): boolean {

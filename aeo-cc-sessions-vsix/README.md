@@ -5,8 +5,9 @@ Real-time state monitoring for Claude Code terminal sessions in VS Code.
 ## Features
 
 - **Session Discovery** — Automatically detects all running Claude Code sessions in the current VS Code window
+- **Transcript Handoff Tracking** — Follows Claude transcript rotation across `/clear`, resume flows, and related session handoffs so state stays attached to the active transcript
 - **Real-Time State** — Shows live session state: idle, thinking, tool use, waiting for permission, compacting, or exited
-- **Tool Details** — Displays which tool is running and what it's operating on (file name, command, search pattern)
+- **Tool Details** — Displays which tool is running and what it's operating on (file name, command, search pattern, agent task description)
 - **Dual View Modes** — Switch between a standard TreeView and a rich HTML view with colored status dots and borders
 - **Click to Focus** — Click any session to jump to its terminal
 - **Instance Scoping** — Only shows sessions belonging to the current VS Code window, not other windows or tmux sessions
@@ -25,6 +26,7 @@ Real-time state monitoring for Claude Code terminal sessions in VS Code.
 ## Settings
 
 - `aeoVscCcSessions.refreshInterval` — Refresh interval in milliseconds (default: `3000`)
+- `aeoVscCcSessions.detectorPollInterval` — Transcript detection poll interval in milliseconds (default: `2000`)
 - `aeoVscCcSessions.sortByActivity` — Sort active sessions before idle ones (default: `true`)
 - `aeoVscCcSessions.showExited` — Show exited sessions in the list (default: `false`)
 - `aeoVscCcSessions.debug` — Enable diagnostic logging to the AEO VSC CC Sessions output channel (default: `false`)

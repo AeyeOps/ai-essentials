@@ -16,6 +16,28 @@ export const stateSortOrder: Record<SessionState, number> = {
   tool: 0, thinking: 1, permission: 2, compact: 3, idle: 4, error: 5, exited: 6,
 };
 
+function compareSessions(
+  a: SessionInfo,
+  b: SessionInfo,
+  sortByActivity: boolean,
+): number {
+  if (sortByActivity) {
+    const oa = stateSortOrder[a.state];
+    const ob = stateSortOrder[b.state];
+    if (oa !== ob) return oa - ob;
+  }
+
+  if (a.stateChangedAt !== b.stateChangedAt) {
+    return a.stateChangedAt - b.stateChangedAt;
+  }
+
+  if (a.startedAt !== b.startedAt) {
+    return a.startedAt - b.startedAt;
+  }
+
+  return a.sessionId.localeCompare(b.sessionId);
+}
+
 export function getStatusText(session: SessionInfo): string {
   const elapsed = Date.now() - session.stateChangedAt;
   switch (session.state) {
@@ -45,13 +67,20 @@ export function getFilteredSortedSessions(
     return true;
   });
 
-  filtered.sort((a, b) => {
-    if (sortByActivity) {
-      const oa = stateSortOrder[a.state], ob = stateSortOrder[b.state];
-      if (oa !== ob) return oa - ob;
-    }
-    return a.stateChangedAt - b.stateChangedAt;
-  });
+  const terminalGroups = new Map<vscode.Terminal | string, SessionInfo[]>();
+  for (const session of filtered) {
+    const terminalKey = session.terminal ?? `session:${session.sessionId}`;
+    const group = terminalGroups.get(terminalKey) ?? [];
+    group.push(session);
+    terminalGroups.set(terminalKey, group);
+  }
 
-  return filtered;
+  const grouped = [...terminalGroups.values()];
+  for (const group of grouped) {
+    group.sort((a, b) => compareSessions(a, b, sortByActivity));
+  }
+
+  grouped.sort((a, b) => compareSessions(a[0], b[0], sortByActivity));
+
+  return grouped.flat();
 }

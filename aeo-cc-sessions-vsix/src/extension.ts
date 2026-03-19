@@ -1,21 +1,45 @@
 import * as vscode from 'vscode';
-import { SessionDiscovery, resolveTranscriptPath } from './sessionDiscovery.js';
+import { SessionDiscovery } from './sessionDiscovery.js';
 import { StateDetector } from './stateDetector.js';
 import { SessionsProvider } from './sessionsProvider.js';
 import { SessionsWebviewProvider } from './sessionsWebviewProvider.js';
 import { TerminalMapper } from './terminalMapper.js';
 import { detectPlatform } from './platform.js';
-import type { SessionState } from './types.js';
+import { TranscriptResolver } from './transcriptResolver.js';
+import type { SessionInfo, SessionState } from './types.js';
 
 function createDetector(
   discovery: SessionDiscovery,
   providers: { refresh(): void },
-  session: { pid: number; cwd: string; sessionId: string },
+  session: SessionInfo,
+  transcriptResolver: TranscriptResolver,
+  detectorPollInterval: number,
   log: vscode.LogOutputChannel,
 ): StateDetector {
-  const filePath = resolveTranscriptPath(session.pid, session.cwd, session.sessionId);
+  let lastResolvedSessionId = session.sessionId;
+  const resolve = () => {
+    const target = transcriptResolver.resolve(
+      session.pid,
+      session.cwd,
+      session.sessionId,
+      lastResolvedSessionId,
+    );
+
+    const changed = session.transcriptSessionId !== target.sessionId || session.transcriptPath !== target.path;
+    lastResolvedSessionId = target.sessionId;
+    session.transcriptSessionId = target.sessionId;
+    session.transcriptPath = target.path;
+    if (changed) {
+      log.info(
+        `Resolved transcript: ${session.sessionId.slice(0, 8)} pid=${session.pid} -> ${target.sessionId.slice(0, 8)} (${target.source})`,
+      );
+      providers.refresh();
+    }
+    return target.path;
+  };
+
   log.debug(`Creating detector: ${session.sessionId.slice(0, 8)} pid=${session.pid}`);
-  const detector = new StateDetector(filePath, session.sessionId, session.pid, (_sid: string, state: SessionState, toolName?: string, toolDetail?: string) => {
+  const detector = new StateDetector(resolve, session.sessionId, session.pid, detectorPollInterval, (_sid: string, state: SessionState, toolName?: string, toolDetail?: string) => {
     const s = discovery.getSession(_sid);
     if (s) {
       s.state = state;
@@ -50,6 +74,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const treeProvider = new SessionsProvider(discovery);
   const webviewProvider = new SessionsWebviewProvider(discovery);
   const terminalMapper = new TerminalMapper(discovery, log);
+  const transcriptResolver = new TranscriptResolver(log);
+  const detectorPollInterval = vscode.workspace.getConfiguration('aeoVscCcSessions').get<number>('detectorPollInterval', 2000);
   treeProvider.setTerminalMapper(terminalMapper);
   webviewProvider.setTerminalMapper(terminalMapper);
   const detectors = new Map<string, StateDetector>();
@@ -80,10 +106,11 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   const matchSub = terminalMapper.onDidMatch(() => bothProviders.refresh());
+  const activeTermSub = vscode.window.onDidChangeActiveTerminal(() => bothProviders.refresh());
 
-  function ensureDetector(session: { pid: number; cwd: string; sessionId: string }): void {
+  function ensureDetector(session: SessionInfo): void {
     if (!detectors.has(session.sessionId)) {
-      detectors.set(session.sessionId, createDetector(discovery, bothProviders, session, log));
+      detectors.set(session.sessionId, createDetector(discovery, bothProviders, session, transcriptResolver, detectorPollInterval, log));
     }
   }
 
@@ -132,6 +159,7 @@ export function activate(context: vscode.ExtensionContext): void {
     focusCmd,
     sessionSub,
     matchSub,
+    activeTermSub,
     { dispose: () => clearInterval(periodicRefresh) },
     { dispose: () => { for (const d of detectors.values()) d.dispose(); detectors.clear(); } },
   );

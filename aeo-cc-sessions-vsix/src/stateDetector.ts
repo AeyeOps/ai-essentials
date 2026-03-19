@@ -113,6 +113,9 @@ function handleAssistant(record: JsonRecord, ctx: HandlerContext): void {
     const parallel = toolUses.length > 1 ? ` +${toolUses.length - 1} parallel` : '';
     ctx.log.info(`${ctx.prefix} assistant/tool → tool  tools=[${names}]${parallel}  stop=${stopReason ?? '?'}  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
     ctx.emit('tool', toolName, detail);
+  } else if (stopReason === 'end_turn') {
+    ctx.log.info(`${ctx.prefix} assistant/text → idle  stop=end_turn  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
+    ctx.emit('idle');
   } else {
     ctx.log.info(`${ctx.prefix} assistant/text → thinking  stop=${stopReason ?? '?'}  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
     ctx.emit('thinking');
@@ -142,12 +145,19 @@ function extractToolDetail(name: string, input: JsonRecord | undefined): string 
     case 'Write':
       return typeof input['file_path'] === 'string' ? path.basename(input['file_path']) : undefined;
     case 'Bash':
-      return typeof input['command'] === 'string' ? (input['command'] as string).slice(0, 40) : undefined;
+      return typeof input['command'] === 'string' ? input['command'] as string : undefined;
     case 'Grep':
     case 'Glob':
       return typeof input['pattern'] === 'string' ? input['pattern'] as string : undefined;
-    case 'Agent':
-      return typeof input['prompt'] === 'string' ? (input['prompt'] as string).slice(0, 30) : undefined;
+    case 'Agent': {
+      if (typeof input['description'] === 'string' && input['description'].trim().length > 0) {
+        return input['description'] as string;
+      }
+      if (typeof input['name'] === 'string' && input['name'].trim().length > 0) {
+        return input['name'] as string;
+      }
+      return typeof input['prompt'] === 'string' ? input['prompt'] as string : undefined;
+    }
     case 'WebSearch':
       return typeof input['query'] === 'string' ? input['query'] as string : undefined;
     default:
@@ -160,7 +170,8 @@ function extractToolDetail(name: string, input: JsonRecord | undefined): string 
 // ---------------------------------------------------------------------------
 
 export class StateDetector implements vscode.Disposable {
-  private readonly filePath: string;
+  private filePath: string;
+  private readonly resolvePath: () => string;
   private byteOffset = 0;
   private lastSize = 0;
   private lastIno = 0;
@@ -170,13 +181,23 @@ export class StateDetector implements vscode.Disposable {
   private disposed = false;
   private reading = false;
   private watchRetryLogged = false;
+  private readonly pollIntervalMs: number;
 
   private readonly ctx: HandlerContext;
 
-  constructor(filePath: string, sessionId: string, pid: number, onStateChange: StateChangeCallback, log: Log) {
-    this.filePath = filePath;
+  constructor(
+    resolvePath: () => string,
+    sessionId: string,
+    pid: number,
+    pollIntervalMs: number,
+    onStateChange: StateChangeCallback,
+    log: Log,
+  ) {
+    this.resolvePath = resolvePath;
+    this.filePath = resolvePath();
+    this.pollIntervalMs = pollIntervalMs;
 
-    const project = path.basename(path.dirname(filePath));
+    const project = path.basename(path.dirname(this.filePath));
     const prefix = `[${project}] ${sessionId.slice(0, 8)} pid=${pid}`;
 
     this.ctx = {
@@ -186,16 +207,34 @@ export class StateDetector implements vscode.Disposable {
     };
   }
 
+  private switchTo(newPath: string): void {
+    this.ctx.log.info(`${this.ctx.prefix} path_switch  ${path.basename(this.filePath)} → ${path.basename(newPath)}`);
+    this.filePath = newPath;
+    this.byteOffset = 0;
+    this.lastSize = 0;
+    this.lastIno = 0;
+    if (this.fsWatcher) { this.fsWatcher.close(); this.fsWatcher = undefined; }
+    this.watchRetryLogged = false;
+  }
+
+  private checkPathChange(): void {
+    const newPath = this.resolvePath();
+    if (newPath !== this.filePath) {
+      this.switchTo(newPath);
+    }
+  }
+
   start(): void {
     this.ctx.log.info(`${this.ctx.prefix} started  path=${this.filePath}`);
     this.tryWatch();
 
     this.pollInterval = setInterval(() => {
       if (!this.disposed) {
+        this.checkPathChange();
         this.tryWatch();
         void this.readNewData();
       }
-    }, 3_000);
+    }, this.pollIntervalMs);
 
     const vscode = require('vscode') as typeof import('vscode');
     this.windowStateDisposable = vscode.window.onDidChangeWindowState((e: { focused: boolean }) => {

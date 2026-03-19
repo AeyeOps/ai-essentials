@@ -7,6 +7,8 @@ export interface SessionInfo {
   sessionId: string;
   cwd: string;
   startedAt: number;
+  transcriptSessionId?: string;
+  transcriptPath?: string;
   state: SessionState;
   toolName?: string;
   toolDetail?: string;

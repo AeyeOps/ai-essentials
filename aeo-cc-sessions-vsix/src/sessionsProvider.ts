@@ -16,8 +16,12 @@ const stateColorMap: Record<SessionState, string> = {
 };
 
 export class SessionTreeItem extends vscode.TreeItem {
-  constructor(public readonly session: SessionInfo) {
-    super(session.slug ?? path.basename(session.cwd), vscode.TreeItemCollapsibleState.None);
+  constructor(public readonly session: SessionInfo, active: boolean) {
+    const labelText = session.slug ?? path.basename(session.cwd);
+    super(
+      active ? { label: labelText, highlights: [[0, labelText.length]] } : labelText,
+      vscode.TreeItemCollapsibleState.None,
+    );
     this.description = getStatusText(session);
     this.iconPath = new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor(stateColorMap[session.state]));
 
@@ -69,7 +73,10 @@ export class SessionsProvider implements vscode.TreeDataProvider<SessionTreeItem
 
   getChildren(element?: SessionTreeItem): SessionTreeItem[] {
     if (element) return [];
-    return getFilteredSortedSessions(this.discovery, this.terminalMapper).map(s => new SessionTreeItem(s));
+    const activeId = this.terminalMapper?.getActiveSessionId();
+    return getFilteredSortedSessions(this.discovery, this.terminalMapper).map(
+      s => new SessionTreeItem(s, s.sessionId === activeId),
+    );
   }
 
   dispose(): void {
