@@ -8,6 +8,7 @@ make package
 
 VERSION="$(node -p "require('./package.json').version")"
 TAG="v${VERSION}"
+BRANCH="$(git branch --show-current)"
 echo ""
 echo "=== CI: Version check — ${TAG} ==="
 
@@ -28,9 +29,13 @@ fi
 echo "Changelog entry for [${VERSION}] found."
 
 echo ""
+echo "=== CI: Pushing branch ==="
+git push origin "$BRANCH"
+
+echo ""
 echo "=== CI: Tagging & pushing ==="
 git tag -a "$TAG" -m "Release ${TAG}"
 git push origin "$TAG"
 
 echo ""
-echo "Tagged and pushed ${TAG} — GitHub Actions release workflow triggered."
+echo "Pushed ${BRANCH}, tagged ${TAG}, and pushed the tag — GitHub Actions release workflow triggered."
