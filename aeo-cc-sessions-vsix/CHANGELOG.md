@@ -5,6 +5,35 @@ All notable changes to the AEO VSC CC Sessions extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-03-20
+
+### Added
+
+- `prompt` session state detecting `AskUserQuestion`, `request_user_input`, and `ExitPlanMode` tool calls as user-input-needed signals
+- Tool approval detection for mutating tools (`Edit`, `Write`, `Bash`, etc.) under default permission mode
+- Prose-based approval prompt detection from trailing assistant text (e.g., "Want me to apply these changes?")
+- Prompt state warm-glow animation and styling in Rich View with breathing background effect
+- `--continue` cmdline detection resolving to the latest transcript in the project at launch time
+- Prompt-id continuity edges linking transcripts across `/clear` and `/compact` handoffs via first/last `promptId` matching
+- Transcript tail parsing (`readSuffix`) to extract `lastPromptId` from recent records
+- Persistent resolved transcript ID storage in `workspaceState`, surviving extension reloads
+- Resolver decision tracing with deduplicated debug logging per PID
+
+### Changed
+
+- Session sort order is now stable: ordered by start time and terminal position instead of state-based activity sorting
+- Transcript resolver no longer depends on `statusline-activity.jsonl`; all resolution uses `/proc`, `history.jsonl`, and transcript content
+- History-based handoff matching accepts candidates slightly before the event timestamp (5s pre-window) and prefers at-or-after matches
+- Progress records with nested `assistant` or `user` messages are now dispatched through the main record handlers
+- `permissionMode` tracked from user records to inform tool approval heuristics
+- Resolution source labels are more specific: `cmdline-continue-chain`, `task-chain`, `cmdline-resume-chain`, `resolved-chain`
+- `ExitPlanMode` detail shows the first plan heading instead of raw plan text
+
+### Removed
+
+- `sortByActivity` configuration option and state-based sort comparator
+- `statusline-activity.jsonl` parsing and `StatuslineEntry` type from transcript resolver
+
 ## [0.1.5] - 2026-03-19
 
 ### Changed

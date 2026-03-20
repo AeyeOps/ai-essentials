@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-export type SessionState = 'idle' | 'thinking' | 'tool' | 'permission' | 'compact' | 'error' | 'exited';
+export type SessionState = 'idle' | 'thinking' | 'tool' | 'prompt' | 'permission' | 'compact' | 'error' | 'exited';
 
 export interface SessionInfo {
   pid: number;

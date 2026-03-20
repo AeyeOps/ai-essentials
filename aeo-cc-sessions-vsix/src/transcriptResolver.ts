@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import type * as vscode from 'vscode';
 import {
   getTranscriptPath,
+  resolveContinueFromCmdline,
   resolveConversationFromCmdline,
   resolveTaskFromFd,
 } from './sessionDiscovery.js';
@@ -15,16 +16,10 @@ interface HistoryRow {
   timestamp: number;
 }
 
-interface StatuslineEntry {
-  atMs: number;
-  sessionId: string;
-  sessionName?: string;
-  transcriptPath: string;
-  cwd: string;
-}
-
 interface TranscriptMeta {
   customTitle?: string;
+  firstPromptId?: string;
+  lastPromptId?: string;
   path: string;
   mtimeMs: number;
   sessionId: string;
@@ -47,8 +42,10 @@ export interface TranscriptResolution {
 }
 
 const HISTORY_PATH = path.join(os.homedir(), '.claude', 'history.jsonl');
-const STATUSLINE_PATH = path.join(os.homedir(), '.claude', 'statusline-activity.jsonl');
+const CONTINUE_GRACE_MS = 5_000;
+const HISTORY_EDGE_PRE_WINDOW_MS = 5_000;
 const MAX_START_PARSE_BYTES = 256 * 1024;
+const MAX_END_PARSE_BYTES = 64 * 1024;
 const HISTORY_EDGE_WINDOW_MS = 60_000;
 
 const PREVIOUS_TRANSCRIPT_RE = new RegExp(
@@ -114,6 +111,23 @@ function readPrefix(filePath: string): string {
   }
 }
 
+function readSuffix(filePath: string): string {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    const stat = fs.fstatSync(fd);
+    const size = Math.min(stat.size, MAX_END_PARSE_BYTES);
+    const start = Math.max(0, stat.size - size);
+    const buffer = Buffer.alloc(size);
+    fs.readSync(fd, buffer, 0, size, start);
+    return buffer.toString('utf-8');
+  } catch {
+    return '';
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
 function parseTranscriptMeta(filePath: string, mtimeMs: number): TranscriptMeta {
   const sessionId = path.basename(filePath, '.jsonl');
   const meta: TranscriptMeta = {
@@ -124,10 +138,8 @@ function parseTranscriptMeta(filePath: string, mtimeMs: number): TranscriptMeta 
   };
 
   const prefix = readPrefix(filePath);
-  if (!prefix) return meta;
-
-  const lines = prefix.split('\n').filter(Boolean).slice(0, 20);
-  for (const line of lines) {
+  const prefixLines = prefix.split('\n').filter(Boolean).slice(0, 20);
+  for (const line of prefixLines) {
     try {
       const record = JSON.parse(line) as Record<string, unknown>;
 
@@ -148,6 +160,10 @@ function parseTranscriptMeta(filePath: string, mtimeMs: number): TranscriptMeta 
       }
 
       if (record.type === 'user') {
+        if (!meta.firstPromptId && typeof record.promptId === 'string') {
+          meta.firstPromptId = record.promptId;
+        }
+
         const message = record.message as Record<string, unknown> | undefined;
         const contentText = extractContentText(message?.content);
 
@@ -170,6 +186,20 @@ function parseTranscriptMeta(filePath: string, mtimeMs: number): TranscriptMeta 
     }
   }
 
+  const suffix = readSuffix(filePath);
+  const suffixLines = suffix.split('\n').filter(Boolean);
+  const tailWindow = suffixLines.slice(Math.max(0, suffixLines.length - 50));
+  for (const line of tailWindow) {
+    try {
+      const record = JSON.parse(line) as Record<string, unknown>;
+      if (record.type === 'user' && typeof record.promptId === 'string') {
+        meta.lastPromptId = record.promptId;
+      }
+    } catch {
+      continue;
+    }
+  }
+
   return meta;
 }
 
@@ -185,14 +215,36 @@ function addEdge(edges: Map<string, Set<string>>, fromId: string, toId: string):
   edges.set(fromId, current);
 }
 
+type HandoffKind = 'clear' | 'compact';
+
+function parseHandoffKind(display: string): HandoffKind | undefined {
+  const normalized = display.trim().toLowerCase();
+  if (normalized === '/clear') return 'clear';
+  if (normalized === '/compact') return 'compact';
+  return undefined;
+}
+
+function isHandoffStart(meta: TranscriptMeta, kind: HandoffKind): boolean {
+  if (kind === 'clear') {
+    return meta.startKind === 'clear' || meta.startsWithClearCommand;
+  }
+  return meta.startKind === 'compact';
+}
+
+function metaSortTs(meta: TranscriptMeta): number {
+  return Math.max(meta.startTsMs ?? Number.NEGATIVE_INFINITY, meta.mtimeMs);
+}
+
 export class TranscriptResolver {
+  private readonly log: vscode.LogOutputChannel;
   private readonly historyRows = new Map<string, HistoryRow[]>();
   private historyMtimeMs = -1;
+  private readonly lastDecisionByPid = new Map<number, string>();
   private readonly projects = new Map<string, ProjectCache>();
-  private readonly statuslineBySession = new Map<string, StatuslineEntry>();
-  private statuslineMtimeMs = -1;
 
-  constructor(_log: vscode.LogOutputChannel) {}
+  constructor(log: vscode.LogOutputChannel) {
+    this.log = log;
+  }
 
   private loadProject(projectDir: string): ProjectCache {
     const cached = this.projects.get(projectDir) ?? {
@@ -281,51 +333,6 @@ export class TranscriptResolver {
     this.historyMtimeMs = stat.mtimeMs;
   }
 
-  private loadStatuslineEntries(): void {
-    let stat: fs.Stats;
-    try {
-      stat = fs.statSync(STATUSLINE_PATH);
-    } catch {
-      this.statuslineBySession.clear();
-      this.statuslineMtimeMs = -1;
-      return;
-    }
-
-    if (stat.mtimeMs === this.statuslineMtimeMs) return;
-
-    this.statuslineBySession.clear();
-    for (const line of readJsonlRows(STATUSLINE_PATH)) {
-      try {
-        const row = JSON.parse(line) as Record<string, unknown>;
-        if (
-          typeof row.session_id !== 'string'
-          || typeof row.transcript_path !== 'string'
-          || typeof row.cwd !== 'string'
-          || typeof row.meta_ts !== 'string'
-        ) {
-          continue;
-        }
-
-        const atMs = parseIsoMs(row.meta_ts);
-        if (atMs === undefined) continue;
-
-        const current = this.statuslineBySession.get(row.session_id);
-        if (current && current.atMs >= atMs) continue;
-
-        this.statuslineBySession.set(row.session_id, {
-          atMs,
-          cwd: row.cwd,
-          sessionId: row.session_id,
-          sessionName: typeof row.session_name === 'string' ? row.session_name : undefined,
-          transcriptPath: row.transcript_path,
-        });
-      } catch {
-        continue;
-      }
-    }
-    this.statuslineMtimeMs = stat.mtimeMs;
-  }
-
   private buildEdges(cwd: string, metas: Map<string, TranscriptMeta>): Map<string, Set<string>> {
     const edges = new Map<string, Set<string>>();
 
@@ -335,37 +342,122 @@ export class TranscriptResolver {
       }
     }
 
-    this.loadHistoryRows();
-    const rows = this.historyRows.get(cwd) ?? [];
-    for (let index = 0; index < rows.length; index++) {
-      const row = rows[index];
-      const normalized = row.display.trim().toLowerCase();
-      if (normalized !== '/clear' && normalized !== '/compact') continue;
+    const metasByLastPrompt = new Map<string, TranscriptMeta[]>();
+    for (const meta of metas.values()) {
+      if (!meta.lastPromptId) continue;
+      const bucket = metasByLastPrompt.get(meta.lastPromptId) ?? [];
+      bucket.push(meta);
+      metasByLastPrompt.set(meta.lastPromptId, bucket);
+    }
+    for (const bucket of metasByLastPrompt.values()) {
+      bucket.sort((a, b) => (a.startTsMs ?? a.mtimeMs) - (b.startTsMs ?? b.mtimeMs));
+    }
 
-      let bestCandidate: { delta: number; sessionId: string } | undefined;
-      for (let nextIndex = index + 1; nextIndex < rows.length; nextIndex++) {
-        const next = rows[nextIndex];
-        if (next.timestamp - row.timestamp > HISTORY_EDGE_WINDOW_MS) break;
-        if (next.sessionId === row.sessionId) continue;
+    for (const meta of metas.values()) {
+      const isHandoffDescendant = meta.startKind === 'clear' || meta.startKind === 'compact' || meta.startsWithClearCommand;
+      if (!isHandoffDescendant || !meta.firstPromptId) continue;
 
-        const target = metas.get(next.sessionId);
-        if (!target?.startTsMs) continue;
-        if (normalized === '/clear' && !target.startsWithClearCommand) continue;
-
-        const startDelta = Math.abs(target.startTsMs - row.timestamp);
-        if (startDelta > HISTORY_EDGE_WINDOW_MS) continue;
-
-        if (!bestCandidate || startDelta < bestCandidate.delta) {
-          bestCandidate = { delta: startDelta, sessionId: next.sessionId };
+      const candidates = metasByLastPrompt.get(meta.firstPromptId) ?? [];
+      const metaStart = metaSortTs(meta);
+      let bestCandidate: TranscriptMeta | undefined;
+      for (const candidate of candidates) {
+        if (candidate.sessionId === meta.sessionId) continue;
+        const candidateStart = metaSortTs(candidate);
+        if (candidateStart >= metaStart) continue;
+        if (!bestCandidate || candidateStart > metaSortTs(bestCandidate)) {
+          bestCandidate = candidate;
         }
       }
 
       if (bestCandidate) {
-        addEdge(edges, row.sessionId, bestCandidate.sessionId);
+        addEdge(edges, bestCandidate.sessionId, meta.sessionId);
+      }
+    }
+
+    this.loadHistoryRows();
+    const rows = this.historyRows.get(cwd) ?? [];
+    for (const row of rows) {
+      const handoffKind = parseHandoffKind(row.display);
+      if (!handoffKind) continue;
+
+      let bestCandidate:
+        | { deltaMs: number; absDeltaMs: number; meta: TranscriptMeta; prefersAfter: boolean }
+        | undefined;
+      for (const meta of metas.values()) {
+        if (meta.sessionId === row.sessionId) continue;
+        if (!isHandoffStart(meta, handoffKind)) continue;
+
+        const startTs = meta.startTsMs ?? meta.mtimeMs;
+        const deltaMs = startTs - row.timestamp;
+        if (deltaMs < -HISTORY_EDGE_PRE_WINDOW_MS || deltaMs > HISTORY_EDGE_WINDOW_MS) continue;
+
+        const candidate = {
+          deltaMs,
+          absDeltaMs: Math.abs(deltaMs),
+          meta,
+          prefersAfter: deltaMs >= 0,
+        };
+
+        if (
+          !bestCandidate
+          || Number(candidate.prefersAfter) > Number(bestCandidate.prefersAfter)
+          || (
+            candidate.prefersAfter === bestCandidate.prefersAfter
+            && (
+              candidate.absDeltaMs < bestCandidate.absDeltaMs
+              || (
+                candidate.absDeltaMs === bestCandidate.absDeltaMs
+                && metaSortTs(candidate.meta) < metaSortTs(bestCandidate.meta)
+              )
+            )
+          )
+        ) {
+          bestCandidate = candidate;
+        }
+      }
+
+      if (bestCandidate) {
+        addEdge(edges, row.sessionId, bestCandidate.meta.sessionId);
       }
     }
 
     return edges;
+  }
+
+  private findContinueAnchor(
+    metas: Map<string, TranscriptMeta>,
+    processStartedAt?: number,
+  ): string | undefined {
+    const cutoffMs = typeof processStartedAt === 'number'
+      ? processStartedAt + CONTINUE_GRACE_MS
+      : Number.POSITIVE_INFINITY;
+
+    let best: TranscriptMeta | undefined;
+    for (const meta of metas.values()) {
+      const anchorTs = meta.startTsMs ?? meta.mtimeMs;
+      if (anchorTs > cutoffMs) continue;
+      if (!best || anchorTs > (best.startTsMs ?? best.mtimeMs)) {
+        best = meta;
+      }
+    }
+    return best?.sessionId;
+  }
+
+  private traceDecision(
+    pid: number,
+    details: {
+      anchors: string[];
+      chosenSessionId: string;
+      continueMode: boolean;
+      continueSessionId?: string;
+      reachableIds: string[];
+      source: string;
+    },
+  ): void {
+    const summary = JSON.stringify(details);
+    if (this.lastDecisionByPid.get(pid) === summary) return;
+    this.lastDecisionByPid.set(pid, summary);
+    this.log.debug(`resolver pid=${pid} ${summary}`);
   }
 
   private walkReachable(anchors: string[], edges: Map<string, Set<string>>): Set<string> {
@@ -390,18 +482,23 @@ export class TranscriptResolver {
     cwd: string,
     registrySessionId: string,
     previousResolvedSessionId?: string,
+    processStartedAt?: number,
   ): TranscriptResolution {
     const projectDir = transcriptProjectDir(cwd);
     const project = this.loadProject(projectDir);
-    this.loadStatuslineEntries();
 
+    const continueMode = resolveContinueFromCmdline(pid);
     const resumeSessionId = resolveConversationFromCmdline(pid);
     const taskSessionId = resolveTaskFromFd(pid);
+    const continueSessionId = continueMode
+      ? this.findContinueAnchor(project.bySessionId, processStartedAt)
+      : undefined;
 
     const anchors = [
       previousResolvedSessionId,
       taskSessionId,
       resumeSessionId,
+      continueSessionId,
       registrySessionId,
     ].filter((value): value is string => typeof value === 'string' && value.length > 0);
 
@@ -413,18 +510,30 @@ export class TranscriptResolver {
       const meta = project.bySessionId.get(sessionId);
       if (!meta) continue;
 
-      const activity = this.statuslineBySession.get(sessionId);
-      const score = activity && activity.cwd === cwd
-        ? 1_000_000_000_000_000 + activity.atMs
-        : meta.mtimeMs;
-
-      const source = activity && activity.cwd === cwd ? 'statusline-chain' : 'transcript-chain';
+      const score = Math.max(meta.mtimeMs, meta.startTsMs ?? Number.NEGATIVE_INFINITY);
+      const source = continueMode && continueSessionId && reachableIds.has(continueSessionId)
+        ? 'cmdline-continue-chain'
+        : taskSessionId && reachableIds.has(taskSessionId)
+          ? 'task-chain'
+          : resumeSessionId && reachableIds.has(resumeSessionId)
+            ? 'cmdline-resume-chain'
+            : previousResolvedSessionId && reachableIds.has(previousResolvedSessionId)
+              ? 'resolved-chain'
+              : 'transcript-chain';
       if (!best || score > best.score) {
         best = { meta, score, source };
       }
     }
 
     if (best) {
+      this.traceDecision(pid, {
+        anchors,
+        chosenSessionId: best.meta.sessionId,
+        continueMode,
+        continueSessionId,
+        reachableIds: [...reachableIds].sort(),
+        source: best.source,
+      });
       return {
         path: best.meta.path,
         sessionId: best.meta.sessionId,
@@ -432,16 +541,28 @@ export class TranscriptResolver {
       };
     }
 
-    const fallbackSessionId = taskSessionId ?? resumeSessionId ?? registrySessionId;
+    const fallbackSessionId = taskSessionId ?? resumeSessionId ?? continueSessionId ?? registrySessionId;
     const fallbackPath = getTranscriptPath(cwd, fallbackSessionId);
+    const fallbackSource = fallbackSessionId === taskSessionId
+      ? 'task-fd'
+      : fallbackSessionId === resumeSessionId
+        ? 'cmdline-resume'
+        : fallbackSessionId === continueSessionId
+          ? 'cmdline-continue'
+          : 'registry';
+
+    this.traceDecision(pid, {
+      anchors,
+      chosenSessionId: fallbackSessionId,
+      continueMode,
+      continueSessionId,
+      reachableIds: [],
+      source: fallbackSource,
+    });
     return {
       path: project.bySessionId.get(fallbackSessionId)?.path ?? fallbackPath,
       sessionId: fallbackSessionId,
-      source: fallbackSessionId === taskSessionId
-        ? 'task-fd'
-        : fallbackSessionId === resumeSessionId
-          ? 'cmdline-resume'
-          : 'registry',
+      source: fallbackSource,
     };
   }
 }

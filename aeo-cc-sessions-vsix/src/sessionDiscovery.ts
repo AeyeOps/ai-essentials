@@ -9,18 +9,31 @@ export function getTranscriptPath(cwd: string, sessionId: string): string {
   return path.join(os.homedir(), '.claude', 'projects', encoded, `${sessionId}.jsonl`);
 }
 
-/** Parse --resume <uuid> from /proc/<pid>/cmdline. */
-export function resolveConversationFromCmdline(pid: number): string | undefined {
+function readCmdlineArgs(pid: number): string[] | undefined {
   try {
     const raw = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf-8');
-    const args = raw.split('\0');
-    const idx = args.indexOf('--resume');
-    if (idx !== -1 && idx + 1 < args.length) {
-      const uuid = args[idx + 1];
-      if (uuid.length >= 36) return uuid;
-    }
+    return raw.split('\0');
   } catch { /* /proc not available */ }
   return undefined;
+}
+
+/** Parse --resume <uuid> from /proc/<pid>/cmdline. */
+export function resolveConversationFromCmdline(pid: number): string | undefined {
+  const args = readCmdlineArgs(pid);
+  if (!args) return undefined;
+
+  const idx = args.indexOf('--resume');
+  if (idx !== -1 && idx + 1 < args.length) {
+    const uuid = args[idx + 1];
+    if (uuid.length >= 36) return uuid;
+  }
+  return undefined;
+}
+
+/** Detect --continue from /proc/<pid>/cmdline. */
+export function resolveContinueFromCmdline(pid: number): boolean {
+  const args = readCmdlineArgs(pid);
+  return Array.isArray(args) && args.includes('--continue');
 }
 
 /** Find active task UUID from /proc/<pid>/fd/ symlinks into ~/.claude/tasks/. */
@@ -46,15 +59,59 @@ export function resolveTaskFromFd(pid: number): string | undefined {
   return undefined;
 }
 
+function findLatestTranscriptSessionId(cwd: string, processStartedAt?: number): string | undefined {
+  const encoded = cwd.replace(/\//g, '-');
+  const projectDir = path.join(os.homedir(), '.claude', 'projects', encoded);
+
+  let fileNames: string[];
+  try {
+    fileNames = fs.readdirSync(projectDir).filter(name => name.endsWith('.jsonl'));
+  } catch {
+    return undefined;
+  }
+
+  const cutoffMs = typeof processStartedAt === 'number'
+    ? processStartedAt + 5_000
+    : Number.POSITIVE_INFINITY;
+
+  let best: { sessionId: string; score: number } | undefined;
+  for (const name of fileNames) {
+    try {
+      const filePath = path.join(projectDir, name);
+      const stat = fs.statSync(filePath);
+      if (stat.mtimeMs > cutoffMs) continue;
+
+      const sessionId = path.basename(name, '.jsonl');
+      if (!best || stat.mtimeMs > best.score) {
+        best = { sessionId, score: stat.mtimeMs };
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return best?.sessionId;
+}
+
 /**
  * Resolve the transcript path for a session, trying in order:
  * 1. --resume <uuid> from cmdline (conversation ID)
  * 2. Active task from /proc/fd/ (plan mode)
- * 3. Registry sessionId (original conversation)
+ * 3. --continue latest transcript in project at launch time
+ * 4. Registry sessionId (original conversation)
  */
-export function resolveTranscriptPath(pid: number, cwd: string, registrySessionId: string): string {
+export function resolveTranscriptPath(
+  pid: number,
+  cwd: string,
+  registrySessionId: string,
+  processStartedAt?: number,
+): string {
+  const continueSessionId = resolveContinueFromCmdline(pid)
+    ? findLatestTranscriptSessionId(cwd, processStartedAt)
+    : undefined;
   const conversationId = resolveConversationFromCmdline(pid)
     ?? resolveTaskFromFd(pid)
+    ?? continueSessionId
     ?? registrySessionId;
   return getTranscriptPath(cwd, conversationId);
 }

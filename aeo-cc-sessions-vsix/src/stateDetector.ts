@@ -27,12 +27,17 @@ const SYSTEM_STATE_MAP: Record<string, SessionState> = {
 type JsonRecord = Record<string, unknown>;
 type ContentBlock = { type?: string; name?: string; input?: JsonRecord; [k: string]: unknown };
 
+const PROMPT_TOOLS = new Set(['AskUserQuestion', 'request_user_input', 'ExitPlanMode']);
+const PROSE_APPROVAL_RE = /\b(?:want me to|do you want me to|would you like me to|should i|shall i)\b.*\b(?:apply|patch|edit|update|fix|change|modify)\b/i;
+const MUTATING_APPROVAL_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash']);
+
 // ---------------------------------------------------------------------------
 // Record handlers (progress is batched in doRead, not dispatched here)
 // ---------------------------------------------------------------------------
 
 type HandlerContext = {
   prefix: string;
+  permissionMode?: string;
   emit: (state: SessionState, toolName?: string, toolDetail?: string) => void;
   log: Log;
 };
@@ -66,7 +71,35 @@ function handleQueueOp(record: JsonRecord, ctx: HandlerContext): void {
   ctx.log.debug(`${ctx.prefix} queue-op/${op}  (rec=${recTs(record)})`);
 }
 
+function handleProgress(record: JsonRecord, ctx: HandlerContext): void {
+  const data = record['data'] as JsonRecord | undefined;
+  const nested = data?.['message'] as JsonRecord | undefined;
+  const nestedType = nested?.['type'];
+  const nestedMessage = nested?.['message'] as JsonRecord | undefined;
+
+  if ((nestedType === 'assistant' || nestedType === 'user') && nestedMessage) {
+    const synthetic: JsonRecord = {
+      timestamp: record['timestamp'],
+      message: nestedMessage,
+    };
+    if (nestedType === 'assistant') {
+      handleAssistant(synthetic, ctx);
+      return;
+    }
+    handleUser(synthetic, ctx);
+    return;
+  }
+
+  const progressType = data?.['type'] as string | undefined;
+  const hookEvent = data?.['hookEvent'] as string | undefined;
+  ctx.log.debug(`${ctx.prefix} progress/${progressType ?? hookEvent ?? '?'}  (rec=${recTs(record)})`);
+}
+
 function handleUser(record: JsonRecord, ctx: HandlerContext): void {
+  if (typeof record['permissionMode'] === 'string') {
+    ctx.permissionMode = record['permissionMode'] as string;
+  }
+
   const content = resolveContent(record);
 
   if (Array.isArray(content)) {
@@ -106,14 +139,28 @@ function handleAssistant(record: JsonRecord, ctx: HandlerContext): void {
 
   if (toolUses.length > 0) {
     const names = toolUses.map(t => t.name as string);
-    const first = toolUses[0];
+    const first = toolUses.find(t => PROMPT_TOOLS.has(t.name as string)) ?? toolUses[0];
     const toolName = first.name as string;
     const input = first.input as JsonRecord | undefined;
     const detail = extractToolDetail(toolName, input);
     const parallel = toolUses.length > 1 ? ` +${toolUses.length - 1} parallel` : '';
     ctx.log.info(`${ctx.prefix} assistant/tool → tool  tools=[${names}]${parallel}  stop=${stopReason ?? '?'}  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
+    if (PROMPT_TOOLS.has(toolName)) {
+      ctx.emit('prompt', toolName, detail);
+      return;
+    }
+    if (shouldPromptForToolApproval(toolName, input, ctx.permissionMode)) {
+      ctx.emit('prompt', toolName, describeApprovalPrompt(toolName, input, detail));
+      return;
+    }
     ctx.emit('tool', toolName, detail);
   } else if (stopReason === 'end_turn') {
+    const promptDetail = extractAssistantApprovalPromptDetail(blocks);
+    if (promptDetail) {
+      ctx.log.info(`${ctx.prefix} assistant/text → prompt  stop=end_turn  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
+      ctx.emit('prompt', undefined, promptDetail);
+      return;
+    }
     ctx.log.info(`${ctx.prefix} assistant/text → idle  stop=end_turn  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
     ctx.emit('idle');
   } else {
@@ -128,6 +175,7 @@ function handleAssistant(record: JsonRecord, ctx: HandlerContext): void {
 
 const HANDLERS: Record<string, (record: JsonRecord, ctx: HandlerContext) => void> = {
   system: handleSystem,
+  progress: handleProgress,
   'queue-operation': handleQueueOp,
   user: handleUser,
   assistant: handleAssistant,
@@ -158,11 +206,97 @@ function extractToolDetail(name: string, input: JsonRecord | undefined): string 
       }
       return typeof input['prompt'] === 'string' ? input['prompt'] as string : undefined;
     }
+    case 'AskUserQuestion':
+    case 'request_user_input': {
+      const questions = input['questions'];
+      if (Array.isArray(questions) && questions.length > 0) {
+        const first = questions[0] as JsonRecord;
+        if (typeof first['header'] === 'string' && (first['header'] as string).trim().length > 0) {
+          return first['header'] as string;
+        }
+        if (typeof first['question'] === 'string') {
+          return first['question'] as string;
+        }
+      }
+      return undefined;
+    }
+    case 'ExitPlanMode': {
+      const plan = input['plan'];
+      if (typeof plan !== 'string') return undefined;
+      const firstMeaningfulLine = plan
+        .split('\n')
+        .map(line => line.trim())
+        .find(line => line.length > 0);
+      if (!firstMeaningfulLine) return undefined;
+      return firstMeaningfulLine.replace(/^#+\s*/, '');
+    }
     case 'WebSearch':
       return typeof input['query'] === 'string' ? input['query'] as string : undefined;
     default:
       return undefined;
   }
+}
+
+function describeApprovalPrompt(toolName: string, input: JsonRecord | undefined, toolDetail?: string): string {
+  if (toolName === 'Bash' && typeof input?.['description'] === 'string' && (input['description'] as string).trim().length > 0) {
+    return `Approve bash: ${input['description'] as string}`;
+  }
+  if (toolDetail) {
+    return `Approve ${toolName.toLowerCase()}: ${toolDetail}`;
+  }
+  return `Approve ${toolName.toLowerCase()}`;
+}
+
+function shouldPromptForToolApproval(
+  toolName: string,
+  input: JsonRecord | undefined,
+  permissionMode?: string,
+): boolean {
+  if (permissionMode === 'default' && MUTATING_APPROVAL_TOOLS.has(toolName)) {
+    return true;
+  }
+
+  if (toolName === 'Bash' && typeof input?.['command'] === 'string') {
+    return hasQuotedNewlineCommentRisk(input['command'] as string);
+  }
+
+  return false;
+}
+
+function hasQuotedNewlineCommentRisk(command: string): boolean {
+  const lines = command.split('\n');
+  if (lines.length < 2) return false;
+  const firstLine = lines[0];
+  if (!/["']\s*$/.test(firstLine)) return false;
+  return lines.slice(1).some(line => line.trimStart().startsWith('#'));
+}
+
+function extractAssistantApprovalPromptDetail(blocks: ContentBlock[]): string | undefined {
+  const rawLines = blocks
+    .filter(block => block.type === 'text')
+    .flatMap(block => typeof block.text === 'string' ? block.text.split('\n') : []);
+
+  const textLines: string[] = [];
+  let inFence = false;
+  for (const rawLine of rawLines) {
+    const line = rawLine.trim();
+    if (line.startsWith('```')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence || line.length === 0) continue;
+    textLines.push(line);
+  }
+
+  const tail = textLines.slice(-4);
+  for (let i = tail.length - 1; i >= 0; i -= 1) {
+    const line = tail[i];
+    if (PROSE_APPROVAL_RE.test(line)) {
+      return line;
+    }
+  }
+
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------

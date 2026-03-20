@@ -9,6 +9,7 @@ const stateColorMap: Record<SessionState, string> = {
   idle: 'charts.green',
   thinking: 'charts.yellow',
   tool: 'charts.blue',
+  prompt: 'editorWarning.foreground',
   permission: 'charts.red',
   error: 'charts.red',
   compact: 'charts.yellow',

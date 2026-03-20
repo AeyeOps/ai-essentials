@@ -39,6 +39,10 @@ body { margin:0; padding:0; font-family: var(--vscode-font-family, system-ui); f
 .s-tool .status { color:#58a6ff; }
 .s-tool { border-left-color:#58a6ff; }
 
+.s-prompt .dot { background:#f7f1e3; box-shadow:0 0 6px #f7f1e388; }
+.s-prompt .status { color:#f7f1e3; }
+.s-prompt { border-left-color:#f7f1e3; animation:promptBreath 2.8s ease-in-out infinite; }
+
 .s-permission .dot { background:#f85149; box-shadow:0 0 3px #f8514955; }
 .s-permission .status { color:#f85149; }
 .s-permission { border-left-color:#f85149; }
@@ -58,6 +62,10 @@ body { margin:0; padding:0; font-family: var(--vscode-font-family, system-ui); f
 .active { font-weight:600; }
 
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+@keyframes promptBreath {
+  0%, 100% { background: rgba(247, 241, 227, 0.05); }
+  50% { background: rgba(247, 241, 227, 0.18); }
+}
 `;
 
 export class SessionsWebviewProvider implements vscode.WebviewViewProvider, vscode.Disposable {

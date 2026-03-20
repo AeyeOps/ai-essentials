@@ -13,26 +13,20 @@ export function formatDuration(ms: number): string {
 }
 
 export const stateSortOrder: Record<SessionState, number> = {
-  tool: 0, thinking: 1, permission: 2, compact: 3, idle: 4, error: 5, exited: 6,
+  prompt: 0, tool: 1, thinking: 2, permission: 3, compact: 4, idle: 5, error: 6, exited: 7,
 };
 
-function compareSessions(
-  a: SessionInfo,
-  b: SessionInfo,
-  sortByActivity: boolean,
-): number {
-  if (sortByActivity) {
-    const oa = stateSortOrder[a.state];
-    const ob = stateSortOrder[b.state];
-    if (oa !== ob) return oa - ob;
-  }
-
-  if (a.stateChangedAt !== b.stateChangedAt) {
-    return a.stateChangedAt - b.stateChangedAt;
-  }
-
+function compareSessionsStable(a: SessionInfo, b: SessionInfo): number {
   if (a.startedAt !== b.startedAt) {
     return a.startedAt - b.startedAt;
+  }
+
+  const aTerminalIndex = a.terminal ? vscode.window.terminals.indexOf(a.terminal) : -1;
+  const bTerminalIndex = b.terminal ? vscode.window.terminals.indexOf(b.terminal) : -1;
+  if (aTerminalIndex !== bTerminalIndex) {
+    if (aTerminalIndex === -1) return 1;
+    if (bTerminalIndex === -1) return -1;
+    return aTerminalIndex - bTerminalIndex;
   }
 
   return a.sessionId.localeCompare(b.sessionId);
@@ -46,6 +40,9 @@ export function getStatusText(session: SessionInfo): string {
     case 'tool':
       if (session.toolName && session.toolDetail) return `${session.toolName}: ${session.toolDetail}`;
       return session.toolName ?? 'Tool';
+    case 'prompt':
+      if (session.toolDetail) return `Needs input: ${session.toolDetail}`;
+      return 'Needs your input';
     case 'permission': return 'Waiting for permission...';
     case 'compact': return 'Compacting context...';
     case 'error': return 'Error';
@@ -58,7 +55,6 @@ export function getFilteredSortedSessions(
   terminalMapper: { isOwnSessionSync(pid: number): boolean } | undefined,
 ): SessionInfo[] {
   const showExited = vscode.workspace.getConfiguration('aeoVscCcSessions').get<boolean>('showExited', false);
-  const sortByActivity = vscode.workspace.getConfiguration('aeoVscCcSessions').get<boolean>('sortByActivity', true);
   const sessions = [...discovery.getSessions().values()];
 
   const filtered = sessions.filter(s => {
@@ -77,10 +73,10 @@ export function getFilteredSortedSessions(
 
   const grouped = [...terminalGroups.values()];
   for (const group of grouped) {
-    group.sort((a, b) => compareSessions(a, b, sortByActivity));
+    group.sort(compareSessionsStable);
   }
 
-  grouped.sort((a, b) => compareSessions(a[0], b[0], sortByActivity));
+  grouped.sort((a, b) => compareSessionsStable(a[0], b[0]));
 
   return grouped.flat();
 }

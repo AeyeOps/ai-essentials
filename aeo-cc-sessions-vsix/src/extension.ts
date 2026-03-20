@@ -14,21 +14,27 @@ function createDetector(
   session: SessionInfo,
   transcriptResolver: TranscriptResolver,
   detectorPollInterval: number,
+  loadResolvedTranscriptId: (sessionId: string) => string | undefined,
+  storeResolvedTranscriptId: (sessionId: string, transcriptSessionId: string) => void,
   log: vscode.LogOutputChannel,
 ): StateDetector {
-  let lastResolvedSessionId = session.sessionId;
+  let lastResolvedSessionId = session.transcriptSessionId
+    ?? loadResolvedTranscriptId(session.sessionId)
+    ?? session.sessionId;
   const resolve = () => {
     const target = transcriptResolver.resolve(
       session.pid,
       session.cwd,
       session.sessionId,
       lastResolvedSessionId,
+      session.startedAt,
     );
 
     const changed = session.transcriptSessionId !== target.sessionId || session.transcriptPath !== target.path;
     lastResolvedSessionId = target.sessionId;
     session.transcriptSessionId = target.sessionId;
     session.transcriptPath = target.path;
+    storeResolvedTranscriptId(session.sessionId, target.sessionId);
     if (changed) {
       log.info(
         `Resolved transcript: ${session.sessionId.slice(0, 8)} pid=${session.pid} -> ${target.sessionId.slice(0, 8)} (${target.source})`,
@@ -79,10 +85,35 @@ export function activate(context: vscode.ExtensionContext): void {
   treeProvider.setTerminalMapper(terminalMapper);
   webviewProvider.setTerminalMapper(terminalMapper);
   const detectors = new Map<string, StateDetector>();
+  const resolvedTranscriptKey = 'resolvedTranscriptSessionIds';
+  const resolvedTranscriptIds = new Map<string, string>(
+    Object.entries(context.workspaceState.get<Record<string, string>>(resolvedTranscriptKey, {})),
+  );
 
   const bothProviders = {
     refresh() { treeProvider.refresh(); webviewProvider.refresh(); },
   };
+
+  function loadResolvedTranscriptId(sessionId: string): string | undefined {
+    return resolvedTranscriptIds.get(sessionId);
+  }
+
+  function persistResolvedTranscriptId(sessionId: string, transcriptSessionId: string): void {
+    if (resolvedTranscriptIds.get(sessionId) === transcriptSessionId) return;
+    resolvedTranscriptIds.set(sessionId, transcriptSessionId);
+    void context.workspaceState.update(
+      resolvedTranscriptKey,
+      Object.fromEntries(resolvedTranscriptIds),
+    );
+  }
+
+  function forgetResolvedTranscriptId(sessionId: string): void {
+    if (!resolvedTranscriptIds.delete(sessionId)) return;
+    void context.workspaceState.update(
+      resolvedTranscriptKey,
+      Object.fromEntries(resolvedTranscriptIds),
+    );
+  }
 
   const treeView = vscode.window.createTreeView('aeoVscCcSessions', { treeDataProvider: treeProvider });
 
@@ -110,7 +141,19 @@ export function activate(context: vscode.ExtensionContext): void {
 
   function ensureDetector(session: SessionInfo): void {
     if (!detectors.has(session.sessionId)) {
-      detectors.set(session.sessionId, createDetector(discovery, bothProviders, session, transcriptResolver, detectorPollInterval, log));
+      detectors.set(
+        session.sessionId,
+        createDetector(
+          discovery,
+          bothProviders,
+          session,
+          transcriptResolver,
+          detectorPollInterval,
+          loadResolvedTranscriptId,
+          persistResolvedTranscriptId,
+          log,
+        ),
+      );
     }
   }
 
@@ -130,6 +173,7 @@ export function activate(context: vscode.ExtensionContext): void {
         detector.dispose();
         detectors.delete(session.sessionId);
       }
+      forgetResolvedTranscriptId(session.sessionId);
       bothProviders.refresh();
     } else {
       bothProviders.refresh();
