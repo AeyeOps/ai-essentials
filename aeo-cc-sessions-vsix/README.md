@@ -36,6 +36,18 @@ Real-time state monitoring for Claude Code terminal sessions in VS Code.
 - VS Code 1.110.0 or later
 - Claude Code running in VS Code terminal sessions
 
+### Planned Enhanced Lineage Mode
+
+For the planned high-fidelity lineage and prompt-detection mode, this extension will require the dedicated Claude Code sidecar plugin to be installed and enabled so its hooks can emit authoritative per-session state.
+
+Plugin and skill installation guidance should follow the official Claude Code documentation:
+- Plugins: https://docs.claude.com/en/docs/claude-code/plugins
+- Skills: https://docs.claude.com/en/docs/claude-code/skills
+
+The sidecar JSONL output must be retention-managed so it does not grow without bound. The current roadmap target is:
+- per-process `state.json` retained only while active plus a short post-exit window
+- per-process `events.jsonl` pruned on age and capped in size
+
 ### Supported Environments
 
 - **WSL Remote** (stable + Insiders) — VS Code on Windows connecting to WSL. Full functionality via `/proc` filesystem.
