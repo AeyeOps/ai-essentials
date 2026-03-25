@@ -1,8 +1,8 @@
 {
   "name": "aeo-vsc-cc-sessions",
-  "displayName": "AEO VSC CC Sessions",
+  "displayName": "AEO CC Sessions",
   "description": "Real-time state monitoring for Claude Code terminal sessions in VS Code",
-  "version": "0.1.6",
+  "version": "0.2.1",
   "publisher": "AeyeOps",
   "license": "MIT",
   "engines": {
@@ -51,67 +51,72 @@
     "views": {
       "aeoVscCcSessionsPanel": [
         {
-          "id": "aeoVscCcSessions",
-          "name": "Sessions",
-          "when": "aeoVscCcSessions.viewMode != 'rich'"
-        },
-        {
           "id": "aeoVscCcSessionsRich",
           "type": "webview",
-          "name": "Sessions",
-          "when": "aeoVscCcSessions.viewMode == 'rich'"
+          "name": "Sessions"
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "aeoVscCcSessions",
-        "contents": "No Claude Code sessions found.\nStart a Claude Code session in the terminal to see it here."
-      }
-    ],
     "commands": [
       {
-        "command": "aeoVscCcSessions.showTreeView",
-        "title": "Tree View",
-        "icon": "$(list-tree)"
+        "command": "aeoVscCcSessions.installSidecarPlugin",
+        "title": "Install Claude Runtime",
+        "icon": "$(sparkle)"
       },
       {
-        "command": "aeoVscCcSessions.showRichView",
-        "title": "Rich View",
-        "icon": "$(open-preview)"
+        "command": "aeoVscCcSessions.sessionInfo",
+        "title": "Info"
+      },
+      {
+        "command": "aeoVscCcSessions.forkSession",
+        "title": "Fork Session"
+      },
+      {
+        "command": "aeoVscCcSessions.closeSession",
+        "title": "Close Session"
+      },
+      {
+        "command": "aeoVscCcSessions.copySession",
+        "title": "Copy"
+      },
+      {
+        "command": "aeoVscCcSessions.renameSessionEntry",
+        "title": "Rename Session Entry"
+      },
+      {
+        "command": "aeoVscCcSessions.newSession",
+        "title": "New Session"
+      },
+      {
+        "command": "aeoVscCcSessions.validateSidecarHealth",
+        "title": "Validate Claude Runtime"
+      },
+      {
+        "command": "aeoVscCcSessions.removeSidecarPlugin",
+        "title": "Remove Claude Runtime"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "aeoVscCcSessions.showRichView",
-          "when": "view == aeoVscCcSessions",
-          "group": "navigation@1"
-        },
-        {
-          "command": "aeoVscCcSessions.showTreeView",
-          "when": "view == aeoVscCcSessionsRich",
-          "group": "navigation@1"
+          "command": "aeoVscCcSessions.installSidecarPlugin",
+          "when": "view == aeoVscCcSessionsRich && aeoVscCcSessions.runtimeMissingPlugin",
+          "group": "navigation@0"
         }
       ]
     },
     "configuration": {
-      "title": "AEO VSC CC Sessions",
+      "title": "AEO CC Sessions",
       "properties": {
         "aeoVscCcSessions.refreshInterval": {
           "type": "number",
           "default": 3000,
-          "description": "TreeView refresh debounce interval (ms)"
+          "description": "Background refresh cadence in milliseconds"
         },
         "aeoVscCcSessions.detectorPollInterval": {
           "type": "number",
           "default": 2000,
           "description": "Transcript detection poll interval in milliseconds"
-        },
-        "aeoVscCcSessions.sortByActivity": {
-          "type": "boolean",
-          "default": true,
-          "description": "Sort active sessions before idle"
         },
         "aeoVscCcSessions.showExited": {
           "type": "boolean",

@@ -59,7 +59,7 @@ function handleSystem(record: JsonRecord, ctx: HandlerContext): void {
   const subtype = record['subtype'] as string ?? 'unknown';
   const state = SYSTEM_STATE_MAP[subtype];
   if (state) {
-    ctx.log.info(`${ctx.prefix} system/${subtype} → ${state}  (rec=${recTs(record)})`);
+    ctx.log.debug(`${ctx.prefix} system/${subtype} → ${state}  (rec=${recTs(record)})`);
     ctx.emit(state);
   } else {
     ctx.log.debug(`${ctx.prefix} system/${subtype} (no state change)  (rec=${recTs(record)})`);
@@ -106,17 +106,17 @@ function handleUser(record: JsonRecord, ctx: HandlerContext): void {
     const types = (content as ContentBlock[]).map(b => b.type ?? '?');
     const hasToolResult = types.includes('tool_result');
     if (hasToolResult) {
-      ctx.log.info(`${ctx.prefix} user/tool_result → thinking  blocks=[${types}]  (rec=${recTs(record)})`);
+      ctx.log.debug(`${ctx.prefix} user/tool_result → thinking  blocks=[${types}]  (rec=${recTs(record)})`);
       ctx.emit('thinking');
       return;
     }
-    ctx.log.info(`${ctx.prefix} user/array → thinking  blocks=[${types}]  (rec=${recTs(record)})`);
+    ctx.log.debug(`${ctx.prefix} user/array → thinking  blocks=[${types}]  (rec=${recTs(record)})`);
     ctx.emit('thinking');
     return;
   }
 
   if (typeof content === 'string') {
-    ctx.log.info(`${ctx.prefix} user/text → thinking  len=${content.length}  (rec=${recTs(record)})`);
+    ctx.log.debug(`${ctx.prefix} user/text → thinking  len=${content.length}  (rec=${recTs(record)})`);
     ctx.emit('thinking');
   } else {
     ctx.log.debug(`${ctx.prefix} user/unknown  content_type=${typeof content}  (rec=${recTs(record)})`);
@@ -144,7 +144,7 @@ function handleAssistant(record: JsonRecord, ctx: HandlerContext): void {
     const input = first.input as JsonRecord | undefined;
     const detail = extractToolDetail(toolName, input);
     const parallel = toolUses.length > 1 ? ` +${toolUses.length - 1} parallel` : '';
-    ctx.log.info(`${ctx.prefix} assistant/tool → tool  tools=[${names}]${parallel}  stop=${stopReason ?? '?'}  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
+    ctx.log.debug(`${ctx.prefix} assistant/tool → tool  tools=[${names}]${parallel}  stop=${stopReason ?? '?'}  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
     if (PROMPT_TOOLS.has(toolName)) {
       ctx.emit('prompt', toolName, detail);
       return;
@@ -157,14 +157,14 @@ function handleAssistant(record: JsonRecord, ctx: HandlerContext): void {
   } else if (stopReason === 'end_turn') {
     const promptDetail = extractAssistantApprovalPromptDetail(blocks);
     if (promptDetail) {
-      ctx.log.info(`${ctx.prefix} assistant/text → prompt  stop=end_turn  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
+      ctx.log.debug(`${ctx.prefix} assistant/text → prompt  stop=end_turn  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
       ctx.emit('prompt', undefined, promptDetail);
       return;
     }
-    ctx.log.info(`${ctx.prefix} assistant/text → idle  stop=end_turn  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
+    ctx.log.debug(`${ctx.prefix} assistant/text → idle  stop=end_turn  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
     ctx.emit('idle');
   } else {
-    ctx.log.info(`${ctx.prefix} assistant/text → thinking  stop=${stopReason ?? '?'}  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
+    ctx.log.debug(`${ctx.prefix} assistant/text → thinking  stop=${stopReason ?? '?'}  blocks=[${blockTypes}]  (rec=${recTs(record)})`);
     ctx.emit('thinking');
   }
 }
@@ -342,7 +342,7 @@ export class StateDetector implements vscode.Disposable {
   }
 
   private switchTo(newPath: string): void {
-    this.ctx.log.info(`${this.ctx.prefix} path_switch  ${path.basename(this.filePath)} → ${path.basename(newPath)}`);
+    this.ctx.log.debug(`${this.ctx.prefix} path_switch  ${path.basename(this.filePath)} → ${path.basename(newPath)}`);
     this.filePath = newPath;
     this.byteOffset = 0;
     this.lastSize = 0;
@@ -359,7 +359,7 @@ export class StateDetector implements vscode.Disposable {
   }
 
   start(): void {
-    this.ctx.log.info(`${this.ctx.prefix} started  path=${this.filePath}`);
+    this.ctx.log.debug(`${this.ctx.prefix} started  path=${this.filePath}`);
     this.tryWatch();
 
     this.pollInterval = setInterval(() => {
@@ -389,7 +389,7 @@ export class StateDetector implements vscode.Disposable {
         this.fsWatcher = undefined;
       });
       this.watchRetryLogged = false;
-      this.ctx.log.info(`${this.ctx.prefix} watch_ok`);
+      this.ctx.log.debug(`${this.ctx.prefix} watch_ok`);
     } catch {
       if (!this.watchRetryLogged) {
         this.ctx.log.debug(`${this.ctx.prefix} watch_pending (file not ready)`);

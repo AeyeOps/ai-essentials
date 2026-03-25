@@ -5,6 +5,46 @@ All notable changes to the AEO VSC CC Sessions extension will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-03-25
+
+### Added
+
+- Expandable Rich View diagnostics showing the extracted per-process and per-session fields inline
+- Session popup `Rename` action with persistent extension-owned local aliases keyed by Claude process identity
+
+### Changed
+
+- Removed Claude random `slug` values from the primary display-name fallback path
+- Runtime plugin detection now uses `claude plugins list --json` only at startup / explicit install flows, not during ordinary runtime refreshes
+- Periodic refresh scheduling now restarts its cadence after a refresh completes instead of using a wall-clock overlap interval
+- Rich View rows now use improved width accounting, overlay scrolling, and slightly roomier internal spacing
+- Activity text wraps again for long commands instead of clipping to a single line
+
+### Fixed
+
+- Restored the prompt / permission background pulse in Rich View
+- Eliminated the row-padding right-click popup flicker caused by a re-render on context menu open
+- Reduced false-positive stale-runtime warnings for long-running Claude tool activity
+- Removed runtime reliance on Claude plugin cache-layout inspection
+- Added stable per-process diagnostics fields such as `registrySessionId` for debugging session-id churn
+- Fixed the selected-row tint and right-edge badge clipping regressions in narrow panels
+
+## [0.2.0] - 2026-03-21
+
+### Added
+
+- Bundled Claude marketplace payload carrying the `aeo-vsc-cc-sessions-sidecar` plugin
+- Python hook dispatcher writing retention-managed per-process `state.json` and `events.jsonl` under `~/.claude/aeo-vsc-cc-sessions/`
+- Phase 0 validation evidence bundle under `docs/roadmap/validation/hook-sidecar/`
+- Sidecar install, validate, and remove commands in the VSIX command palette
+
+### Changed
+
+- Session rows are now keyed by Claude process identity (`pid:start_ticks`) instead of mutable `sessionId`
+- Runtime state prefers validated sidecar hook data ahead of transcript inference
+- Startup grace handling adds a `starting` state while waiting for the first sidecar file
+- Sidecar install automation uses the bundled marketplace path rather than a hardcoded cache layout
+
 ## [0.1.6] - 2026-03-20
 
 ### Added

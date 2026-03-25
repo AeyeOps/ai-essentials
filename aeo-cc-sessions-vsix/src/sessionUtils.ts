@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'node:path';
 import type { SessionInfo, SessionState } from './types.js';
 
 export function formatDuration(ms: number): string {
@@ -13,8 +14,63 @@ export function formatDuration(ms: number): string {
 }
 
 export const stateSortOrder: Record<SessionState, number> = {
-  prompt: 0, tool: 1, thinking: 2, permission: 3, compact: 4, idle: 5, error: 6, exited: 7,
+  starting: 0,
+  prompt: 1,
+  permission: 2,
+  tool: 3,
+  thinking: 4,
+  compact: 5,
+  idle: 6,
+  error: 7,
+  exited: 8,
 };
+
+export type RichSortMode = 'none' | 'name' | 'state';
+
+export function getSessionDisplayName(session: SessionInfo): string {
+  const candidates = [
+    session.localAlias,
+    session.customTitle,
+    session.agentName,
+    path.basename(session.cwd),
+    session.cwd,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+  return 'Session';
+}
+
+export function getSessionShortId(session: SessionInfo): string {
+  const currentId = session.sessionId || session.transcriptSessionId || '';
+  if (currentId.length <= 6) return currentId || 'unknown';
+  return `…${currentId.slice(-6)}`;
+}
+
+export function getSessionAgeText(session: SessionInfo): string {
+  return formatDuration(Math.max(0, Date.now() - session.startedAt));
+}
+
+export function getSubagentSummary(count: number | undefined): string | undefined {
+  if (!count || count <= 0) return undefined;
+  return count === 1 ? '1 subagent' : `${count} subagents`;
+}
+
+function isAnonymousWorkerCandidate(session: SessionInfo): boolean {
+  const hasPresentationIdentity = Boolean(
+    session.localAlias
+    || session.customTitle
+    || session.agentName
+    || session.slug,
+  );
+
+  if (hasPresentationIdentity) return false;
+  if ((session.activeSubagentCount ?? 0) > 0) return false;
+  if (session.state === 'exited') return false;
+  return true;
+}
 
 function compareSessionsStable(a: SessionInfo, b: SessionInfo): number {
   if (a.startedAt !== b.startedAt) {
@@ -29,12 +85,14 @@ function compareSessionsStable(a: SessionInfo, b: SessionInfo): number {
     return aTerminalIndex - bTerminalIndex;
   }
 
-  return a.sessionId.localeCompare(b.sessionId);
+  return a.processKey.localeCompare(b.processKey);
 }
 
 export function getStatusText(session: SessionInfo): string {
   const elapsed = Date.now() - session.stateChangedAt;
   switch (session.state) {
+    case 'starting':
+      return session.sidecarMessage ?? 'Starting Claude runtime...';
     case 'idle': return `Idle ${formatDuration(elapsed)}`;
     case 'thinking': return elapsed > 3000 ? `Thinking ${formatDuration(elapsed)}...` : 'Thinking...';
     case 'tool':
@@ -44,8 +102,10 @@ export function getStatusText(session: SessionInfo): string {
       if (session.toolDetail) return `Needs input: ${session.toolDetail}`;
       return 'Needs your input';
     case 'permission': return 'Waiting for permission...';
-    case 'compact': return 'Compacting context...';
-    case 'error': return 'Error';
+    case 'compact':
+      if (session.toolDetail) return `Compact: ${session.toolDetail}`;
+      return 'Compacting context...';
+    case 'error': return session.toolDetail ?? session.sidecarMessage ?? 'Runtime error';
     case 'exited': return 'Exited';
   }
 }
@@ -65,7 +125,7 @@ export function getFilteredSortedSessions(
 
   const terminalGroups = new Map<vscode.Terminal | string, SessionInfo[]>();
   for (const session of filtered) {
-    const terminalKey = session.terminal ?? `session:${session.sessionId}`;
+    const terminalKey = session.terminal ?? `session:${session.processKey}`;
     const group = terminalGroups.get(terminalKey) ?? [];
     group.push(session);
     terminalGroups.set(terminalKey, group);
@@ -76,7 +136,47 @@ export function getFilteredSortedSessions(
     group.sort(compareSessionsStable);
   }
 
+  const suppressedIds = new Set<string>();
+  for (const group of grouped) {
+    const parentHasActiveSubagents = group.some(session => (session.activeSubagentCount ?? 0) > 0);
+    if (!parentHasActiveSubagents) continue;
+
+    for (const session of group) {
+      if (isAnonymousWorkerCandidate(session)) {
+        suppressedIds.add(session.processKey);
+      }
+    }
+  }
+
   grouped.sort((a, b) => compareSessionsStable(a[0], b[0]));
 
-  return grouped.flat();
+  return grouped
+    .flat()
+    .filter(session => !suppressedIds.has(session.processKey));
+}
+
+export function getRichSortedSessions(
+  sessions: SessionInfo[],
+  mode: RichSortMode,
+): SessionInfo[] {
+  if (mode === 'none') return sessions;
+
+  const sorted = [...sessions];
+  if (mode === 'name') {
+    sorted.sort((a, b) => {
+      const diff = getSessionDisplayName(a).localeCompare(getSessionDisplayName(b));
+      if (diff !== 0) return diff;
+      return compareSessionsStable(a, b);
+    });
+    return sorted;
+  }
+
+  sorted.sort((a, b) => {
+    const stateDiff = stateSortOrder[a.state] - stateSortOrder[b.state];
+    if (stateDiff !== 0) return stateDiff;
+    const nameDiff = getSessionDisplayName(a).localeCompare(getSessionDisplayName(b));
+    if (nameDiff !== 0) return nameDiff;
+    return compareSessionsStable(a, b);
+  });
+  return sorted;
 }

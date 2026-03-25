@@ -28,16 +28,12 @@ echo "Environment: WSL=${IS_WSL} Linux=${IS_LINUX}"
 declare -a TARGETS=()
 
 if [[ "$IS_WSL" == true ]]; then
-  # WSL: Windows VS Code connects via Remote WSL, server lives on WSL side
-  # Resolve Windows %APPDATA% for Windows-side profile registration
-  # cmd.exe may emit UNC path warnings before the actual value — extract the C:\... path
-  WIN_APPDATA="$(cmd.exe /c "echo %APPDATA%" 2>&1 | grep -oP '[A-Z]:\\.*' | tr -d '\r')"
-  WIN_APPDATA_WSL="$(wslpath -u "$WIN_APPDATA")"
-  echo "Windows APPDATA: $WIN_APPDATA_WSL"
-
+  # WSL: Windows VS Code connects via Remote WSL, server lives on WSL side.
+  # Do not register Windows-side profiles here; that creates a ghost local-installed
+  # entry that points at nonexistent Windows extension directories.
   TARGETS+=(
-    "code-insiders|$HOME/.vscode-server-insiders|$HOME/.vscode-server-insiders/data/User/profiles|$WIN_APPDATA_WSL/Code - Insiders/User/profiles"
-    "code|$HOME/.vscode-server|$HOME/.vscode-server/data/User/profiles|$WIN_APPDATA_WSL/Code/User/profiles"
+    "code-insiders|$HOME/.vscode-server-insiders|$HOME/.vscode-server-insiders/data/User/profiles|"
+    "code|$HOME/.vscode-server|$HOME/.vscode-server/data/User/profiles|"
   )
 elif [[ "$IS_LINUX" == true ]]; then
   # Linux native: VS Code runs locally (no Windows-side profiles)
@@ -60,16 +56,13 @@ register_profiles() {
     local profile_ext="${profile}extensions.json"
     [[ -f "$profile_ext" ]] || continue
 
-    if grep -q "$EXT_ID" "$profile_ext"; then
-      echo "Already registered in ${label} profile $(basename "$profile")"
-    else
-      echo "Registering in ${label} profile $(basename "$profile") ..."
-      node -e "
+    echo "Reconciling ${label} profile $(basename "$profile") ..."
+    node -e "
 const fs = require('fs');
 const p = '$profile_ext';
 const d = JSON.parse(fs.readFileSync(p, 'utf8'));
-if (d.some(e => e.identifier?.id === '$EXT_ID')) process.exit(0);
-d.push({
+const idx = d.findIndex(e => e.identifier?.id === '$EXT_ID');
+const entry = {
   identifier: { id: '$EXT_ID' },
   version: '$VERSION',
   location: { '\$mid': 1, path: '$ext_dir', scheme: 'file' },
@@ -82,11 +75,25 @@ d.push({
     isBuiltin: false,
     pinned: false
   }
-});
+};
+if (idx >= 0) {
+  const existing = d[idx] || {};
+  const next = {
+    ...existing,
+    ...entry,
+    identifier: { ...(existing.identifier || {}), ...entry.identifier },
+    location: { ...(existing.location || {}), ...entry.location },
+    metadata: { ...(existing.metadata || {}), ...entry.metadata }
+  };
+  d[idx] = next;
+  fs.writeFileSync(p, JSON.stringify(d, null, '\t'));
+  console.log(existing.version === '$VERSION' && existing.relativeLocation === '$EXT_REL' ? 'Already current' : 'Updated');
+  process.exit(0);
+}
+d.push(entry);
 fs.writeFileSync(p, JSON.stringify(d, null, '\t'));
 console.log('Registered');
 "
-    fi
   done
 }
 
@@ -118,6 +125,13 @@ install_extension() {
     rm -rf "$ext_dir.tmp"
     echo "Extracted to $ext_dir"
   fi
+
+  # Step 1b: prune stale older versions of this extension from the same extension root
+  find "${ext_base}/extensions" -maxdepth 1 -mindepth 1 -type d -name "${EXT_ID}-*" ! -name "${EXT_REL}" -print0 | \
+    while IFS= read -r -d '' stale_dir; do
+      echo "Removing stale extension dir $stale_dir"
+      rm -rf "$stale_dir"
+    done
 
   # Step 2: Register in WSL-side profiles
   register_profiles "$wsl_profile_base" "$ext_dir" "WSL"

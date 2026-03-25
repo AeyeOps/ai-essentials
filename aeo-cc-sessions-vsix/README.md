@@ -8,8 +8,11 @@ Real-time state monitoring for Claude Code terminal sessions in VS Code.
 - **Transcript Handoff Tracking** — Follows Claude transcript rotation across `/clear`, resume flows, and related session handoffs so state stays attached to the active transcript
 - **Real-Time State** — Shows live session state: idle, thinking, tool use, waiting for permission, compacting, or exited
 - **Tool Details** — Displays which tool is running and what it's operating on (file name, command, search pattern, agent task description)
-- **Dual View Modes** — Switch between a standard TreeView and a rich HTML view with colored status dots and borders
 - **Click to Focus** — Click any session to jump to its terminal
+- **Rich View Labels** — Multi-line Rich View rows show session name, compacted path, short session id, session age, and current activity with active-terminal highlighting
+- **Expandable Diagnostics** — Expand any row to inspect the extracted per-process/session fields without leaving the panel
+- **Local Aliases** — Rename a live row entry in the popup menu with an extension-owned alias that persists for that process lifetime
+- **Rich View Actions** — Right-click a session for actions, or right-click blank space in Rich View to start a new Claude session in the loaded workspace folder
 - **Instance Scoping** — Only shows sessions belonging to the current VS Code window, not other windows or tmux sessions
 
 ## Session States
@@ -27,18 +30,21 @@ Real-time state monitoring for Claude Code terminal sessions in VS Code.
 
 - `aeoVscCcSessions.refreshInterval` — Refresh interval in milliseconds (default: `3000`)
 - `aeoVscCcSessions.detectorPollInterval` — Transcript detection poll interval in milliseconds (default: `2000`)
-- `aeoVscCcSessions.sortByActivity` — Sort active sessions before idle ones (default: `true`)
 - `aeoVscCcSessions.showExited` — Show exited sessions in the list (default: `false`)
-- `aeoVscCcSessions.debug` — Enable diagnostic logging to the AEO VSC CC Sessions output channel (default: `false`)
 
 ## Requirements
 
 - VS Code 1.110.0 or later
 - Claude Code running in VS Code terminal sessions
+- The `aeo-vsc-cc-sessions-sidecar` Claude plugin installed and enabled for authoritative hook state
 
-### Planned Enhanced Lineage Mode
+### Sidecar runtime mode
 
-For the planned high-fidelity lineage and prompt-detection mode, this extension will require the dedicated Claude Code sidecar plugin to be installed and enabled so its hooks can emit authoritative per-session state.
+High-fidelity lineage and prompt detection now depend on the `aeo-vsc-cc-sessions-sidecar` plugin from the `aeo-skill-marketplace` Claude marketplace. The VSIX install command first adds the marketplace from `https://github.com/AeyeOps/aeo-skill-marketplace.git`, then installs or updates the plugin. The VSIX exposes commands to:
+
+- install or update the sidecar plugin
+- validate sidecar health for the current machine and live sessions
+- remove or disable the sidecar plugin cleanly
 
 Plugin and skill installation guidance should follow the official Claude Code documentation:
 - Plugins: https://docs.claude.com/en/docs/claude-code/plugins
@@ -54,11 +60,15 @@ The sidecar JSONL output must be retention-managed so it does not grow without b
 - **Linux native** (stable + Insiders) — VS Code running directly on Linux. Full functionality via `/proc` filesystem.
 - **Windows native** — Graceful degradation. Session detection requires `/proc` and is not available on native Windows. An informational message is shown on first activation.
 
-## View Toggle
+## View
 
-Use the toolbar icons in the AEO VSC CC Sessions panel header to switch between:
-- **Tree View** — Standard VS Code tree with colored circle icons
-- **Rich View** — HTML view with two-line rows, colored left borders, pulsing dots for thinking state
+The Sessions panel uses the Rich View interface with multi-line rows, active-terminal grouping, and inline sort controls for `None`, `Name`, and `State`.
+
+## Rich View context menu
+
+- Right-click a session row in Rich View to open session actions.
+- Right-click a session row to rename that live entry with a local alias.
+- Right-click blank space in Rich View to open `New Session`, which launches `claude --debug --verbose` in the loaded workspace folder.
 
 ## License
 

@@ -17,6 +17,7 @@ interface HistoryRow {
 }
 
 interface TranscriptMeta {
+  agentName?: string;
   customTitle?: string;
   firstPromptId?: string;
   lastPromptId?: string;
@@ -39,6 +40,36 @@ export interface TranscriptResolution {
   path: string;
   sessionId: string;
   source: string;
+}
+
+export interface TranscriptSessionMetadata {
+  customTitle?: string;
+  firstPromptId?: string;
+  lastPromptId?: string;
+  path: string;
+  sessionId: string;
+  slug?: string;
+  startKind?: string;
+  startTsMs?: number;
+}
+
+export interface TranscriptLineageItem {
+  sessionId: string;
+  path?: string;
+  customTitle?: string;
+  agentName?: string;
+  slug?: string;
+  startKind?: string;
+  linkSource: 'current' | 'transcript-link' | 'resolver-edge';
+}
+
+export interface SessionPresentationMeta {
+  agentName?: string;
+  customTitle?: string;
+  path: string;
+  sessionId: string;
+  slug?: string;
+  startKind?: string;
 }
 
 const HISTORY_PATH = path.join(os.homedir(), '.claude', 'history.jsonl');
@@ -128,6 +159,41 @@ function readSuffix(filePath: string): string {
   }
 }
 
+function hydratePresentationMetaFromFullTranscript(filePath: string, meta: TranscriptMeta): void {
+  if (meta.customTitle && meta.agentName && meta.slug) return;
+
+  for (const line of readJsonlRows(filePath)) {
+    try {
+      const record = JSON.parse(line) as Record<string, unknown>;
+      if (!meta.slug && typeof record.slug === 'string') {
+        meta.slug = record.slug;
+      }
+      if (record.type === 'agent-name' && typeof record.agentName === 'string') {
+        meta.agentName = record.agentName;
+      }
+      if (record.type === 'custom-title' && typeof record.customTitle === 'string') {
+        meta.customTitle = record.customTitle;
+      }
+    } catch {
+      continue;
+    }
+  }
+}
+
+function extractRenamedSessionLabel(content: string): string | undefined {
+  const stdoutMatch = /Session renamed to:\s*([^<\n]+)/u.exec(content);
+  if (stdoutMatch?.[1]) {
+    return stdoutMatch[1].trim();
+  }
+
+  const argsMatch = /<command-name>\/rename<\/command-name>[\s\S]*?<command-args>([^<]+)<\/command-args>/u.exec(content);
+  if (argsMatch?.[1]) {
+    return argsMatch[1].trim();
+  }
+
+  return undefined;
+}
+
 function parseTranscriptMeta(filePath: string, mtimeMs: number): TranscriptMeta {
   const sessionId = path.basename(filePath, '.jsonl');
   const meta: TranscriptMeta = {
@@ -147,8 +213,20 @@ function parseTranscriptMeta(filePath: string, mtimeMs: number): TranscriptMeta 
         meta.slug = record.slug;
       }
 
+      if (!meta.agentName && record.type === 'agent-name' && typeof record.agentName === 'string') {
+        meta.agentName = record.agentName;
+      }
+
       if (!meta.customTitle && record.type === 'custom-title' && typeof record.customTitle === 'string') {
         meta.customTitle = record.customTitle;
+      }
+
+      if (record.type === 'system' && record.subtype === 'local_command' && typeof record.content === 'string') {
+        const renamed = extractRenamedSessionLabel(record.content);
+        if (renamed) {
+          meta.customTitle = renamed;
+          meta.agentName = renamed;
+        }
       }
 
       if (!meta.startKind && record.type === 'progress') {
@@ -188,7 +266,28 @@ function parseTranscriptMeta(filePath: string, mtimeMs: number): TranscriptMeta 
 
   const suffix = readSuffix(filePath);
   const suffixLines = suffix.split('\n').filter(Boolean);
-  const tailWindow = suffixLines.slice(Math.max(0, suffixLines.length - 50));
+  for (const line of suffixLines) {
+    try {
+      const record = JSON.parse(line) as Record<string, unknown>;
+      if (record.type === 'agent-name' && typeof record.agentName === 'string') {
+        meta.agentName = record.agentName;
+      }
+      if (record.type === 'custom-title' && typeof record.customTitle === 'string') {
+        meta.customTitle = record.customTitle;
+      }
+      if (record.type === 'system' && record.subtype === 'local_command' && typeof record.content === 'string') {
+        const renamed = extractRenamedSessionLabel(record.content);
+        if (renamed) {
+          meta.customTitle = renamed;
+          meta.agentName = renamed;
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  const tailWindow = suffixLines.slice(Math.max(0, suffixLines.length - 200));
   for (const line of tailWindow) {
     try {
       const record = JSON.parse(line) as Record<string, unknown>;
@@ -198,6 +297,10 @@ function parseTranscriptMeta(filePath: string, mtimeMs: number): TranscriptMeta 
     } catch {
       continue;
     }
+  }
+
+  if (!meta.customTitle || !meta.agentName) {
+    hydratePresentationMetaFromFullTranscript(filePath, meta);
   }
 
   return meta;
@@ -475,6 +578,141 @@ export class TranscriptResolver {
     }
 
     return seen;
+  }
+
+  getLineageStack(
+    cwd: string,
+    currentSessionId?: string,
+    currentTranscriptPath?: string,
+  ): TranscriptLineageItem[] {
+    const projectDir = transcriptProjectDir(cwd);
+    const project = this.loadProject(projectDir);
+    const transcriptSessionId = currentTranscriptPath ? path.basename(currentTranscriptPath, '.jsonl') : undefined;
+    const startId = [currentSessionId, transcriptSessionId]
+      .find((value): value is string => typeof value === 'string' && project.bySessionId.has(value));
+
+    if (!startId) {
+      return [];
+    }
+
+    const edges = this.buildEdges(cwd, project.bySessionId);
+    const reverseParents = new Map<string, Set<string>>();
+    for (const [parentId, childIds] of edges) {
+      for (const childId of childIds) {
+        const parents = reverseParents.get(childId) ?? new Set<string>();
+        parents.add(parentId);
+        reverseParents.set(childId, parents);
+      }
+    }
+
+    const stack: TranscriptLineageItem[] = [];
+    const seen = new Set<string>();
+    let currentId: string | undefined = startId;
+    let linkSource: TranscriptLineageItem['linkSource'] = 'current';
+
+    while (currentId && !seen.has(currentId)) {
+      seen.add(currentId);
+      const meta = project.bySessionId.get(currentId);
+      if (!meta) {
+        stack.push({ sessionId: currentId, linkSource });
+        break;
+      }
+
+      stack.push({
+        agentName: meta.agentName,
+        customTitle: meta.customTitle,
+        sessionId: meta.sessionId,
+        path: meta.path,
+        slug: meta.slug,
+        startKind: meta.startKind,
+        linkSource,
+      });
+
+      if (meta.previousTranscriptId && project.bySessionId.has(meta.previousTranscriptId)) {
+        currentId = meta.previousTranscriptId;
+        linkSource = 'transcript-link';
+        continue;
+      }
+
+      const parentIds = [...(reverseParents.get(meta.sessionId) ?? [])]
+        .filter(parentId => parentId !== meta.sessionId && !seen.has(parentId));
+      if (parentIds.length === 0) {
+        break;
+      }
+
+      parentIds.sort((a, b) => {
+        const aMeta = project.bySessionId.get(a);
+        const bMeta = project.bySessionId.get(b);
+        return (bMeta ? metaSortTs(bMeta) : 0) - (aMeta ? metaSortTs(aMeta) : 0);
+      });
+      currentId = parentIds[0];
+      linkSource = 'resolver-edge';
+    }
+
+    return stack;
+  }
+
+  getSessionMetadata(
+    cwd: string,
+    currentSessionId?: string,
+    currentTranscriptPath?: string,
+  ): TranscriptSessionMetadata | undefined {
+    const projectDir = transcriptProjectDir(cwd);
+    const project = this.loadProject(projectDir);
+    const transcriptSessionId = currentTranscriptPath ? path.basename(currentTranscriptPath, '.jsonl') : undefined;
+    const startId = [currentSessionId, transcriptSessionId]
+      .find((value): value is string => typeof value === 'string' && project.bySessionId.has(value));
+
+    if (!startId) {
+      return undefined;
+    }
+
+    const meta = project.bySessionId.get(startId);
+    if (!meta) {
+      return undefined;
+    }
+
+    return {
+      customTitle: meta.customTitle,
+      firstPromptId: meta.firstPromptId,
+      lastPromptId: meta.lastPromptId,
+      path: meta.path,
+      sessionId: meta.sessionId,
+      slug: meta.slug,
+      startKind: meta.startKind,
+      startTsMs: meta.startTsMs,
+    };
+  }
+
+  getSessionPresentation(
+    cwd: string,
+    currentSessionId?: string,
+    transcriptPath?: string,
+  ): SessionPresentationMeta | undefined {
+    const project = this.loadProject(transcriptProjectDir(cwd));
+    const candidateIds = [
+      currentSessionId,
+      transcriptPath ? path.basename(transcriptPath, '.jsonl') : undefined,
+    ].filter((value, index, values): value is string => (
+      typeof value === 'string'
+      && value.length > 0
+      && values.indexOf(value) === index
+    ));
+
+    for (const sessionId of candidateIds) {
+      const meta = project.bySessionId.get(sessionId);
+      if (!meta) continue;
+      return {
+        agentName: meta.agentName,
+        customTitle: meta.customTitle,
+        path: meta.path,
+        sessionId: meta.sessionId,
+        slug: meta.slug,
+        startKind: meta.startKind,
+      };
+    }
+
+    return undefined;
   }
 
   resolve(

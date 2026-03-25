@@ -1,4 +1,6 @@
 """Generate AEO VSC CC Sessions extension icon at 256x256."""
+from pathlib import Path
+
 from PIL import Image, ImageDraw, ImageFont
 
 SIZE = 256
@@ -70,9 +72,10 @@ aeo_w = bbox_aeo[2] - bbox_aeo[0]
 draw.text(((SIZE - aeo_w) // 2, aeo_y - bbox_aeo[1]), "AEO", fill=WHITE, font=font_sm)
 
 # Save at 256x256 (recommended) and 128x128 (minimum)
-img.save("/opt/aeo/ai-essentials/aeo-cc-sessions-vsix/media/icon.png")
+media_dir = Path(__file__).resolve().parent
+img.save(media_dir / "icon.png")
 
 img_128 = img.resize((128, 128), Image.LANCZOS)
-img_128.save("/opt/aeo/ai-essentials/aeo-cc-sessions-vsix/media/icon-128.png")
+img_128.save(media_dir / "icon-128.png")
 
 print(f"Generated icon.png (256x256) and icon-128.png (128x128)")

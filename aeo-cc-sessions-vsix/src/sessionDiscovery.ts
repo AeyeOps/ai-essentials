@@ -3,18 +3,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import type { SessionInfo, SessionEvent, SessionRegistryEntry } from './types.js';
+import { readCmdlineArgs, readProcStat } from './proc.js';
 
 export function getTranscriptPath(cwd: string, sessionId: string): string {
   const encoded = cwd.replace(/\//g, '-');
   return path.join(os.homedir(), '.claude', 'projects', encoded, `${sessionId}.jsonl`);
-}
-
-function readCmdlineArgs(pid: number): string[] | undefined {
-  try {
-    const raw = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf-8');
-    return raw.split('\0');
-  } catch { /* /proc not available */ }
-  return undefined;
 }
 
 /** Parse --resume <uuid> from /proc/<pid>/cmdline. */
@@ -175,30 +168,73 @@ export class SessionDiscovery implements vscode.Disposable {
         const entry: SessionRegistryEntry & { slug?: string } = JSON.parse(raw);
         if (!entry.pid || !entry.sessionId || !entry.cwd) continue;
 
-        seen.add(entry.sessionId);
         const alive = isPidAlive(entry.pid);
-        const existing = this.sessions.get(entry.sessionId);
+        const proc = readProcStat(entry.pid);
+        const existingExitedMatch = [...this.sessions.values()].find(session =>
+          session.pid === entry.pid
+          && session.sessionId === entry.sessionId
+          && session.cwd === entry.cwd
+          && session.state === 'exited',
+        );
+        if (!proc?.startTicks && !existingExitedMatch) continue;
+
+        const processKey = proc?.startTicks
+          ? `${entry.pid}:${proc.startTicks}`
+          : existingExitedMatch!.processKey;
+        seen.add(processKey);
+        const existing = proc?.startTicks
+          ? this.sessions.get(processKey)
+          : existingExitedMatch;
+
+        if (
+          proc?.startTicks
+          && existing
+          && existing.state !== 'exited'
+          && existing.startedAt !== entry.startedAt
+        ) {
+          continue;
+        }
 
         if (existing) {
+          const sessionChanged = existing.sessionId !== entry.sessionId;
+          const cwdChanged = existing.cwd !== entry.cwd;
+          const slugChanged = existing.slug !== (entry.slug || undefined);
+          existing.sessionId = entry.sessionId;
+          existing.registrySessionId = entry.sessionId;
+          existing.pid = entry.pid;
+          if (proc?.startTicks) {
+            existing.pidStartTicks = proc.startTicks;
+          }
+          existing.processKey = processKey;
+          existing.cwd = entry.cwd;
+          existing.startedAt = entry.startedAt;
+          existing.registrySlug = entry.slug || undefined;
+          existing.slug = entry.slug || undefined;
           if (!alive && existing.state !== 'exited') {
             existing.state = 'exited';
             existing.stateChangedAt = Date.now();
             this._onDidChangeSession.fire({ type: 'updated', session: existing });
-          }
-          if (entry.slug && !existing.slug) {
-            existing.slug = entry.slug;
+          } else if (sessionChanged || cwdChanged || slugChanged) {
+            this._onDidChangeSession.fire({ type: 'updated', session: existing });
           }
         } else {
           const session: SessionInfo = {
+            processKey,
             pid: entry.pid,
+            pidStartTicks: proc!.startTicks,
             sessionId: entry.sessionId,
+            registrySessionId: entry.sessionId,
+            registrySlug: entry.slug || undefined,
+            customTitle: undefined,
+            agentName: undefined,
             cwd: entry.cwd,
             startedAt: entry.startedAt,
+            observedAt: Date.now(),
             state: alive ? 'idle' : 'exited',
             stateChangedAt: Date.now(),
-            slug: entry.slug,
+            slug: entry.slug || undefined,
           };
-          this.sessions.set(entry.sessionId, session);
+          this.sessions.set(processKey, session);
           this._onDidChangeSession.fire({ type: 'added', session });
         }
       } catch {
