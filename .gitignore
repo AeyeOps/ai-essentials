@@ -30,6 +30,8 @@ uv.lock
 .idea/
 .vscode/
 .history/
+.vscode-test/
+output/
 
 # Claude Code local state
 .claude/plans/
