@@ -9,6 +9,7 @@
 #   - Kitty terminal (GPU-optimized for high-DPI/OLED)
 #   - Yazi file manager
 #   - CLI tools: fd, fzf, bat, eza, delta, ripgrep, glow, btop, ncdu, duf, httpie, yq, shellcheck, p7zip
+#   - tmux (with optional AEO config: C-Space prefix, true color, keyboard reference bar)
 #   - Zellij terminal multiplexer
 #   - bun (JS runtime) + direnv
 #   - Zsh + Oh-My-Zsh + Powerlevel10k
@@ -252,6 +253,80 @@ fi
         success "AEO Powerlevel10k theme preset applied"
     else
         info "Skipped AEO preset — p10k wizard will run on first Zsh launch"
+    fi
+fi
+
+# --- Tmux (install + optional AEO config) ---
+TMUX_CONFIG_APPLIED=false
+TMUX_FRESH_INSTALL=false
+TMUX_CONFIG_SRC="$SCRIPT_DIR/../configs/tmux"
+TMUX_DEST="$HOME/.config/tmux"
+
+info "Checking tmux..."
+if ! command_exists tmux; then
+    info "Installing tmux..."
+    sudo apt-get install -y tmux
+    TMUX_FRESH_INSTALL=true
+    success "tmux installed"
+else
+    TMUX_CURRENT="$(tmux -V)"
+    warn "tmux already installed: $TMUX_CURRENT"
+    read -r -p "Upgrade tmux to latest apt version? [y/N] " tmux_upgrade || tmux_upgrade="n"
+    if [[ "${tmux_upgrade,,}" == "y" ]]; then
+        sudo apt-get install -y --only-upgrade tmux
+        success "tmux upgraded: $(tmux -V)"
+    fi
+fi
+
+if command_exists tmux && [[ -f "$TMUX_CONFIG_SRC/tmux.conf" ]]; then
+    if $TMUX_FRESH_INSTALL; then
+        # Fresh install — no existing config to clobber, just deploy
+        mkdir -p "$TMUX_DEST/scripts"
+        cp "$TMUX_CONFIG_SRC/tmux.conf" "$TMUX_DEST/tmux.conf"
+        if [[ -d "$TMUX_CONFIG_SRC/scripts" ]]; then
+            cp "$TMUX_CONFIG_SRC/scripts/"* "$TMUX_DEST/scripts/"
+            chmod +x "$TMUX_DEST/scripts/"*.sh 2>/dev/null || true
+        fi
+        TMUX_CONFIG_APPLIED=true
+        success "AEO tmux config deployed -> ~/.config/tmux/"
+    else
+        # Existing install — ask before replacing
+        echo ""
+        echo -e "${BLUE}Tmux Configuration${NC}"
+        echo "  The AEO tmux config sets C-Space prefix (avoids Claude Code Ctrl+b conflict),"
+        echo "  true color, vi copy mode, OSC 52 clipboard, and a 3-line keyboard reference bar."
+        echo ""
+        echo -e "${YELLOW}  WARNING: This will REPLACE your existing tmux config if you have one.${NC}"
+        if [[ -f "$TMUX_DEST/tmux.conf" ]]; then
+            echo -e "  Existing config found: ${TMUX_DEST}/tmux.conf (will be backed up)"
+        elif [[ -f "$HOME/.tmux.conf" ]]; then
+            echo -e "  Existing config found: ~/.tmux.conf (will be backed up)"
+        fi
+        echo ""
+        read -r -p "Apply AEO tmux config? [y/N] " tmux_answer || tmux_answer="n"
+        if [[ "${tmux_answer,,}" == "y" ]]; then
+            # Back up existing configs
+            if [[ -f "$TMUX_DEST/tmux.conf" ]]; then
+                cp "$TMUX_DEST/tmux.conf" "$TMUX_DEST/tmux.conf.bak.$(date +%Y%m%d%H%M%S)"
+                info "Backed up existing ~/.config/tmux/tmux.conf"
+            fi
+            if [[ -f "$HOME/.tmux.conf" ]]; then
+                cp "$HOME/.tmux.conf" "$HOME/.tmux.conf.bak.$(date +%Y%m%d%H%M%S)"
+                info "Backed up existing ~/.tmux.conf"
+            fi
+
+            mkdir -p "$TMUX_DEST/scripts"
+            cp "$TMUX_CONFIG_SRC/tmux.conf" "$TMUX_DEST/tmux.conf"
+            if [[ -d "$TMUX_CONFIG_SRC/scripts" ]]; then
+                cp "$TMUX_CONFIG_SRC/scripts/"* "$TMUX_DEST/scripts/"
+                chmod +x "$TMUX_DEST/scripts/"*.sh 2>/dev/null || true
+            fi
+
+            TMUX_CONFIG_APPLIED=true
+            success "AEO tmux config deployed -> ~/.config/tmux/"
+        else
+            info "Skipped AEO tmux config"
+        fi
     fi
 fi
 
@@ -649,6 +724,11 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════
 # 7. ZELLIJ TERMINAL MULTIPLEXER
 # ═══════════════════════════════════════════════════════════════════════════
+ZELLIJ_CONFIG_APPLIED=false
+ZELLIJ_FRESH_INSTALL=false
+ZELLIJ_CONFIG_SRC="$SCRIPT_DIR/../configs/zellij"
+ZELLIJ_DEST="$HOME/.config/zellij"
+
 info "Checking Zellij..."
 if ! command_exists zellij; then
     info "Installing Zellij..."
@@ -660,9 +740,144 @@ if ! command_exists zellij; then
     curl -fSL "$ZELLIJ_URL" -o /tmp/zellij.tar.gz
     sudo tar -xzf /tmp/zellij.tar.gz -C /usr/local/bin/
     rm /tmp/zellij.tar.gz
+    ZELLIJ_FRESH_INSTALL=true
     success "Zellij installed"
 else
     warn "Zellij already installed"
+fi
+
+# zjstatus plugin (required by AEO layout for the Alt-key powerline status row)
+# `-s` test (exists AND non-empty) so a 0-byte download from a prior run gets repaired.
+if command_exists zellij; then
+    mkdir -p "$ZELLIJ_DEST/plugins"
+    if [[ ! -s "$ZELLIJ_DEST/plugins/zjstatus.wasm" ]]; then
+        if [[ -f "$ZELLIJ_DEST/plugins/zjstatus.wasm" ]]; then
+            info "zjstatus.wasm exists but is empty — re-downloading..."
+        else
+            info "Downloading zjstatus plugin..."
+        fi
+        ZJSTATUS_URL="https://github.com/dj95/zjstatus/releases/latest/download/zjstatus.wasm"
+        if curl -fSL --max-time 60 "$ZJSTATUS_URL" -o "$ZELLIJ_DEST/plugins/zjstatus.wasm" \
+            && [[ -s "$ZELLIJ_DEST/plugins/zjstatus.wasm" ]]; then
+            success "zjstatus.wasm installed -> ~/.config/zellij/plugins/"
+        else
+            warn "Failed to download zjstatus.wasm (or got empty file) — Alt-key status row will not render"
+        fi
+    else
+        warn "zjstatus.wasm already present"
+    fi
+fi
+
+# zjwidth sidecar plugin (required by AEO layout: width-aware Alt-bar via {pipe_altbar})
+# `-s` test guards against deploying a 0-byte wasm if the repo build was mid-flight.
+if command_exists zellij; then
+    if [[ -s "$ZELLIJ_CONFIG_SRC/plugins/zjwidth.wasm" ]]; then
+        cp "$ZELLIJ_CONFIG_SRC/plugins/zjwidth.wasm" "$ZELLIJ_DEST/plugins/zjwidth.wasm"
+        if [[ -s "$ZELLIJ_DEST/plugins/zjwidth.wasm" ]]; then
+            success "zjwidth.wasm installed -> ~/.config/zellij/plugins/"
+        else
+            warn "zjwidth.wasm copied but deployed file is empty — Alt-key bar will be empty"
+        fi
+    elif [[ -f "$ZELLIJ_CONFIG_SRC/plugins/zjwidth.wasm" ]]; then
+        warn "zjwidth.wasm in repo at $ZELLIJ_CONFIG_SRC/plugins/ is empty (0 bytes) — skipping deploy"
+    else
+        warn "zjwidth.wasm not found in repo at $ZELLIJ_CONFIG_SRC/plugins/ — Alt-key bar will be empty"
+    fi
+fi
+
+# Pre-seed zellij plugin permissions so users don't get prompted on first
+# session for AEO-deployed plugins. Idempotently merges into permissions.kdl;
+# preserves any existing grants for other plugins.
+if command_exists zellij && command_exists python3; then
+    python3 - <<'PYEOF'
+import os
+import re
+from pathlib import Path
+
+HOME = Path(os.environ["HOME"])
+PATH = HOME / ".cache/zellij/permissions.kdl"
+PATH.parent.mkdir(parents=True, exist_ok=True)
+PLUGINS_DIR = str(HOME / ".config/zellij/plugins")
+
+GRANTS = {
+    f"{PLUGINS_DIR}/zjstatus.wasm": [
+        "ReadApplicationState",
+        "ChangeApplicationState",
+        "RunCommands",
+    ],
+    f"{PLUGINS_DIR}/zjwidth.wasm": [
+        "ReadApplicationState",
+        "ChangeApplicationState",
+        "MessageAndLaunchOtherPlugins",
+    ],
+}
+
+existing = PATH.read_text() if PATH.exists() else ""
+
+def remove_block(text, path):
+    pattern = re.compile(
+        r'^\s*"' + re.escape(path) + r'"\s*\{[^}]*\}\s*\n?',
+        re.MULTILINE | re.DOTALL,
+    )
+    return pattern.sub("", text)
+
+def block_for(path, perms):
+    inner = "\n".join(f"    {p}" for p in perms)
+    return f'"{path}" {{\n{inner}\n}}\n'
+
+result = existing
+for path, perms in GRANTS.items():
+    result = remove_block(result, path)
+    if result and not result.endswith("\n"):
+        result += "\n"
+    result += block_for(path, perms)
+
+PATH.write_text(result)
+PYEOF
+    success "Pre-seeded zellij plugin permissions for zjstatus and zjwidth"
+fi
+
+if command_exists zellij && [[ -f "$ZELLIJ_CONFIG_SRC/config.kdl" ]]; then
+    if $ZELLIJ_FRESH_INSTALL; then
+        # Fresh install — no existing config to clobber, just deploy
+        mkdir -p "$ZELLIJ_DEST/layouts"
+        cp "$ZELLIJ_CONFIG_SRC/config.kdl" "$ZELLIJ_DEST/config.kdl"
+        cp "$ZELLIJ_CONFIG_SRC/layouts/default.kdl" "$ZELLIJ_DEST/layouts/default.kdl"
+        ZELLIJ_CONFIG_APPLIED=true
+        success "AEO zellij config deployed -> ~/.config/zellij/"
+    else
+        # Existing install — ask before replacing
+        echo ""
+        echo -e "${BLUE}Zellij Configuration${NC}"
+        echo "  The AEO zellij config provides the p10k-aeo theme, custom keybinds"
+        echo "  (Alt+w SIGWINCH redraw, Alt+arrows navigation, Alt+p pane group),"
+        echo "  and a powerline Alt-key reference status row via the zjstatus plugin."
+        echo ""
+        echo -e "${YELLOW}  WARNING: This will REPLACE your existing zellij config if you have one.${NC}"
+        if [[ -f "$ZELLIJ_DEST/config.kdl" ]]; then
+            echo -e "  Existing config found: ${ZELLIJ_DEST}/config.kdl (will be backed up)"
+        fi
+        echo ""
+        read -r -p "Apply AEO zellij config? [y/N] " zellij_answer || zellij_answer="n"
+        if [[ "${zellij_answer,,}" == "y" ]]; then
+            STAMP="$(date +%Y%m%d%H%M%S)"
+            if [[ -f "$ZELLIJ_DEST/config.kdl" ]]; then
+                cp "$ZELLIJ_DEST/config.kdl" "$ZELLIJ_DEST/config.kdl.bak.$STAMP"
+                info "Backed up existing ~/.config/zellij/config.kdl"
+            fi
+            if [[ -f "$ZELLIJ_DEST/layouts/default.kdl" ]]; then
+                cp "$ZELLIJ_DEST/layouts/default.kdl" "$ZELLIJ_DEST/layouts/default.kdl.bak.$STAMP"
+                info "Backed up existing ~/.config/zellij/layouts/default.kdl"
+            fi
+            mkdir -p "$ZELLIJ_DEST/layouts"
+            cp "$ZELLIJ_CONFIG_SRC/config.kdl" "$ZELLIJ_DEST/config.kdl"
+            cp "$ZELLIJ_CONFIG_SRC/layouts/default.kdl" "$ZELLIJ_DEST/layouts/default.kdl"
+            ZELLIJ_CONFIG_APPLIED=true
+            success "AEO zellij config deployed -> ~/.config/zellij/"
+        else
+            info "Skipped AEO zellij config"
+        fi
+    fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -914,6 +1129,7 @@ echo "  - Kitty terminal (GPU-optimized, OLED theme, 4K ready)"
 echo "  - Yazi file manager"
 echo "  - CLI tools: ripgrep, fd, fzf, bat, eza, delta, glow, btop, ncdu, duf, httpie, yq, shellcheck, p7zip"
 echo "  - Terminal media: ffmpeg, mpv, chafa"
+echo "  - tmux (with optional AEO config)"
 echo "  - Zellij terminal multiplexer"
 echo "  - Bun JS runtime"
 echo "  - direnv"
@@ -938,6 +1154,9 @@ if $P10K_PRESET_APPLIED; then
     echo "  - AEO Powerlevel10k theme pre-configured (no wizard needed)"
 else
     echo "  - On first Zsh launch, Powerlevel10k will run its configuration wizard"
+fi
+if $TMUX_CONFIG_APPLIED; then
+    echo "  - AEO tmux config applied (C-Space prefix, 3-line status bar)"
 fi
 echo "  - Set your terminal font to 'MesloLGS NF' for proper icons"
 echo ""

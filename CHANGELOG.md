@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.26] - 2026-04-26
+
+### Added
+- Zellij default layout (`configs/zellij/layouts/default.kdl`): built-in tab-bar + status-bar (preserves Ctrl submodes) plus a 1-row zjstatus alt-bar sized at runtime by the zjwidth sidecar
+- zjwidth sidecar plugin source tree (`configs/zellij/plugins-src/zjwidth/`) and built artifact (`configs/zellij/plugins/zjwidth.wasm`)
+- `setup-ai-dev-stack.sh`: deploy step for `zjwidth.wasm` from repo to `~/.config/zellij/plugins/`
+- `setup-ai-dev-stack.sh`: idempotent permission pre-seeding for `zjstatus.wasm` and `zjwidth.wasm` in `~/.cache/zellij/permissions.kdl`, preserving any existing entries — avoids interactive Allow? prompts on first session
+
+### Changed
+- `configs/zellij/config.kdl`: substantial rewrite to drive the new layout and zjstatus integration
+- `setup-ai-dev-stack.sh` zjstatus deploy: switched existence check from `-f` to `-s` so a 0-byte download from a prior run is repaired on rerun; added post-curl size validation chained via `&&`
+- `setup-ai-dev-stack.sh` zjwidth deploy: `-s` source validation, three-state branching (good / empty / missing) with distinct warnings, and a defensive post-cp size check
+
+### Fixed
+- `update_cli_ubuntu.sh`: source nvm with `${NVM_DIR:=$HOME/.nvm}` fallback so non-interactive shells (hooks, cron, `env -i`) don't fall through to stale system Node and produce EACCES errors on npm-managed CLIs (e.g. Gemini)
+- `update_cli_ubuntu.sh`: `handle_crush` now resolves `$GOBIN` / `$(go env GOPATH)/bin` and prepends to `PATH` inside the function, so non-interactive runs detect installed crush instead of reporting "Updated from none to unknown"
+
 ## [0.0.25] - 2026-02-17
 
 ### Added

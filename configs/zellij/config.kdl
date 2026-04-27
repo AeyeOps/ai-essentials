@@ -1,3 +1,6 @@
+// AEO zellij configuration — keybindings, theme, and session settings
+// Layout: layouts/default.kdl  (provides Alt-key powerline status row via zjstatus)
+
 keybinds clear-defaults=true {
     locked {
         bind "Ctrl g" { SwitchToMode "normal"; }
@@ -155,6 +158,12 @@ keybinds clear-defaults=true {
         bind "Alt p" { TogglePaneInGroup; }
         bind "Alt Shift p" { ToggleGroupMarking; }
         bind "Ctrl q" { Quit; }
+        bind "Alt w" {
+            Run "sh" "-c" "kill -SIGWINCH $PPID" {
+                floating true
+                hold_on_close false
+            }
+        }
     }
     shared_except "locked" "move" {
         bind "Ctrl h" { SwitchToMode "move"; }
@@ -243,6 +252,134 @@ keybinds clear-defaults=true {
         bind "z" { ToggleFocusFullscreen; SwitchToMode "normal"; }
     }
 }
+themes {
+    p10k-aeo {
+        text_unselected {
+            base 90 90 90
+            background 28 28 28
+            emphasis_0 215 175 0
+            emphasis_1 0 175 255
+            emphasis_2 0 179 179
+            emphasis_3 215 135 95
+        }
+        text_selected {
+            base 215 175 0
+            background 50 41 27
+            emphasis_0 0 175 255
+            emphasis_1 95 215 0
+            emphasis_2 0 179 179
+            emphasis_3 215 135 95
+        }
+        ribbon_selected {
+            base 215 175 0
+            background 50 41 27
+            emphasis_0 0 175 255
+            emphasis_1 95 215 0
+            emphasis_2 0 179 179
+            emphasis_3 255 255 255
+        }
+        ribbon_unselected {
+            base 90 90 90
+            background 50 41 27
+            emphasis_0 215 175 0
+            emphasis_1 0 135 175
+            emphasis_2 0 179 179
+            emphasis_3 90 90 90
+        }
+        table_title {
+            base 215 175 0
+            background 28 28 28
+            emphasis_0 0 175 255
+            emphasis_1 0 179 179
+            emphasis_2 95 215 0
+            emphasis_3 215 135 95
+        }
+        table_cell_selected {
+            base 215 175 0
+            background 50 41 27
+            emphasis_0 0 175 255
+            emphasis_1 95 215 0
+            emphasis_2 0 179 179
+            emphasis_3 255 255 255
+        }
+        table_cell_unselected {
+            base 90 90 90
+            background 28 28 28
+            emphasis_0 215 175 0
+            emphasis_1 0 135 175
+            emphasis_2 0 179 179
+            emphasis_3 90 90 90
+        }
+        list_selected {
+            base 215 175 0
+            background 50 41 27
+            emphasis_0 0 175 255
+            emphasis_1 95 215 0
+            emphasis_2 0 179 179
+            emphasis_3 255 255 255
+        }
+        list_unselected {
+            base 90 90 90
+            background 28 28 28
+            emphasis_0 215 175 0
+            emphasis_1 0 135 175
+            emphasis_2 0 179 179
+            emphasis_3 90 90 90
+        }
+        frame_selected {
+            base 0 175 255
+            background 28 28 28
+            emphasis_0 215 175 0
+            emphasis_1 0 179 179
+            emphasis_2 95 215 0
+            emphasis_3 215 135 95
+        }
+        frame_unselected {
+            base 68 68 68
+            background 28 28 28
+            emphasis_0 90 90 90
+            emphasis_1 90 90 90
+            emphasis_2 90 90 90
+            emphasis_3 90 90 90
+        }
+        frame_highlight {
+            base 215 175 0
+            background 28 28 28
+            emphasis_0 0 175 255
+            emphasis_1 95 215 0
+            emphasis_2 0 179 179
+            emphasis_3 255 255 255
+        }
+        exit_code_success {
+            base 95 215 0
+            background 28 28 28
+            emphasis_0 0 179 179
+            emphasis_1 215 175 0
+            emphasis_2 0 175 255
+            emphasis_3 90 90 90
+        }
+        exit_code_error {
+            base 215 0 0
+            background 28 28 28
+            emphasis_0 215 95 95
+            emphasis_1 215 175 0
+            emphasis_2 0 175 255
+            emphasis_3 90 90 90
+        }
+        multiplayer_user_colors {
+            player_1 0 175 255
+            player_2 215 175 0
+            player_3 0 179 179
+            player_4 215 135 95
+            player_5 95 215 0
+            player_6 175 135 215
+            player_7 0 135 175
+            player_8 215 95 95
+            player_9 207
+            player_10 215
+        }
+    }
+}
 
 // Plugin aliases - can be used to change the implementation of Zellij
 // changing these requires a restart to take effect
@@ -258,6 +395,7 @@ plugins {
     status-bar location="zellij:status-bar"
     strider location="zellij:strider"
     tab-bar location="zellij:tab-bar"
+    zjwidth location="file:~/.config/zellij/plugins/zjwidth.wasm"
     welcome-screen location="zellij:session-manager" {
         welcome_screen true
     }
@@ -267,6 +405,7 @@ plugins {
 // eg. "file:/path/to/my-plugin.wasm"
 // eg. "https://example.com/my-plugin.wasm"
 load_plugins {
+    zjwidth
 }
 web_client {
     font "monospace"
@@ -277,7 +416,7 @@ web_client {
 //   - true
 //   - false (Default)
 // 
-// simplified_ui true
+simplified_ui false
  
 // Choose the theme that is specified in the themes section.
 // Default: default
@@ -287,12 +426,12 @@ theme "p10k-aeo"
 // Choose the base input mode of zellij.
 // Default: normal
 // 
-// default_mode "locked"
+default_mode "normal"
  
 // Choose the path to the default shell that zellij will use for opening new panes
 // Default: $SHELL
 // 
-// default_shell "fish"
+default_shell "zsh"
  
 // Choose the path to override cwd that zellij will use for opening new panes
 // 
@@ -301,7 +440,7 @@ theme "p10k-aeo"
 // The name of the default layout to load on startup
 // Default: "default"
 // 
-// default_layout "compact"
+default_layout "default"
  
 // The folder in which Zellij will look for layouts
 // (Requires restart)
@@ -320,14 +459,14 @@ theme "p10k-aeo"
 //   - true (default)
 //   - false
 // 
-// mouse_mode false
+mouse_mode true
  
 // Toggle having pane frames around the panes
 // Options:
 //   - true (default, enabled)
 //   - false
 // 
-// pane_frames false
+pane_frames false
  
 // When attaching to an existing session with other users,
 // should the session be mirrored (true)
@@ -344,7 +483,7 @@ theme "p10k-aeo"
 //   - detach (Default)
 //   - quit
 // 
-// on_force_close "quit"
+on_force_close "detach"
  
 // Configure the scroll back buffer size
 // This is the number of lines zellij stores for each pane in the scroll back
@@ -410,20 +549,20 @@ theme "p10k-aeo"
 //   - true (default)
 //   - false
 // 
-// session_serialization false
+session_serialization true
  
 // Whether pane viewports are serialized along with the session, default is false
 // Options:
 //   - true
 //   - false (default)
 // 
-// serialize_pane_viewport false
+serialize_pane_viewport true
  
 // Scrollback lines to serialize along with the pane viewport when serializing sessions, 0
 // defaults to the scrollback size. If this number is higher than the scrollback size, it will
 // also default to the scrollback size. This does nothing if `serialize_pane_viewport` is not true.
 // 
-// scrollback_lines_to_serialize 10000
+scrollback_lines_to_serialize 10000
  
 // Enable or disable the rendering of styled and colored underlines (undercurl).
 // May need to be disabled for certain unsupported terminals
@@ -434,7 +573,7 @@ theme "p10k-aeo"
  
 // How often in seconds sessions are serialized
 // 
-// serialization_interval 10000
+serialization_interval 60
  
 // Enable or disable writing of session metadata to disk (if disabled, other sessions might not know
 // metadata info on this session)
@@ -503,7 +642,7 @@ theme "p10k-aeo"
 // Whether to show tips on startup
 // Default: true
 // 
-// show_startup_tips false
+show_startup_tips false
  
 // Whether to show release notes on first version run
 // Default: true
@@ -530,59 +669,3 @@ theme "p10k-aeo"
 // can be useful for removing wrappers around commands
 // Note: be sure to escape backslashes and similar characters properly
 // post_command_discovery_hook "echo $RESURRECT_COMMAND | sed <your_regex_here>"
-
-// ═══════════════════════════════════════════════════════════════════════════
-// AEO Modern Theme - matches Powerlevel10k classic darkest (color 234)
-// ═══════════════════════════════════════════════════════════════════════════
-// Color reference (from p10k):
-//   Background 234: #1c1c1c (28 28 28)
-//   Warm brown:     #32291B (50 41 27) - ribbon/menu backgrounds
-//   Gold 178:       #d7af00 (215 175 0) - accents, modified state
-//   Blue 31:        #0087af (0 135 175) - directories
-//   Cyan 39:        #00afff (0 175 255) - anchors, highlights
-//   Green 76:       #5fd700 (95 215 0) - clean/success state
-//   Teal:           #00b3b3 (0 179 179) - alternative success
-//   Red 160:        #d70000 (215 0 0) - errors
-//   Dim grey:       #5a5a5a (90 90 90) - muted text
-// ═══════════════════════════════════════════════════════════════════════════
-themes {
-    p10k-aeo {
-        // Bare text in UI (status indicators, modifiers)
-        text_unselected { base 90 90 90; background 28 28 28; emphasis_0 215 175 0; emphasis_1 0 175 255; emphasis_2 0 179 179; emphasis_3 215 135 95; }
-        text_selected { base 215 175 0; background 50 41 27; emphasis_0 0 175 255; emphasis_1 95 215 0; emphasis_2 0 179 179; emphasis_3 215 135 95; }
-
-        // Ribbons: tabs, mode indicators, bottom menu
-        ribbon_unselected { base 90 90 90; background 50 41 27; emphasis_0 215 175 0; emphasis_1 0 135 175; emphasis_2 0 179 179; emphasis_3 90 90 90; }
-        ribbon_selected { base 215 175 0; background 50 41 27; emphasis_0 0 175 255; emphasis_1 95 215 0; emphasis_2 0 179 179; emphasis_3 255 255 255; }
-
-        // Pane frames/borders
-        frame_unselected { base 68 68 68; background 28 28 28; emphasis_0 90 90 90; emphasis_1 90 90 90; emphasis_2 90 90 90; emphasis_3 90 90 90; }
-        frame_selected { base 0 175 255; background 28 28 28; emphasis_0 215 175 0; emphasis_1 0 179 179; emphasis_2 95 215 0; emphasis_3 215 135 95; }
-        frame_highlight { base 215 175 0; background 28 28 28; emphasis_0 0 175 255; emphasis_1 95 215 0; emphasis_2 0 179 179; emphasis_3 255 255 255; }
-
-        // Tables (plugin UIs, session manager)
-        table_title { base 215 175 0; background 28 28 28; emphasis_0 0 175 255; emphasis_1 0 179 179; emphasis_2 95 215 0; emphasis_3 215 135 95; }
-        table_cell_unselected { base 90 90 90; background 28 28 28; emphasis_0 215 175 0; emphasis_1 0 135 175; emphasis_2 0 179 179; emphasis_3 90 90 90; }
-        table_cell_selected { base 215 175 0; background 50 41 27; emphasis_0 0 175 255; emphasis_1 95 215 0; emphasis_2 0 179 179; emphasis_3 255 255 255; }
-
-        // Lists/menus
-        list_unselected { base 90 90 90; background 28 28 28; emphasis_0 215 175 0; emphasis_1 0 135 175; emphasis_2 0 179 179; emphasis_3 90 90 90; }
-        list_selected { base 215 175 0; background 50 41 27; emphasis_0 0 175 255; emphasis_1 95 215 0; emphasis_2 0 179 179; emphasis_3 255 255 255; }
-
-        // Exit code indicators
-        exit_code_success { base 95 215 0; background 28 28 28; emphasis_0 0 179 179; emphasis_1 215 175 0; emphasis_2 0 175 255; emphasis_3 90 90 90; }
-        exit_code_error { base 215 0 0; background 28 28 28; emphasis_0 215 95 95; emphasis_1 215 175 0; emphasis_2 0 175 255; emphasis_3 90 90 90; }
-
-        // Multiplayer user colors (if using collaborative features)
-        multiplayer_user_colors {
-            player_1 0 175 255
-            player_2 215 175 0
-            player_3 0 179 179
-            player_4 215 135 95
-            player_5 95 215 0
-            player_6 175 135 215
-            player_7 0 135 175
-            player_8 215 95 95
-        }
-    }
-}

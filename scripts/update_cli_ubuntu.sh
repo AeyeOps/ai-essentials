@@ -52,8 +52,10 @@ declare -a SUMMARY
 ##########
 
 # Source nvm if available so npm/node resolve to the nvm-managed versions
-# rather than the (often stale) system packages.
-if [[ -n "${NVM_DIR:-}" && -s "$NVM_DIR/nvm.sh" ]]; then
+# rather than the (often stale) system packages. Fall back to ~/.nvm when
+# NVM_DIR isn't exported (non-interactive shells, hooks, cron, etc.).
+: "${NVM_DIR:=$HOME/.nvm}"
+if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   # shellcheck source=/dev/null
   source "$NVM_DIR/nvm.sh"
   nvm use --silent default 2>/dev/null \
@@ -276,6 +278,16 @@ handle_crush() {
     echo -e "${YELLOW}Go toolchain not found; skipping Crush update.${NC}"
     record_summary "Crush" "Skipped: Go toolchain not installed"
     return
+  fi
+
+  # Ensure Go's install target ($GOBIN or $GOPATH/bin) is on PATH so we can
+  # detect freshly installed binaries even when the caller's shell doesn't
+  # export it.
+  local go_bin
+  go_bin=$(go env GOBIN 2>/dev/null)
+  [[ -z "$go_bin" ]] && go_bin="$(go env GOPATH 2>/dev/null)/bin"
+  if [[ -n "$go_bin" && ":$PATH:" != *":$go_bin:"* ]]; then
+    PATH="$go_bin:$PATH"
   fi
 
   if command -v crush &>/dev/null; then

@@ -1,0 +1,11 @@
+# Strip the build host's $HOME and rust sysroot from panic-handler path
+# constants in the wasm. Without this, the resulting binary leaks the
+# builder's username via debug strings even with `strip = true` in Cargo.toml.
+# /home and /Users cover Linux + macOS hosts; the rust sysroot remap is set
+# at build time via env var since we can't reference $RUSTUP_HOME here.
+[build]
+rustflags = [
+    "--remap-path-prefix=/home=/builder",
+    "--remap-path-prefix=/Users=/builder",
+    "--remap-path-prefix=/root=/builder",
+]
