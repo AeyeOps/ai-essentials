@@ -37,6 +37,7 @@ output/
 .claude/plans/
 .claude/audio/
 .claude/nous/
+.claude/worktrees/
 
 # Local-only roadmap drafts (committed entries are explicitly tracked)
 docs/roadmap/
