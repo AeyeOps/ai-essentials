@@ -118,93 +118,127 @@ if $IS_WSL; then
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 1. ZSH + OH-MY-ZSH + POWERLEVEL10K + FONTS
+# 1. AEO SHELL STACK (zsh + oh-my-zsh + Powerlevel10k + fonts + .zshenv)
 # ═══════════════════════════════════════════════════════════════════════════
-
-# Install Nerd Fonts (MesloLGS NF - recommended for Powerlevel10k)
-info "Checking Nerd Fonts (MesloLGS NF)..."
+SHELL_STACK_APPLIED=false
+P10K_PRESET_APPLIED=false
 FONT_DIR="$HOME/.local/share/fonts"
-# Check for any MesloLGS font file (handles both space and %20 in filenames)
-if ! ls "$FONT_DIR"/MesloLGS* &>/dev/null; then
-    info "Installing MesloLGS Nerd Font..."
-    mkdir -p "$FONT_DIR"
-    curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf" -o "$FONT_DIR/MesloLGS NF Regular.ttf"
-    curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold.ttf" -o "$FONT_DIR/MesloLGS NF Bold.ttf"
-    curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Italic.ttf" -o "$FONT_DIR/MesloLGS NF Italic.ttf"
-    curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold%20Italic.ttf" -o "$FONT_DIR/MesloLGS NF Bold Italic.ttf"
-    fc-cache -f
-    success "MesloLGS Nerd Font installed"
-else
-    warn "MesloLGS Nerd Font already installed"
-fi
-
-info "Checking Zsh..."
-if ! command_exists zsh; then
-    info "Installing Zsh..."
-    sudo apt-get install -y zsh
-    success "Zsh installed"
-else
-    warn "Zsh already installed: $(zsh --version)"
-fi
-
-info "Checking Oh-My-Zsh..."
-if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
-    info "Installing Oh-My-Zsh..."
-    RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"  # silent: output piped to sh
-    success "Oh-My-Zsh installed"
-else
-    warn "Oh-My-Zsh already installed"
-fi
-
-info "Checking Powerlevel10k..."
-P10K_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k"
-if [[ ! -d "$P10K_DIR" ]]; then
-    info "Installing Powerlevel10k..."
-    git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$P10K_DIR"
-    success "Powerlevel10k installed"
-else
-    warn "Powerlevel10k already installed"
-fi
-
-# Install essential zsh plugins
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+P10K_DIR="$ZSH_CUSTOM/themes/powerlevel10k"
+P10K_PRESET_SRC="$SCRIPT_DIR/../configs/zsh/p10k-aeo.zsh"
+ZSHENV_SRC="$SCRIPT_DIR/../configs/zsh/zshenv"
+ZSHENV_DEST="$HOME/.zshenv"
 
-info "Checking zsh-autosuggestions..."
-if [[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]]; then
-    info "Installing zsh-autosuggestions..."
-    git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
-    success "zsh-autosuggestions installed"
+# Pre-check: silently skip the bundle when everything is already in place.
+_shell_stack_ready=true
+command_exists zsh || _shell_stack_ready=false
+[[ -d "$HOME/.oh-my-zsh" ]] || _shell_stack_ready=false
+[[ -d "$P10K_DIR" ]] || _shell_stack_ready=false
+[[ -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]] || _shell_stack_ready=false
+[[ -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]] || _shell_stack_ready=false
+ls "$FONT_DIR"/MesloLGS* &>/dev/null || _shell_stack_ready=false
+[[ -f "$HOME/.p10k.zsh" ]] || _shell_stack_ready=false
+grep -q 'Enable Powerlevel10k instant prompt' ~/.zshrc 2>/dev/null || _shell_stack_ready=false
+grep -q 'oh-my-zsh\.sh' ~/.zshrc 2>/dev/null || _shell_stack_ready=false
+[[ -f "$ZSHENV_DEST" ]] || _shell_stack_ready=false
+grep -q 'NVM_DIR' "$ZSHENV_DEST" 2>/dev/null || _shell_stack_ready=false
+grep -q 'BUN_INSTALL' "$ZSHENV_DEST" 2>/dev/null || _shell_stack_ready=false
+
+if $_shell_stack_ready; then
+    warn "AEO Shell stack already installed and configured"
+    SHELL_STACK_APPLIED=true
+    P10K_PRESET_APPLIED=true
 else
-    warn "zsh-autosuggestions already installed"
-fi
+    echo ""
+    echo -e "${BLUE}AEO Shell Stack${NC}"
+    echo "  Installs: zsh + Oh-My-Zsh + Powerlevel10k + MesloLGS Nerd Font"
+    echo "  Plugins: zsh-autosuggestions, zsh-syntax-highlighting"
+    echo "  Config:  AEO p10k preset, ~/.zshenv (NVM + Bun env exports)"
+    echo ""
+    read -r -p "Install AEO Shell stack? [Y/n] " shell_stack_answer || shell_stack_answer="n"
+    if [[ "${shell_stack_answer,,}" != "n" ]]; then
+        # ── MesloLGS Nerd Font ──
+        info "Checking Nerd Fonts (MesloLGS NF)..."
+        if ! ls "$FONT_DIR"/MesloLGS* &>/dev/null; then
+            info "Installing MesloLGS Nerd Font..."
+            mkdir -p "$FONT_DIR"
+            curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf" -o "$FONT_DIR/MesloLGS NF Regular.ttf"
+            curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold.ttf" -o "$FONT_DIR/MesloLGS NF Bold.ttf"
+            curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Italic.ttf" -o "$FONT_DIR/MesloLGS NF Italic.ttf"
+            curl -fSL "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold%20Italic.ttf" -o "$FONT_DIR/MesloLGS NF Bold Italic.ttf"
+            fc-cache -f
+            success "MesloLGS Nerd Font installed"
+        else
+            warn "MesloLGS Nerd Font already installed"
+        fi
 
-info "Checking zsh-syntax-highlighting..."
-if [[ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]]; then
-    info "Installing zsh-syntax-highlighting..."
-    git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
-    success "zsh-syntax-highlighting installed"
-else
-    warn "zsh-syntax-highlighting already installed"
-fi
+        # ── zsh ──
+        info "Checking Zsh..."
+        if ! command_exists zsh; then
+            info "Installing Zsh..."
+            sudo apt-get install -y zsh
+            success "Zsh installed"
+        else
+            warn "Zsh already installed: $(zsh --version)"
+        fi
 
-# Set Zsh as default shell if not already
-if [[ "$SHELL" != *"zsh"* ]]; then
-    info "Setting Zsh as default shell..."
-    if sudo chsh -s "$(which zsh)" "$USER" 2>/dev/null; then
-        success "Zsh set as default shell (log out and back in to apply)"
-    else
-        warn "Could not change default shell (run 'chsh -s $(which zsh)' manually)"
-    fi
-else
-    warn "Zsh is already the default shell"
-fi
+        # ── Oh-My-Zsh ──
+        info "Checking Oh-My-Zsh..."
+        if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+            info "Installing Oh-My-Zsh..."
+            RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"  # silent: output piped to sh
+            success "Oh-My-Zsh installed"
+        else
+            warn "Oh-My-Zsh already installed"
+        fi
 
-# Configure .zshrc with oh-my-zsh wiring (theme + plugins).
-# Single guard: if oh-my-zsh.sh is not sourced anywhere, append the full block.
-# Otherwise (standard omz .zshrc), use sed to update the existing ZSH_THEME and plugins lines.
-if ! grep -q 'oh-my-zsh\.sh' ~/.zshrc 2>/dev/null; then
-    info "Wiring oh-my-zsh into .zshrc (theme + plugins + source)..."
-    cat >> ~/.zshrc << 'EOF'
+        # ── Powerlevel10k ──
+        info "Checking Powerlevel10k..."
+        if [[ ! -d "$P10K_DIR" ]]; then
+            info "Installing Powerlevel10k..."
+            git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$P10K_DIR"
+            success "Powerlevel10k installed"
+        else
+            warn "Powerlevel10k already installed"
+        fi
+
+        # ── zsh plugins ──
+        info "Checking zsh-autosuggestions..."
+        if [[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]]; then
+            info "Installing zsh-autosuggestions..."
+            git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+            success "zsh-autosuggestions installed"
+        else
+            warn "zsh-autosuggestions already installed"
+        fi
+
+        info "Checking zsh-syntax-highlighting..."
+        if [[ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]]; then
+            info "Installing zsh-syntax-highlighting..."
+            git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
+            success "zsh-syntax-highlighting installed"
+        else
+            warn "zsh-syntax-highlighting already installed"
+        fi
+
+        # ── chsh to zsh ──
+        if [[ "$SHELL" != *"zsh"* ]]; then
+            info "Setting Zsh as default shell..."
+            if sudo chsh -s "$(which zsh)" "$USER" 2>/dev/null; then
+                success "Zsh set as default shell (log out and back in to apply)"
+            else
+                warn "Could not change default shell (run 'chsh -s $(which zsh)' manually)"
+            fi
+        else
+            warn "Zsh is already the default shell"
+        fi
+
+        # ── .zshrc oh-my-zsh wiring (theme + plugins + source) ──
+        # Single guard: if oh-my-zsh.sh is not sourced anywhere, append the full block.
+        # Otherwise (standard omz .zshrc), use sed to update the existing ZSH_THEME and plugins lines.
+        if ! grep -q 'oh-my-zsh\.sh' ~/.zshrc 2>/dev/null; then
+            info "Wiring oh-my-zsh into .zshrc (theme + plugins + source)..."
+            cat >> ~/.zshrc << 'EOF'
 
 # ─── Oh-My-Zsh ─────────────────────────────────────────────────────────────────
 export ZSH="$HOME/.oh-my-zsh"
@@ -212,204 +246,198 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
 source $ZSH/oh-my-zsh.sh
 EOF
-    success "Appended oh-my-zsh block to ~/.zshrc"
-else
-    # oh-my-zsh is already sourced — adjust theme + plugin list in place.
-    if ! grep -q 'ZSH_THEME="powerlevel10k/powerlevel10k"' ~/.zshrc 2>/dev/null; then
-        info "Setting Powerlevel10k theme in .zshrc..."
-        if grep -q '^ZSH_THEME=' ~/.zshrc 2>/dev/null; then
-            sed -i 's|^ZSH_THEME=.*|ZSH_THEME="powerlevel10k/powerlevel10k"|' ~/.zshrc
+            success "Appended oh-my-zsh block to ~/.zshrc"
         else
-            echo 'ZSH_THEME="powerlevel10k/powerlevel10k"' >> ~/.zshrc
-        fi
-    fi
-    if ! grep -q 'zsh-autosuggestions' ~/.zshrc 2>/dev/null; then
-        info "Adding zsh-autosuggestions to .zshrc plugins..."
-        sed -i 's/^plugins=(\(.*\))/plugins=(\1 zsh-autosuggestions)/' ~/.zshrc 2>/dev/null || true
-    fi
-    if ! grep -q 'zsh-syntax-highlighting' ~/.zshrc 2>/dev/null; then
-        info "Adding zsh-syntax-highlighting to .zshrc plugins..."
-        sed -i 's/^plugins=(\(.*\))/plugins=(\1 zsh-syntax-highlighting)/' ~/.zshrc 2>/dev/null || true
-    fi
-fi
-
-# --- Apply AEO Powerlevel10k preset (skip wizard on first launch) ---
-P10K_PRESET_APPLIED=false
-P10K_PRESET_SRC="$SCRIPT_DIR/../configs/zsh/p10k-aeo.zsh"
-if [[ -f "$P10K_PRESET_SRC" ]]; then
-    echo ""
-    echo -e "${BLUE}Powerlevel10k Configuration${NC}"
-    echo "  The AEO preset provides a ready-to-use terminal prompt theme."
-    echo "  If you skip this, the p10k configuration wizard will run on first Zsh launch."
-    echo ""
-    read -r -p "Apply AEO Powerlevel10k theme preset? [Y/n] " p10k_answer || p10k_answer="n"
-    if [[ "${p10k_answer,,}" != "n" ]]; then
-        # Deploy p10k config (skip if user already has one)
-        if [[ ! -f "$HOME/.p10k.zsh" ]]; then
-            cp "$P10K_PRESET_SRC" "$HOME/.p10k.zsh"
-            success "Copied AEO p10k preset → ~/.p10k.zsh"
-        else
-            warn "~/.p10k.zsh already exists (keeping existing config)"
+            if ! grep -q 'ZSH_THEME="powerlevel10k/powerlevel10k"' ~/.zshrc 2>/dev/null; then
+                info "Setting Powerlevel10k theme in .zshrc..."
+                if grep -q '^ZSH_THEME=' ~/.zshrc 2>/dev/null; then
+                    sed -i 's|^ZSH_THEME=.*|ZSH_THEME="powerlevel10k/powerlevel10k"|' ~/.zshrc
+                else
+                    echo 'ZSH_THEME="powerlevel10k/powerlevel10k"' >> ~/.zshrc
+                fi
+            fi
+            if ! grep -q 'zsh-autosuggestions' ~/.zshrc 2>/dev/null; then
+                info "Adding zsh-autosuggestions to .zshrc plugins..."
+                sed -i 's/^plugins=(\(.*\))/plugins=(\1 zsh-autosuggestions)/' ~/.zshrc 2>/dev/null || true
+            fi
+            if ! grep -q 'zsh-syntax-highlighting' ~/.zshrc 2>/dev/null; then
+                info "Adding zsh-syntax-highlighting to .zshrc plugins..."
+                sed -i 's/^plugins=(\(.*\))/plugins=(\1 zsh-syntax-highlighting)/' ~/.zshrc 2>/dev/null || true
+            fi
         fi
 
-        # Prepend instant prompt cache block to top of .zshrc (p10k requirement)
-        if ! grep -q 'Enable Powerlevel10k instant prompt' ~/.zshrc 2>/dev/null; then
-            info "Adding Powerlevel10k instant prompt to top of .zshrc..."
-            INSTANT_PROMPT_BLOCK='# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+        # ── AEO Powerlevel10k preset ──
+        _p10k_mutated=false
+        if [[ -f "$P10K_PRESET_SRC" ]]; then
+            if [[ ! -f "$HOME/.p10k.zsh" ]]; then
+                cp "$P10K_PRESET_SRC" "$HOME/.p10k.zsh"
+                success "Copied AEO p10k preset → ~/.p10k.zsh"
+                _p10k_mutated=true
+            else
+                warn "~/.p10k.zsh already exists (keeping existing config)"
+            fi
+
+            if ! grep -q 'Enable Powerlevel10k instant prompt' ~/.zshrc 2>/dev/null; then
+                info "Adding Powerlevel10k instant prompt to top of .zshrc..."
+                INSTANT_PROMPT_BLOCK='# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 '
-            # Prepend to .zshrc (preserve permissions)
-            _tmpfile=$(mktemp)
-            printf '%s' "$INSTANT_PROMPT_BLOCK" | cat - ~/.zshrc > "$_tmpfile"
-            chmod --reference="$HOME/.zshrc" "$_tmpfile"
-            mv "$_tmpfile" ~/.zshrc
-            success "Instant prompt block added to top of .zshrc"
+                _tmpfile=$(mktemp)
+                printf '%s' "$INSTANT_PROMPT_BLOCK" | cat - ~/.zshrc > "$_tmpfile"
+                chmod --reference="$HOME/.zshrc" "$_tmpfile"
+                mv "$_tmpfile" ~/.zshrc
+                success "Instant prompt block added to top of .zshrc"
+                _p10k_mutated=true
+            fi
+
+            P10K_PRESET_APPLIED=true
+            if $_p10k_mutated; then
+                success "AEO Powerlevel10k theme preset applied"
+            fi
         fi
 
-        P10K_PRESET_APPLIED=true
-        success "AEO Powerlevel10k theme preset applied"
-    else
-        info "Skipped AEO preset — p10k wizard will run on first Zsh launch"
-    fi
-fi
-
-# --- .zshenv (NVM + Bun env exports for non-interactive shells) ---
-ZSHENV_SRC="$SCRIPT_DIR/../configs/zsh/zshenv"
-ZSHENV_DEST="$HOME/.zshenv"
-
-if [[ -f "$ZSHENV_SRC" ]]; then
-    echo ""
-    echo -e "${BLUE}Zsh Environment File (~/.zshenv)${NC}"
-    echo "  Adds NVM and Bun env exports so Node/npm/bun are available in"
-    echo "  non-interactive shells (CI, VS Code tasks, ssh host cmd)."
-    echo ""
-    if [[ -f "$ZSHENV_DEST" ]]; then
-        echo -e "${YELLOW}  An existing ~/.zshenv was found. It will be backed up before any changes.${NC}"
-        echo "  Missing NVM_DIR / BUN_INSTALL blocks will be appended; existing content is preserved."
-    else
-        echo "  No existing ~/.zshenv found. The AEO template will be installed fresh."
-    fi
-    echo ""
-    read -r -p "Deploy AEO ~/.zshenv env exports? [Y/n] " zshenv_answer || zshenv_answer="n"
-    if [[ "${zshenv_answer,,}" != "n" ]]; then
-        if [[ ! -f "$ZSHENV_DEST" ]]; then
-            cp "$ZSHENV_SRC" "$ZSHENV_DEST"
-            success "Deployed AEO ~/.zshenv (NVM + Bun env exports)"
-        else
-            # Only back up if something actually needs appending.
-            _needs_nvm=false
-            _needs_bun=false
-            grep -q 'NVM_DIR' "$ZSHENV_DEST" 2>/dev/null || _needs_nvm=true
-            grep -q 'BUN_INSTALL' "$ZSHENV_DEST" 2>/dev/null || _needs_bun=true
-            if [[ "$_needs_nvm" == true || "$_needs_bun" == true ]]; then
-                cp "$ZSHENV_DEST" "$ZSHENV_DEST.bak.$(date +%Y%m%d%H%M%S)"
-                info "Backed up existing ~/.zshenv"
-                if [[ "$_needs_nvm" == true ]]; then
-                    info "Appending NVM block to ~/.zshenv..."
-                    cat >> "$ZSHENV_DEST" << 'EOF'
+        # ── ~/.zshenv (NVM + Bun env exports) ──
+        if [[ -f "$ZSHENV_SRC" ]]; then
+            if [[ ! -f "$ZSHENV_DEST" ]]; then
+                cp "$ZSHENV_SRC" "$ZSHENV_DEST"
+                success "Deployed AEO ~/.zshenv (NVM + Bun env exports)"
+            else
+                _needs_nvm=false
+                _needs_bun=false
+                grep -q 'NVM_DIR' "$ZSHENV_DEST" 2>/dev/null || _needs_nvm=true
+                grep -q 'BUN_INSTALL' "$ZSHENV_DEST" 2>/dev/null || _needs_bun=true
+                if [[ "$_needs_nvm" == true || "$_needs_bun" == true ]]; then
+                    cp "$ZSHENV_DEST" "$ZSHENV_DEST.bak.$(date +%Y%m%d%H%M%S)"
+                    info "Backed up existing ~/.zshenv"
+                    if [[ "$_needs_nvm" == true ]]; then
+                        info "Appending NVM block to ~/.zshenv..."
+                        cat >> "$ZSHENV_DEST" << 'EOF'
 
 # ─── NVM ───────────────────────────────────────────────────────────────────────
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 EOF
-                fi
-                if [[ "$_needs_bun" == true ]]; then
-                    info "Appending Bun block to ~/.zshenv..."
-                    cat >> "$ZSHENV_DEST" << 'EOF'
+                    fi
+                    if [[ "$_needs_bun" == true ]]; then
+                        info "Appending Bun block to ~/.zshenv..."
+                        cat >> "$ZSHENV_DEST" << 'EOF'
 
 # ─── Bun ───────────────────────────────────────────────────────────────────────
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 EOF
+                    fi
+                    success "AEO ~/.zshenv env exports applied"
                 fi
-                success "AEO ~/.zshenv env exports applied"
-            else
-                warn "AEO blocks already present in ~/.zshenv — no changes needed"
             fi
+        else
+            warn "configs/zsh/zshenv not found — skipping .zshenv deployment"
         fi
+
+        SHELL_STACK_APPLIED=true
+        success "AEO Shell stack installed"
     else
-        info "Skipped ~/.zshenv deployment"
+        info "Skipped AEO Shell stack"
     fi
-else
-    warn "configs/zsh/zshenv not found — skipping .zshenv deployment"
 fi
 
-# --- Tmux (install + optional AEO config) ---
+# ═══════════════════════════════════════════════════════════════════════════
+# 2. AEO TMUX + CONFIG (install/upgrade tmux + deploy AEO config)
+# ═══════════════════════════════════════════════════════════════════════════
+TMUX_INSTALLED=false
 TMUX_CONFIG_APPLIED=false
-TMUX_FRESH_INSTALL=false
 TMUX_CONFIG_SRC="$SCRIPT_DIR/../configs/tmux"
 TMUX_DEST="$HOME/.config/tmux"
 
-info "Checking tmux..."
-if ! command_exists tmux; then
-    info "Installing tmux..."
-    sudo apt-get install -y tmux
-    TMUX_FRESH_INSTALL=true
-    success "tmux installed"
-else
-    TMUX_CURRENT="$(tmux -V)"
-    warn "tmux already installed: $TMUX_CURRENT"
-    read -r -p "Upgrade tmux to latest apt version? [y/N] " tmux_upgrade || tmux_upgrade="n"
-    if [[ "${tmux_upgrade,,}" == "y" ]]; then
-        sudo apt-get install -y --only-upgrade tmux
-        success "tmux upgraded: $(tmux -V)"
-    fi
+_tmux_md5_match() {
+    local src="$1" dst="$2"
+    [[ -f "$src" && -f "$dst" ]] || return 1
+    [[ "$(md5sum "$src" | awk '{print $1}')" == "$(md5sum "$dst" | awk '{print $1}')" ]]
+}
+
+# Pre-check: silently skip when tmux is installed, no apt upgrade pending,
+# tmux.conf md5 matches the repo, and every repo script has a matching deployed md5.
+_tmux_bundle_ready=true
+command_exists tmux || _tmux_bundle_ready=false
+if $_tmux_bundle_ready && apt list --upgradable 2>/dev/null | grep -q '^tmux/'; then
+    _tmux_bundle_ready=false
+fi
+if $_tmux_bundle_ready && [[ -f "$TMUX_CONFIG_SRC/tmux.conf" ]]; then
+    _tmux_md5_match "$TMUX_CONFIG_SRC/tmux.conf" "$TMUX_DEST/tmux.conf" \
+        || _tmux_bundle_ready=false
+fi
+if $_tmux_bundle_ready && [[ -d "$TMUX_CONFIG_SRC/scripts" ]]; then
+    while IFS= read -r -d '' _src; do
+        _dst="$TMUX_DEST/scripts/$(basename "$_src")"
+        if ! _tmux_md5_match "$_src" "$_dst"; then
+            _tmux_bundle_ready=false
+            break
+        fi
+    done < <(find "$TMUX_CONFIG_SRC/scripts" -type f -print0)
 fi
 
-if command_exists tmux && [[ -f "$TMUX_CONFIG_SRC/tmux.conf" ]]; then
-    if $TMUX_FRESH_INSTALL; then
-        # Fresh install — no existing config to clobber, just deploy
-        mkdir -p "$TMUX_DEST/scripts"
-        cp "$TMUX_CONFIG_SRC/tmux.conf" "$TMUX_DEST/tmux.conf"
-        if [[ -d "$TMUX_CONFIG_SRC/scripts" ]]; then
-            cp "$TMUX_CONFIG_SRC/scripts/"* "$TMUX_DEST/scripts/"
-            chmod +x "$TMUX_DEST/scripts/"*.sh 2>/dev/null || true
+if $_tmux_bundle_ready; then
+    warn "AEO tmux + config already installed and up to date"
+    TMUX_INSTALLED=true
+    TMUX_CONFIG_APPLIED=true
+else
+    echo ""
+    echo -e "${BLUE}AEO Tmux + Config${NC}"
+    echo "  Installs/upgrades tmux and deploys the AEO config:"
+    echo "  C-Space prefix (avoids Claude Code Ctrl+b conflict), true color,"
+    echo "  vi copy mode, OSC 52 clipboard, 3-line keyboard reference bar,"
+    echo "  plus tmux/scripts/."
+    if [[ -f "$TMUX_DEST/tmux.conf" ]] || [[ -f "$HOME/.tmux.conf" ]]; then
+        echo ""
+        echo -e "${YELLOW}  WARNING: This will REPLACE your existing tmux config (backup will be made).${NC}"
+    fi
+    echo ""
+    read -r -p "Install AEO tmux + config? [y/N] " tmux_answer || tmux_answer="n"
+    if [[ "${tmux_answer,,}" == "y" ]]; then
+        # Install or upgrade tmux
+        if ! command_exists tmux; then
+            info "Installing tmux..."
+            sudo apt-get install -y tmux
+            success "tmux installed"
+        else
+            TMUX_CURRENT="$(tmux -V)"
+            warn "tmux already installed: $TMUX_CURRENT"
+            if apt list --upgradable 2>/dev/null | grep -q '^tmux/'; then
+                info "Upgrading tmux..."
+                sudo apt-get install -y --only-upgrade tmux
+                success "tmux upgraded: $(tmux -V)"
+            fi
         fi
-        TMUX_CONFIG_APPLIED=true
-        success "AEO tmux config deployed -> ~/.config/tmux/"
-    else
-        # Existing install — ask before replacing
-        echo ""
-        echo -e "${BLUE}Tmux Configuration${NC}"
-        echo "  The AEO tmux config sets C-Space prefix (avoids Claude Code Ctrl+b conflict),"
-        echo "  true color, vi copy mode, OSC 52 clipboard, and a 3-line keyboard reference bar."
-        echo ""
-        echo -e "${YELLOW}  WARNING: This will REPLACE your existing tmux config if you have one.${NC}"
-        if [[ -f "$TMUX_DEST/tmux.conf" ]]; then
-            echo -e "  Existing config found: ${TMUX_DEST}/tmux.conf (will be backed up)"
-        elif [[ -f "$HOME/.tmux.conf" ]]; then
-            echo -e "  Existing config found: ~/.tmux.conf (will be backed up)"
-        fi
-        echo ""
-        read -r -p "Apply AEO tmux config? [y/N] " tmux_answer || tmux_answer="n"
-        if [[ "${tmux_answer,,}" == "y" ]]; then
-            # Back up existing configs
-            if [[ -f "$TMUX_DEST/tmux.conf" ]]; then
-                cp "$TMUX_DEST/tmux.conf" "$TMUX_DEST/tmux.conf.bak.$(date +%Y%m%d%H%M%S)"
+        TMUX_INSTALLED=true
+
+        # Deploy AEO config
+        if [[ -f "$TMUX_CONFIG_SRC/tmux.conf" ]]; then
+            STAMP="$(date +%Y%m%d%H%M%S)"
+            mkdir -p "$TMUX_DEST/scripts"
+            if [[ -f "$TMUX_DEST/tmux.conf" ]] \
+                && ! _tmux_md5_match "$TMUX_CONFIG_SRC/tmux.conf" "$TMUX_DEST/tmux.conf"; then
+                cp "$TMUX_DEST/tmux.conf" "$TMUX_DEST/tmux.conf.bak.$STAMP"
                 info "Backed up existing ~/.config/tmux/tmux.conf"
             fi
             if [[ -f "$HOME/.tmux.conf" ]]; then
-                cp "$HOME/.tmux.conf" "$HOME/.tmux.conf.bak.$(date +%Y%m%d%H%M%S)"
+                cp "$HOME/.tmux.conf" "$HOME/.tmux.conf.bak.$STAMP"
                 info "Backed up existing ~/.tmux.conf"
             fi
-
-            mkdir -p "$TMUX_DEST/scripts"
             cp "$TMUX_CONFIG_SRC/tmux.conf" "$TMUX_DEST/tmux.conf"
             if [[ -d "$TMUX_CONFIG_SRC/scripts" ]]; then
                 cp "$TMUX_CONFIG_SRC/scripts/"* "$TMUX_DEST/scripts/"
                 chmod +x "$TMUX_DEST/scripts/"*.sh 2>/dev/null || true
             fi
-
             TMUX_CONFIG_APPLIED=true
             success "AEO tmux config deployed -> ~/.config/tmux/"
-        else
-            info "Skipped AEO tmux config"
         fi
+    else
+        info "Skipped AEO tmux + config"
     fi
 fi
 
@@ -805,74 +833,111 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 7. ZELLIJ TERMINAL MULTIPLEXER
+# 7. AEO ZELLIJ + CONFIG (install zellij + plugins + AEO config)
 # ═══════════════════════════════════════════════════════════════════════════
+ZELLIJ_INSTALLED=false
 ZELLIJ_CONFIG_APPLIED=false
-ZELLIJ_FRESH_INSTALL=false
 ZELLIJ_CONFIG_SRC="$SCRIPT_DIR/../configs/zellij"
 ZELLIJ_DEST="$HOME/.config/zellij"
 
-info "Checking Zellij..."
-if ! command_exists zellij; then
-    info "Installing Zellij..."
-    info "  Fetching latest version from GitHub API..."
-    ZELLIJ_VERSION=$(curl --max-time 30 https://api.github.com/repos/zellij-org/zellij/releases/latest | grep -oP '"tag_name": "\K[^"]+')
-    info "  Version: $ZELLIJ_VERSION"
-    ZELLIJ_URL="https://github.com/zellij-org/zellij/releases/download/${ZELLIJ_VERSION}/zellij-${ARCH_ALT}-unknown-linux-musl.tar.gz"
-    info "  Downloading: $ZELLIJ_URL"
-    curl -fSL "$ZELLIJ_URL" -o /tmp/zellij.tar.gz
-    sudo tar -xzf /tmp/zellij.tar.gz -C /usr/local/bin/
-    rm /tmp/zellij.tar.gz
-    ZELLIJ_FRESH_INSTALL=true
-    success "Zellij installed"
+_zellij_md5_match() {
+    local src="$1" dst="$2"
+    [[ -f "$src" && -f "$dst" ]] || return 1
+    [[ "$(md5sum "$src" | awk '{print $1}')" == "$(md5sum "$dst" | awk '{print $1}')" ]]
+}
+
+# Pre-check: silently skip when zellij is installed, both wasms are deployed,
+# zjwidth (when repo-side non-empty) md5-matches, and config + default layout md5-match.
+_zellij_bundle_ready=true
+command_exists zellij || _zellij_bundle_ready=false
+[[ -s "$ZELLIJ_DEST/plugins/zjstatus.wasm" ]] || _zellij_bundle_ready=false
+if $_zellij_bundle_ready && [[ -s "$ZELLIJ_CONFIG_SRC/plugins/zjwidth.wasm" ]]; then
+    _zellij_md5_match "$ZELLIJ_CONFIG_SRC/plugins/zjwidth.wasm" "$ZELLIJ_DEST/plugins/zjwidth.wasm" \
+        || _zellij_bundle_ready=false
+fi
+if $_zellij_bundle_ready && [[ -f "$ZELLIJ_CONFIG_SRC/config.kdl" ]]; then
+    _zellij_md5_match "$ZELLIJ_CONFIG_SRC/config.kdl" "$ZELLIJ_DEST/config.kdl" \
+        || _zellij_bundle_ready=false
+fi
+if $_zellij_bundle_ready && [[ -f "$ZELLIJ_CONFIG_SRC/layouts/default.kdl" ]]; then
+    _zellij_md5_match "$ZELLIJ_CONFIG_SRC/layouts/default.kdl" "$ZELLIJ_DEST/layouts/default.kdl" \
+        || _zellij_bundle_ready=false
+fi
+
+if $_zellij_bundle_ready; then
+    warn "AEO zellij + config already installed and up to date"
+    ZELLIJ_INSTALLED=true
+    ZELLIJ_CONFIG_APPLIED=true
 else
-    warn "Zellij already installed"
-fi
-
-# zjstatus plugin (required by AEO layout for the Alt-key powerline status row)
-# `-s` test (exists AND non-empty) so a 0-byte download from a prior run gets repaired.
-if command_exists zellij; then
-    mkdir -p "$ZELLIJ_DEST/plugins"
-    if [[ ! -s "$ZELLIJ_DEST/plugins/zjstatus.wasm" ]]; then
-        if [[ -f "$ZELLIJ_DEST/plugins/zjstatus.wasm" ]]; then
-            info "zjstatus.wasm exists but is empty — re-downloading..."
-        else
-            info "Downloading zjstatus plugin..."
-        fi
-        ZJSTATUS_URL="https://github.com/dj95/zjstatus/releases/latest/download/zjstatus.wasm"
-        if curl -fSL --max-time 60 "$ZJSTATUS_URL" -o "$ZELLIJ_DEST/plugins/zjstatus.wasm" \
-            && [[ -s "$ZELLIJ_DEST/plugins/zjstatus.wasm" ]]; then
-            success "zjstatus.wasm installed -> ~/.config/zellij/plugins/"
-        else
-            warn "Failed to download zjstatus.wasm (or got empty file) — Alt-key status row will not render"
-        fi
-    else
-        warn "zjstatus.wasm already present"
+    echo ""
+    echo -e "${BLUE}AEO Zellij + Config${NC}"
+    echo "  Installs zellij plus the AEO config:"
+    echo "  p10k-aeo theme, custom keybinds (Alt+w SIGWINCH redraw, Alt+arrows nav,"
+    echo "  Alt+p pane group), powerline Alt-key status row via zjstatus + zjwidth wasm plugins."
+    if [[ -f "$ZELLIJ_DEST/config.kdl" ]] || [[ -f "$ZELLIJ_DEST/layouts/default.kdl" ]]; then
+        echo ""
+        echo -e "${YELLOW}  WARNING: This will REPLACE your existing zellij config (backup will be made).${NC}"
     fi
-fi
-
-# zjwidth sidecar plugin (required by AEO layout: width-aware Alt-bar via {pipe_altbar})
-# `-s` test guards against deploying a 0-byte wasm if the repo build was mid-flight.
-if command_exists zellij; then
-    if [[ -s "$ZELLIJ_CONFIG_SRC/plugins/zjwidth.wasm" ]]; then
-        cp "$ZELLIJ_CONFIG_SRC/plugins/zjwidth.wasm" "$ZELLIJ_DEST/plugins/zjwidth.wasm"
-        if [[ -s "$ZELLIJ_DEST/plugins/zjwidth.wasm" ]]; then
-            success "zjwidth.wasm installed -> ~/.config/zellij/plugins/"
+    echo ""
+    read -r -p "Install AEO zellij + config? [y/N] " zellij_answer || zellij_answer="n"
+    if [[ "${zellij_answer,,}" == "y" ]]; then
+        # Install zellij if missing
+        if ! command_exists zellij; then
+            info "Installing Zellij..."
+            info "  Fetching latest version from GitHub API..."
+            ZELLIJ_VERSION=$(curl --max-time 30 https://api.github.com/repos/zellij-org/zellij/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+            info "  Version: $ZELLIJ_VERSION"
+            ZELLIJ_URL="https://github.com/zellij-org/zellij/releases/download/${ZELLIJ_VERSION}/zellij-${ARCH_ALT}-unknown-linux-musl.tar.gz"
+            info "  Downloading: $ZELLIJ_URL"
+            curl -fSL "$ZELLIJ_URL" -o /tmp/zellij.tar.gz
+            sudo tar -xzf /tmp/zellij.tar.gz -C /usr/local/bin/
+            rm /tmp/zellij.tar.gz
+            success "Zellij installed"
         else
-            warn "zjwidth.wasm copied but deployed file is empty — Alt-key bar will be empty"
+            warn "Zellij already installed"
         fi
-    elif [[ -f "$ZELLIJ_CONFIG_SRC/plugins/zjwidth.wasm" ]]; then
-        warn "zjwidth.wasm in repo at $ZELLIJ_CONFIG_SRC/plugins/ is empty (0 bytes) — skipping deploy"
-    else
-        warn "zjwidth.wasm not found in repo at $ZELLIJ_CONFIG_SRC/plugins/ — Alt-key bar will be empty"
-    fi
-fi
+        ZELLIJ_INSTALLED=true
 
-# Pre-seed zellij plugin permissions so users don't get prompted on first
-# session for AEO-deployed plugins. Idempotently merges into permissions.kdl;
-# preserves any existing grants for other plugins.
-if command_exists zellij && command_exists python3; then
-    python3 - <<'PYEOF'
+        if command_exists zellij; then
+            mkdir -p "$ZELLIJ_DEST/plugins" "$ZELLIJ_DEST/layouts"
+
+            # zjstatus (download from upstream; only re-download if missing/empty)
+            if [[ ! -s "$ZELLIJ_DEST/plugins/zjstatus.wasm" ]]; then
+                if [[ -f "$ZELLIJ_DEST/plugins/zjstatus.wasm" ]]; then
+                    info "zjstatus.wasm exists but is empty — re-downloading..."
+                else
+                    info "Downloading zjstatus plugin..."
+                fi
+                ZJSTATUS_URL="https://github.com/dj95/zjstatus/releases/latest/download/zjstatus.wasm"
+                if curl -fSL --max-time 60 "$ZJSTATUS_URL" -o "$ZELLIJ_DEST/plugins/zjstatus.wasm" \
+                    && [[ -s "$ZELLIJ_DEST/plugins/zjstatus.wasm" ]]; then
+                    success "zjstatus.wasm installed -> ~/.config/zellij/plugins/"
+                else
+                    warn "Failed to download zjstatus.wasm (or got empty file) — Alt-key status row will not render"
+                fi
+            else
+                warn "zjstatus.wasm already present"
+            fi
+
+            # zjwidth (from repo; only deploy when repo-side wasm is non-empty)
+            if [[ -s "$ZELLIJ_CONFIG_SRC/plugins/zjwidth.wasm" ]]; then
+                cp "$ZELLIJ_CONFIG_SRC/plugins/zjwidth.wasm" "$ZELLIJ_DEST/plugins/zjwidth.wasm"
+                if [[ -s "$ZELLIJ_DEST/plugins/zjwidth.wasm" ]]; then
+                    success "zjwidth.wasm installed -> ~/.config/zellij/plugins/"
+                else
+                    warn "zjwidth.wasm copied but deployed file is empty — Alt-key bar will be empty"
+                fi
+            elif [[ -f "$ZELLIJ_CONFIG_SRC/plugins/zjwidth.wasm" ]]; then
+                warn "zjwidth.wasm in repo at $ZELLIJ_CONFIG_SRC/plugins/ is empty (0 bytes) — skipping deploy"
+            else
+                warn "zjwidth.wasm not found in repo at $ZELLIJ_CONFIG_SRC/plugins/ — Alt-key bar will be empty"
+            fi
+
+            # Pre-seed zellij plugin permissions so users don't get prompted on first
+            # session for AEO-deployed plugins. Idempotently merges into permissions.kdl;
+            # preserves any existing grants for other plugins.
+            if command_exists python3; then
+                python3 - <<'PYEOF'
 import os
 import re
 from pathlib import Path
@@ -917,49 +982,30 @@ for path, perms in GRANTS.items():
 
 PATH.write_text(result)
 PYEOF
-    success "Pre-seeded zellij plugin permissions for zjstatus and zjwidth"
-fi
+                success "Pre-seeded zellij plugin permissions for zjstatus and zjwidth"
+            fi
 
-if command_exists zellij && [[ -f "$ZELLIJ_CONFIG_SRC/config.kdl" ]]; then
-    if $ZELLIJ_FRESH_INSTALL; then
-        # Fresh install — no existing config to clobber, just deploy
-        mkdir -p "$ZELLIJ_DEST/layouts"
-        cp "$ZELLIJ_CONFIG_SRC/config.kdl" "$ZELLIJ_DEST/config.kdl"
-        cp "$ZELLIJ_CONFIG_SRC/layouts/default.kdl" "$ZELLIJ_DEST/layouts/default.kdl"
-        ZELLIJ_CONFIG_APPLIED=true
-        success "AEO zellij config deployed -> ~/.config/zellij/"
+            # Deploy AEO config + default layout
+            if [[ -f "$ZELLIJ_CONFIG_SRC/config.kdl" ]]; then
+                STAMP="$(date +%Y%m%d%H%M%S)"
+                if [[ -f "$ZELLIJ_DEST/config.kdl" ]] \
+                    && ! _zellij_md5_match "$ZELLIJ_CONFIG_SRC/config.kdl" "$ZELLIJ_DEST/config.kdl"; then
+                    cp "$ZELLIJ_DEST/config.kdl" "$ZELLIJ_DEST/config.kdl.bak.$STAMP"
+                    info "Backed up existing ~/.config/zellij/config.kdl"
+                fi
+                if [[ -f "$ZELLIJ_DEST/layouts/default.kdl" ]] \
+                    && ! _zellij_md5_match "$ZELLIJ_CONFIG_SRC/layouts/default.kdl" "$ZELLIJ_DEST/layouts/default.kdl"; then
+                    cp "$ZELLIJ_DEST/layouts/default.kdl" "$ZELLIJ_DEST/layouts/default.kdl.bak.$STAMP"
+                    info "Backed up existing ~/.config/zellij/layouts/default.kdl"
+                fi
+                cp "$ZELLIJ_CONFIG_SRC/config.kdl" "$ZELLIJ_DEST/config.kdl"
+                cp "$ZELLIJ_CONFIG_SRC/layouts/default.kdl" "$ZELLIJ_DEST/layouts/default.kdl"
+                ZELLIJ_CONFIG_APPLIED=true
+                success "AEO zellij config deployed -> ~/.config/zellij/"
+            fi
+        fi
     else
-        # Existing install — ask before replacing
-        echo ""
-        echo -e "${BLUE}Zellij Configuration${NC}"
-        echo "  The AEO zellij config provides the p10k-aeo theme, custom keybinds"
-        echo "  (Alt+w SIGWINCH redraw, Alt+arrows navigation, Alt+p pane group),"
-        echo "  and a powerline Alt-key reference status row via the zjstatus plugin."
-        echo ""
-        echo -e "${YELLOW}  WARNING: This will REPLACE your existing zellij config if you have one.${NC}"
-        if [[ -f "$ZELLIJ_DEST/config.kdl" ]]; then
-            echo -e "  Existing config found: ${ZELLIJ_DEST}/config.kdl (will be backed up)"
-        fi
-        echo ""
-        read -r -p "Apply AEO zellij config? [y/N] " zellij_answer || zellij_answer="n"
-        if [[ "${zellij_answer,,}" == "y" ]]; then
-            STAMP="$(date +%Y%m%d%H%M%S)"
-            if [[ -f "$ZELLIJ_DEST/config.kdl" ]]; then
-                cp "$ZELLIJ_DEST/config.kdl" "$ZELLIJ_DEST/config.kdl.bak.$STAMP"
-                info "Backed up existing ~/.config/zellij/config.kdl"
-            fi
-            if [[ -f "$ZELLIJ_DEST/layouts/default.kdl" ]]; then
-                cp "$ZELLIJ_DEST/layouts/default.kdl" "$ZELLIJ_DEST/layouts/default.kdl.bak.$STAMP"
-                info "Backed up existing ~/.config/zellij/layouts/default.kdl"
-            fi
-            mkdir -p "$ZELLIJ_DEST/layouts"
-            cp "$ZELLIJ_CONFIG_SRC/config.kdl" "$ZELLIJ_DEST/config.kdl"
-            cp "$ZELLIJ_CONFIG_SRC/layouts/default.kdl" "$ZELLIJ_DEST/layouts/default.kdl"
-            ZELLIJ_CONFIG_APPLIED=true
-            success "AEO zellij config deployed -> ~/.config/zellij/"
-        else
-            info "Skipped AEO zellij config"
-        fi
+        info "Skipped AEO zellij + config"
     fi
 fi
 
@@ -1164,6 +1210,9 @@ alias df='duf'
 alias top='btop'
 alias yaml='yq'
 EOF
+    success "Tool aliases added to ~/.zshrc"
+else
+    warn "Tool aliases already present in ~/.zshrc"
 fi
 
 # ─── WSL2 Environment (persisted to modular env files) ───────────────────────
@@ -1251,6 +1300,22 @@ elif [[ -n "$_brew_bin" ]]; then
     warn "Homebrew already in .zshrc"
 fi
 
+if [[ -n "$_brew_bin" ]] && ! grep -q 'brew shellenv' ~/.bashrc 2>/dev/null; then
+    info "Adding Homebrew shellenv to .bashrc..."
+    cat >> ~/.bashrc << 'EOF'
+
+# ─── Homebrew ──────────────────────────────────────────────────────────────────
+if [[ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif [[ -x "$HOME/.linuxbrew/bin/brew" ]]; then
+    eval "$($HOME/.linuxbrew/bin/brew shellenv)"
+fi
+EOF
+    success "Homebrew shellenv added to .bashrc"
+elif [[ -n "$_brew_bin" ]]; then
+    warn "Homebrew already in .bashrc"
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1260,16 +1325,22 @@ echo -e "${GREEN}  AI Developer Essentials Stack - Installation Complete!${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
 echo ""
 echo "Installed components:"
-echo "  - Zsh + Oh-My-Zsh + Powerlevel10k + MesloLGS Nerd Font"
-echo "  - Zsh plugins: zsh-autosuggestions, zsh-syntax-highlighting"
+if $SHELL_STACK_APPLIED; then
+    echo "  - Zsh + Oh-My-Zsh + Powerlevel10k + MesloLGS Nerd Font"
+    echo "  - Zsh plugins: zsh-autosuggestions, zsh-syntax-highlighting"
+fi
 echo "  - NVM + Node.js 22 LTS"
 echo "  - Mamba + 'dev' environment (anthropic, openai, httpx, rich, typer, pydantic)"
 echo "  - Kitty terminal (GPU-optimized, OLED theme, 4K ready)"
 echo "  - Yazi file manager"
 echo "  - CLI tools: ripgrep, fd, fzf, bat, eza, delta, glow, btop, ncdu, duf, httpie, yq, shellcheck, p7zip"
 echo "  - Terminal media: ffmpeg, mpv, chafa"
-echo "  - tmux (with optional AEO config)"
-echo "  - Zellij terminal multiplexer"
+if $TMUX_INSTALLED; then
+    echo "  - tmux (with AEO config)"
+fi
+if $ZELLIJ_INSTALLED; then
+    echo "  - Zellij terminal multiplexer (with AEO config)"
+fi
 echo "  - Bun JS runtime"
 echo "  - direnv"
 echo "  - GitHub CLI (gh)"
@@ -1298,6 +1369,9 @@ else
 fi
 if $TMUX_CONFIG_APPLIED; then
     echo "  - AEO tmux config applied (C-Space prefix, 3-line status bar)"
+fi
+if $ZELLIJ_CONFIG_APPLIED; then
+    echo "  - AEO zellij config applied (p10k-aeo theme, Alt-key status row)"
 fi
 echo "  - Set your terminal font to 'MesloLGS NF' for proper icons"
 echo ""

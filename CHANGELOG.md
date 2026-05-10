@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.27] - 2026-05-10
+
+### Changed
+- `setup-ai-dev-stack.sh`: Collapsed the shell stack (zsh + Oh-My-Zsh + Powerlevel10k + MesloLGS Nerd Font + zsh plugins + p10k preset + `~/.zshenv`) into a single `[Y/n]` bundle prompt with an idempotent pre-check that silently skips when every component is already in place
+- `setup-ai-dev-stack.sh`: Collapsed tmux install/upgrade and AEO config deploy into a single `[y/N]` bundle prompt; pre-check md5-compares the deployed `tmux.conf` and every file under `tmux/scripts/` against the repo and verifies no apt upgrade is pending before silently skipping
+- `setup-ai-dev-stack.sh`: Collapsed zellij install, plugin deploy (`zjstatus.wasm`, `zjwidth.wasm`), config, and default layout deploy into a single `[y/N]` bundle prompt with an md5-based pre-check
+- `setup-ai-dev-stack.sh`: Homebrew shellenv now wired into both `~/.bashrc` and `~/.zshrc` (previously only `~/.zshrc`)
+- `setup-ai-dev-stack.sh`: Summary block lists shell stack, tmux, and zellij components only when their respective bundles were applied
+
+### Fixed
+- `setup-ai-dev-stack.sh`: Removed the standalone tmux upgrade prompt that fired even when no apt upgrade was available
+- `setup-ai-dev-stack.sh`: Removed the standalone `~/.zshenv` deployment prompt that fired when both NVM and Bun blocks were already present
+- `setup-ai-dev-stack.sh`: Suppressed the misleading "AEO Powerlevel10k theme preset applied" success message when nothing was actually mutated
+- `setup-ai-dev-stack.sh`: Added a missing `success` log line confirming tool aliases were appended to `~/.zshrc`
+
+### Removed
+- `setup-ai-dev-stack.sh`: Internal `TMUX_FRESH_INSTALL` and `ZELLIJ_FRESH_INSTALL` flags, obsoleted by the unified bundle deploy logic
+
 ## [0.0.26] - 2026-04-26
 
 ### Added
