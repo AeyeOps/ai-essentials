@@ -44,3 +44,6 @@ output/
 
 # Local-only roadmap drafts (committed entries are explicitly tracked)
 docs/roadmap/
+
+# Local-only iteration artifacts (skill evals, benchmarks, scratch outputs)
+tmp/

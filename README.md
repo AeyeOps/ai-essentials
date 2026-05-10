@@ -181,6 +181,18 @@ ai-essentials/
 
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
+## Upstream Sources & Versioning Policy
+
+This stack intentionally tracks upstream releases at install time rather than pinning specific versions. The trade-offs are deliberate and documented here so consumers can decide if the policy fits their threat model.
+
+- **CLI tools fetched from GitHub `releases/latest`**: `eza`, `delta`, `glow`, `duf`, `yazi`, `zellij`, `zjstatus.wasm`. The installer queries each project's GitHub API for the latest tag at run time and downloads that release. No version constants are hard-coded; no checksum or signature verification is performed beyond what TLS provides during the curl download. Trade-off: stays current with upstream fixes vs. accepts upstream supply-chain drift on every run.
+- **Vendor install scripts piped to a shell**: `nvm` (pinned to `v0.40.1`), `bun` (`https://bun.sh/install`), Anthropic Claude Code installer (`https://claude.ai/install.sh`), and Homebrew (`https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh`). These follow each vendor's documented canonical install path. No checksum verification beyond TLS. Trade-off: parity with the install instructions each vendor publishes vs. trust delegated to the vendor's release pipeline.
+- **`apt-get install`**: invoked with `-y` and without `--no-install-recommends`. Behavior matches Ubuntu's default and pulls recommended dependencies (often relevant for desktop/media packages such as `mpv`, `ffmpeg`, `kitty`).
+- **Node devDependencies in `aeo-cc-sessions-vsix/`**: caret ranges are kept (e.g. `^1.110.0`, `^5.7.0`). The committed `package-lock.json` pins the actual installed tree, so reproducibility for the published VSIX is preserved at lockfile granularity.
+- **Python**: `pyproject.toml` declares no runtime dependencies; no lockfile is committed.
+
+If any of the above is incompatible with your environment's policy, fork the repository and replace the dynamic version lookups with pinned constants and checksum verification before running the installers.
+
 ## Security
 
 Never commit secrets. Use environment variables and secret managers. See `.gitignore` for excluded patterns.

@@ -246,7 +246,7 @@ This is a transcript-parser problem the sidecar can reduce for current-state dis
 
 Observed:
 
-- `/opt/sf` routinely has multiple concurrent terminals
+- `<project-a>` routinely has multiple concurrent terminals
 - transcript rotation within a single process can create multiple session ids in the same project
 - time proximity alone is insufficient to claim deterministic parent to child correlation in all cases
 
@@ -442,7 +442,7 @@ Proposed schema:
   "process_key": "12345:67890",
   "claude_pid": 12345,
   "claude_pid_start_ticks": 67890,
-  "cwd": "/opt/sf",
+  "cwd": "/path/to/project",
   "current_session_id": "uuid",
   "current_transcript_path": "/home/user/.claude/projects/.../uuid.jsonl",
   "state": "idle",
@@ -484,7 +484,7 @@ Proposed per-record schema:
   "claude_pid_start_ticks": 67890,
   "session_id": "uuid",
   "transcript_path": "/home/user/.claude/projects/.../uuid.jsonl",
-  "cwd": "/opt/sf",
+  "cwd": "/path/to/project",
   "hook_event_name": "PermissionRequest",
   "permission_mode": "default",
   "notification_type": null,
@@ -1054,8 +1054,8 @@ Do not change VSIX yet.
 
 Validation:
 
-- 3 concurrent sessions in `/opt/sf`
-- 1 session in `/opt/aeo/aeo-skill-marketplace`
+- 3 concurrent sessions in `<project-a>`
+- 1 session in `<project-b>`
 - force:
   - `Edit` approval
   - `Bash` approval

@@ -64,7 +64,7 @@ shellcheck scripts/*.sh
 
 ### AEO VSC CC Sessions VSIX
 
-- Project path: `/opt/aeo/ai-essentials/aeo-cc-sessions-vsix`
+- Project path: `aeo-cc-sessions-vsix/` (repo-relative)
 - Real build/install target is `make install`. There is no `make build` target in this repo.
 - The extension currently has 2 real view modes only:
   - Tree View
