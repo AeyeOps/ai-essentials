@@ -1,0 +1,13 @@
+# AEO AI Essentials — ~/.zshenv
+# Sourced by zsh for ALL invocations (login, interactive, non-interactive,
+# scripts). Keep this minimal: env vars, PATH, and lightweight tool init.
+# No prompts, no aliases, no heavy framework sourcing. Conda init stays in ~/.zshrc.
+
+# ─── NVM ───────────────────────────────────────────────────────────────────────
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+# ─── Bun ───────────────────────────────────────────────────────────────────────
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"

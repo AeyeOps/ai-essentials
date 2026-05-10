@@ -199,17 +199,38 @@ else
     warn "Zsh is already the default shell"
 fi
 
-# Configure .zshrc if it doesn't have our setup
-if ! grep -q "ZSH_THEME=\"powerlevel10k/powerlevel10k\"" ~/.zshrc 2>/dev/null; then
-    info "Configuring .zshrc with Powerlevel10k theme..."
-    sed -i 's/^ZSH_THEME=.*/ZSH_THEME="powerlevel10k\/powerlevel10k"/' ~/.zshrc 2>/dev/null || true
-fi
+# Configure .zshrc with oh-my-zsh wiring (theme + plugins).
+# Single guard: if oh-my-zsh.sh is not sourced anywhere, append the full block.
+# Otherwise (standard omz .zshrc), use sed to update the existing ZSH_THEME and plugins lines.
+if ! grep -q 'oh-my-zsh\.sh' ~/.zshrc 2>/dev/null; then
+    info "Wiring oh-my-zsh into .zshrc (theme + plugins + source)..."
+    cat >> ~/.zshrc << 'EOF'
 
-# Enable plugins in .zshrc
-if ! grep -q "zsh-autosuggestions" ~/.zshrc 2>/dev/null; then
-    info "Enabling zsh plugins in .zshrc..."
-    # More robust: add plugins to existing plugins line regardless of current content
-    sed -i 's/^plugins=(\(.*\))/plugins=(\1 zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc 2>/dev/null || true
+# ─── Oh-My-Zsh ─────────────────────────────────────────────────────────────────
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="powerlevel10k/powerlevel10k"
+plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
+source $ZSH/oh-my-zsh.sh
+EOF
+    success "Appended oh-my-zsh block to ~/.zshrc"
+else
+    # oh-my-zsh is already sourced — adjust theme + plugin list in place.
+    if ! grep -q 'ZSH_THEME="powerlevel10k/powerlevel10k"' ~/.zshrc 2>/dev/null; then
+        info "Setting Powerlevel10k theme in .zshrc..."
+        if grep -q '^ZSH_THEME=' ~/.zshrc 2>/dev/null; then
+            sed -i 's|^ZSH_THEME=.*|ZSH_THEME="powerlevel10k/powerlevel10k"|' ~/.zshrc
+        else
+            echo 'ZSH_THEME="powerlevel10k/powerlevel10k"' >> ~/.zshrc
+        fi
+    fi
+    if ! grep -q 'zsh-autosuggestions' ~/.zshrc 2>/dev/null; then
+        info "Adding zsh-autosuggestions to .zshrc plugins..."
+        sed -i 's/^plugins=(\(.*\))/plugins=(\1 zsh-autosuggestions)/' ~/.zshrc 2>/dev/null || true
+    fi
+    if ! grep -q 'zsh-syntax-highlighting' ~/.zshrc 2>/dev/null; then
+        info "Adding zsh-syntax-highlighting to .zshrc plugins..."
+        sed -i 's/^plugins=(\(.*\))/plugins=(\1 zsh-syntax-highlighting)/' ~/.zshrc 2>/dev/null || true
+    fi
 fi
 
 # --- Apply AEO Powerlevel10k preset (skip wizard on first launch) ---
@@ -254,6 +275,68 @@ fi
     else
         info "Skipped AEO preset — p10k wizard will run on first Zsh launch"
     fi
+fi
+
+# --- .zshenv (NVM + Bun env exports for non-interactive shells) ---
+ZSHENV_SRC="$SCRIPT_DIR/../configs/zsh/zshenv"
+ZSHENV_DEST="$HOME/.zshenv"
+
+if [[ -f "$ZSHENV_SRC" ]]; then
+    echo ""
+    echo -e "${BLUE}Zsh Environment File (~/.zshenv)${NC}"
+    echo "  Adds NVM and Bun env exports so Node/npm/bun are available in"
+    echo "  non-interactive shells (CI, VS Code tasks, ssh host cmd)."
+    echo ""
+    if [[ -f "$ZSHENV_DEST" ]]; then
+        echo -e "${YELLOW}  An existing ~/.zshenv was found. It will be backed up before any changes.${NC}"
+        echo "  Missing NVM_DIR / BUN_INSTALL blocks will be appended; existing content is preserved."
+    else
+        echo "  No existing ~/.zshenv found. The AEO template will be installed fresh."
+    fi
+    echo ""
+    read -r -p "Deploy AEO ~/.zshenv env exports? [Y/n] " zshenv_answer || zshenv_answer="n"
+    if [[ "${zshenv_answer,,}" != "n" ]]; then
+        if [[ ! -f "$ZSHENV_DEST" ]]; then
+            cp "$ZSHENV_SRC" "$ZSHENV_DEST"
+            success "Deployed AEO ~/.zshenv (NVM + Bun env exports)"
+        else
+            # Only back up if something actually needs appending.
+            _needs_nvm=false
+            _needs_bun=false
+            grep -q 'NVM_DIR' "$ZSHENV_DEST" 2>/dev/null || _needs_nvm=true
+            grep -q 'BUN_INSTALL' "$ZSHENV_DEST" 2>/dev/null || _needs_bun=true
+            if [[ "$_needs_nvm" == true || "$_needs_bun" == true ]]; then
+                cp "$ZSHENV_DEST" "$ZSHENV_DEST.bak.$(date +%Y%m%d%H%M%S)"
+                info "Backed up existing ~/.zshenv"
+                if [[ "$_needs_nvm" == true ]]; then
+                    info "Appending NVM block to ~/.zshenv..."
+                    cat >> "$ZSHENV_DEST" << 'EOF'
+
+# ─── NVM ───────────────────────────────────────────────────────────────────────
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+EOF
+                fi
+                if [[ "$_needs_bun" == true ]]; then
+                    info "Appending Bun block to ~/.zshenv..."
+                    cat >> "$ZSHENV_DEST" << 'EOF'
+
+# ─── Bun ───────────────────────────────────────────────────────────────────────
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+EOF
+                fi
+                success "AEO ~/.zshenv env exports applied"
+            else
+                warn "AEO blocks already present in ~/.zshenv — no changes needed"
+            fi
+        fi
+    else
+        info "Skipped ~/.zshenv deployment"
+    fi
+else
+    warn "configs/zsh/zshenv not found — skipping .zshenv deployment"
 fi
 
 # --- Tmux (install + optional AEO config) ---
@@ -357,8 +440,8 @@ else
     nvm alias default 22 &>/dev/null || true
 fi
 
-# Ensure NVM is in zshrc
-if ! grep -q 'NVM_DIR' ~/.zshrc 2>/dev/null; then
+# Ensure NVM is in zshrc (skip if already covered by .zshenv)
+if ! grep -q 'NVM_DIR' ~/.zshrc 2>/dev/null && ! grep -q 'NVM_DIR' ~/.zshenv 2>/dev/null; then
     info "Adding NVM to .zshrc..."
     cat >> ~/.zshrc << 'EOF'
 
@@ -892,8 +975,8 @@ else
     warn "Bun already installed: $("$HOME"/.bun/bin/bun --version)"
 fi
 
-# Ensure bun is in zshrc
-if ! grep -q 'BUN_INSTALL' ~/.zshrc 2>/dev/null; then
+# Ensure bun is in zshrc (skip if already covered by .zshenv)
+if ! grep -q 'BUN_INSTALL' ~/.zshrc 2>/dev/null && ! grep -q 'BUN_INSTALL' ~/.zshenv 2>/dev/null; then
     info "Adding Bun to .zshrc..."
     cat >> ~/.zshrc << 'EOF'
 
@@ -1113,6 +1196,62 @@ EOF
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 14. GITHUB CLI (gh)
+# ═══════════════════════════════════════════════════════════════════════════
+info "Checking GitHub CLI (gh)..."
+if ! command_exists gh; then
+    info "Installing GitHub CLI..."
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+    sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+    sudo apt-get update
+    sudo apt-get install -y gh
+    success "GitHub CLI installed: $(gh --version | head -1)"
+else
+    warn "GitHub CLI already installed: $(gh --version | head -1)"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 15. HOMEBREW
+# ═══════════════════════════════════════════════════════════════════════════
+info "Checking Homebrew..."
+_brew_bin=""
+[[ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]] && _brew_bin="/home/linuxbrew/.linuxbrew/bin/brew"
+[[ -z "$_brew_bin" && -x "$HOME/.linuxbrew/bin/brew" ]] && _brew_bin="$HOME/.linuxbrew/bin/brew"
+
+if [[ -z "$_brew_bin" ]]; then
+    info "Installing Homebrew (this may take a few minutes)..."
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    [[ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]] && _brew_bin="/home/linuxbrew/.linuxbrew/bin/brew"
+    [[ -z "$_brew_bin" && -x "$HOME/.linuxbrew/bin/brew" ]] && _brew_bin="$HOME/.linuxbrew/bin/brew"
+    if [[ -n "$_brew_bin" ]]; then
+        success "Homebrew installed: $($_brew_bin --version)"
+    else
+        warn "Homebrew install may have failed — brew binary not found at expected paths"
+    fi
+else
+    warn "Homebrew already installed: $($_brew_bin --version)"
+fi
+
+if [[ -n "$_brew_bin" ]] && ! grep -q 'brew shellenv' ~/.zshrc 2>/dev/null; then
+    info "Adding Homebrew shellenv to .zshrc..."
+    cat >> ~/.zshrc << 'EOF'
+
+# ─── Homebrew ──────────────────────────────────────────────────────────────────
+if [[ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif [[ -x "$HOME/.linuxbrew/bin/brew" ]]; then
+    eval "$($HOME/.linuxbrew/bin/brew shellenv)"
+fi
+EOF
+    success "Homebrew shellenv added to .zshrc"
+elif [[ -n "$_brew_bin" ]]; then
+    warn "Homebrew already in .zshrc"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""
@@ -1133,6 +1272,8 @@ echo "  - tmux (with optional AEO config)"
 echo "  - Zellij terminal multiplexer"
 echo "  - Bun JS runtime"
 echo "  - direnv"
+echo "  - GitHub CLI (gh)"
+echo "  - Homebrew"
 echo "  - Pop Shell (GNOME tiling - if GNOME detected)"
 echo "  - Post-install config: Kitty default terminal, git delta, fzf integration"
 echo ""
