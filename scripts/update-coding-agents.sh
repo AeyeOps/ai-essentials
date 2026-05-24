@@ -1,15 +1,15 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 set -euo pipefail
 
-# update_cli_ubuntu.sh
-# Purpose: Update or install common AI-related CLIs on Ubuntu.
+# update-coding-agents.sh
+# Purpose: Update or install common agentic coding CLIs on Linux and macOS.
 # Usage: run without args to attempt updates; use -h/--help for help.
 
 if [[ ${1:-} == "-h" || ${1:-} == "--help" ]]; then
   cat <<'EOF'
-update_cli_ubuntu.sh
+update-coding-agents.sh
 
-Updates or installs a small set of AI-related CLI tools on Ubuntu-based systems.
+Updates or installs a small set of agentic coding CLI tools on Linux and macOS hosts.
 
 Tools managed
 - Claude Code (Anthropic)
@@ -21,8 +21,8 @@ Notes
 - Script requires curl, bash, and package managers for the respective tools.
 - It may perform network operations and install system packages.
 Usage
-  bash scripts/update_cli_ubuntu.sh
-  bash scripts/update_cli_ubuntu.sh --help
+  bash scripts/update-coding-agents.sh
+  bash scripts/update-coding-agents.sh --help
 EOF
   exit 0
 fi
@@ -254,8 +254,10 @@ handle_claude_code() {
     record_summary "Claude Code" "Already up to date ($local_version)"
   else
     echo -e "${BLUE}Updating Claude Code from $local_version to $remote_version ...${NC}"
-    if curl -fsSL https://claude.ai/install.sh -o /tmp/claude_install.sh; then
-      if bash -x /tmp/claude_install.sh latest 2>&1 | tee "$tmpfile"; then
+    local installer
+    installer=$(mktemp -t claude_install.XXXXXX.sh 2>/dev/null || mktemp)
+    if curl -fsSL https://claude.ai/install.sh -o "$installer"; then
+      if bash -x "$installer" latest 2>&1 | tee "$tmpfile"; then
         new_version=$( ("$HOME/.local/bin/claude" --version 2>/dev/null || claude --version 2>/dev/null) | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
         record_summary "Claude Code" "Updated from $local_version to $new_version"
       else
@@ -264,6 +266,7 @@ handle_claude_code() {
     else
       record_summary "Claude Code" "Install script download failed"
     fi
+    rm -f "$installer"
   fi
   rm -f "$tmpfile"
   set -e

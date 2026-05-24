@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.28] - 2026-05-24
+
+### Changed
+- Renamed `scripts/update_cli_ubuntu.sh` to `scripts/update-coding-agents.sh` — script now supports Linux and macOS, and name reflects its purpose (updating agentic coding CLIs) rather than the original Ubuntu-only scope. Updated references in `README.md`, `AGENTS.md`, and the script's header/help text.
+- `update-coding-agents.sh`: switched shebang from `#!/usr/bin/env zsh` to `#!/usr/bin/env bash` to match `AGENTS.md` project standard, the script's own `bash scripts/...` usage docs, and to allow `shellcheck` to lint the file (previously blocked by SC1071). Stock Ubuntu lacks zsh, so direct invocation (`./scripts/update-coding-agents.sh`) now works on a default Linux host.
+
+### Fixed
+- `update-coding-agents.sh`: replaced hardcoded `/tmp/claude_install.sh` install-script path with `mktemp` (portable across Linux and macOS) to remove a predictable-path symlink-race trap on shared hosts; installer is now cleaned up after run.
+
 ## [0.0.27] - 2026-05-10
 
 ### Changed

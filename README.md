@@ -166,7 +166,7 @@ ai-essentials/
 ├── scripts/
 │   ├── setup-ai-dev-stack.sh
 │   ├── google-chrome-wsl2.sh
-│   └── update_cli_ubuntu.sh
+│   └── update-coding-agents.sh
 ├── configs/
 │   ├── kitty/
 │   ├── zellij/

@@ -4,7 +4,7 @@
 The repository is intentionally lean: documentation lives in `docs/`, executable helpers live in `scripts/`, and top-level Markdown files describe community, contribution, and agent operations. When adding new material, align with this split—reference guides belong under `docs/`, automation should land in `scripts/`, and include a short pointer from `README.md` if the entry point changes.
 
 ## Build, Test, and Development Commands
-There is no monolithic build; validate contributions with targeted commands. Use `bash scripts/update_cli_ubuntu.sh -h` to review script behaviour before running `bash scripts/update_cli_ubuntu.sh` on Ubuntu hosts. Lint shell changes locally via `shellcheck scripts/update_cli_ubuntu.sh` and dry-run new scripts with `bash -n path/to/script.sh`. Keep examples reproducible across POSIX shells.
+There is no monolithic build; validate contributions with targeted commands. Use `bash scripts/update-coding-agents.sh -h` to review script behaviour before running `bash scripts/update-coding-agents.sh` on Linux or macOS hosts. Lint shell changes locally via `shellcheck scripts/update-coding-agents.sh` and dry-run new scripts with `bash -n path/to/script.sh`. Keep examples reproducible across POSIX shells.
 
 ## Coding Style & Naming Conventions
 Shell scripts must start with `#!/usr/bin/env bash` and `set -euo pipefail`. Favour two-space indentation, uppercase constants (e.g., `Q_DEB_URL`), and descriptive function names such as `install_q_from_deb`. New Markdown content should use sentence-case headings and concise bullets; keep tables and diagrams in plain Markdown so they render well on GitHub.
