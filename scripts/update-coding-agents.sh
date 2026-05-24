@@ -5,27 +5,42 @@ set -euo pipefail
 # Purpose: Update or install common agentic coding CLIs on Linux and macOS.
 # Usage: run without args to attempt updates; use -h/--help for help.
 
-if [[ ${1:-} == "-h" || ${1:-} == "--help" ]]; then
+show_help() {
   cat <<'EOF'
 update-coding-agents.sh
 
 Updates or installs a small set of agentic coding CLI tools on Linux and macOS hosts.
 
-Tools managed
+Tools managed (default)
 - Claude Code (Anthropic)
 - Crush (Charmbracelet, Go)
 - Gemini CLI (Google)
 - Codex CLI (OpenAI)
+- pi (Earendil Works pi-coding-agent)
+
+Opt-in tools
+- Grok CLI (xAI) -- enable with --with-grok or INCLUDE_GROK=1
 
 Notes
 - Script requires curl, bash, and package managers for the respective tools.
 - It may perform network operations and install system packages.
+
 Usage
   bash scripts/update-coding-agents.sh
+  bash scripts/update-coding-agents.sh --with-grok
+  INCLUDE_GROK=1 bash scripts/update-coding-agents.sh
   bash scripts/update-coding-agents.sh --help
 EOF
-  exit 0
-fi
+}
+
+INCLUDE_GROK=${INCLUDE_GROK:-0}
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help) show_help; exit 0 ;;
+    --with-grok) INCLUDE_GROK=1 ;;
+    *) echo "Unknown argument: $arg" >&2; show_help >&2; exit 2 ;;
+  esac
+done
 
 # Colors
 RED='\033[0;31m'
@@ -366,6 +381,51 @@ handle_gemini() {
   fi
 }
 
+### ========== PI (Earendil Works) ==========
+handle_pi() {
+  echo -e "\n${CYAN}=== pi (Earendil Works, npm) ===${NC}"
+  local local_version remote_version old_version new_version
+  if ! command -v npm &>/dev/null; then
+    echo -e "${YELLOW}npm not found; skipping pi update.${NC}"
+    record_summary "pi" "Skipped: npm not available"
+    return
+  fi
+  if command -v pi &>/dev/null; then
+    local_version=$(pi --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+    old_version="${local_version:-unknown}"
+    if [[ -n "$local_version" ]]; then
+      echo -e "${GREEN}Detected pi version: $local_version${NC}"
+    else
+      echo -e "${YELLOW}pi found but version check returned no semver.${NC}"
+      local_version="unknown"
+    fi
+  else
+    echo -e "${YELLOW}pi is not installed.${NC}"
+    local_version="none"
+    old_version="none"
+  fi
+
+  if remote_version=$(npm view @earendil-works/pi-coding-agent version 2>/dev/null); then
+    echo -e "${BLUE}Latest pi version: $remote_version${NC}"
+  else
+    echo -e "${YELLOW}Unable to determine latest pi version.${NC}"
+    record_summary "pi" "Skipped: unable to query remote version"
+    return
+  fi
+
+  if [[ "$local_version" == "$remote_version" ]]; then
+    record_summary "pi" "Already up to date ($local_version)"
+    return
+  fi
+
+  if out=$(npm install -g --ignore-scripts @earendil-works/pi-coding-agent 2>&1); then
+    new_version=$(pi --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+    record_summary "pi" "Updated from $old_version to ${new_version:-unknown}"
+  else
+    record_summary "pi" "Update failed: $(echo "$out" | tail -20)"
+  fi
+}
+
 # DISABLED: ### ========== KIRO CLI ==========
 # DISABLED: handle_kiro() {
 # DISABLED:   echo -e "\n${CYAN}=== Kiro CLI (Amazon) ===${NC}"
@@ -503,6 +563,58 @@ handle_codex() {
   record_summary "Codex CLI" "Update failed: $(echo "${out:-unknown error}" | tail -20)"
 }
 
+### ========== GROK CLI (xAI, opt-in) ==========
+# Switch-driven: when --with-grok / INCLUDE_GROK=1 is set, always run the
+# official xAI installer. The installer is the documented install AND
+# upgrade path, so no version pre-check is performed.
+handle_grok() {
+  echo -e "\n${CYAN}=== Grok CLI (xAI, opt-in) ===${NC}"
+
+  if [[ "${INCLUDE_GROK:-0}" != "1" ]]; then
+    echo -e "${YELLOW}Skipping Grok CLI; opt-in only.${NC}"
+    record_summary "Grok CLI" "Skipped: opt-in only (--with-grok or INCLUDE_GROK=1)"
+    return
+  fi
+
+  if ! command -v curl &>/dev/null; then
+    echo -e "${YELLOW}curl not found; skipping Grok CLI update.${NC}"
+    record_summary "Grok CLI" "Skipped: curl not available"
+    return
+  fi
+
+  echo -e "${BLUE}Running official xAI installer (curl -fsSL https://x.ai/cli/install.sh | bash) ...${NC}"
+  local tmpfile installer new_version status
+  tmpfile=$(mktemp)
+  installer=$(mktemp -t grok_install.XXXXXX.sh 2>/dev/null || mktemp)
+  set +e
+  curl -fsSL https://x.ai/cli/install.sh -o "$installer"
+  status=$?
+  if [[ $status -ne 0 ]]; then
+    record_summary "Grok CLI" "Installer download failed (curl exit $status)"
+    rm -f "$tmpfile" "$installer"
+    set -e
+    return
+  fi
+
+  bash "$installer" 2>&1 | tee "$tmpfile"
+  status=${PIPESTATUS[0]}
+  if [[ $status -ne 0 ]]; then
+    record_summary "Grok CLI" "Installer failed (exit $status): $(tail -5 "$tmpfile")"
+    rm -f "$tmpfile" "$installer"
+    set -e
+    return
+  fi
+
+  new_version=$(grok --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+  if [[ -n "$new_version" ]]; then
+    record_summary "Grok CLI" "Installer ran (now: $new_version)"
+  else
+    record_summary "Grok CLI" "Installer ran (version unknown)"
+  fi
+  rm -f "$tmpfile" "$installer"
+  set -e
+}
+
 #####################
 ### MAIN SECTION  ###
 #####################
@@ -511,8 +623,10 @@ main() {
   handle_claude_code
   handle_crush
   handle_gemini
+  handle_pi
   # DISABLED: handle_kiro
   handle_codex
+  handle_grok
 
   echo -e "\n${MAGENTA}======= SUMMARY ========${NC}"
   for s in "${SUMMARY[@]}"; do

@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.0.28] - 2026-05-24
 
+### Added
+- `update-coding-agents.sh`: `handle_pi` — manages the `pi` agentic coding CLI (Earendil Works, `@earendil-works/pi-coding-agent`). Detects local `pi` via `command -v`, queries the npm registry for the latest version, installs/updates via `npm install -g --ignore-scripts @earendil-works/pi-coding-agent` when versions differ. Skips gracefully if `npm` is unavailable.
+- `update-coding-agents.sh`: `handle_grok` — manages the xAI Grok CLI as an opt-in tool. Gated by `--with-grok` flag or `INCLUDE_GROK=1` environment variable. When opted in, always runs the official installer `curl -fsSL https://x.ai/cli/install.sh | bash` (the documented install and upgrade path); no version pre-check is performed. Records resulting `grok --version` in the summary when detectable.
+- `update-coding-agents.sh`: `--with-grok` command-line flag. Unknown arguments now cause the script to print help and exit 2.
+
 ### Changed
 - Renamed `scripts/update_cli_ubuntu.sh` to `scripts/update-coding-agents.sh` — script now supports Linux and macOS, and name reflects its purpose (updating agentic coding CLIs) rather than the original Ubuntu-only scope. Updated references in `README.md`, `AGENTS.md`, and the script's header/help text.
 - `update-coding-agents.sh`: switched shebang from `#!/usr/bin/env zsh` to `#!/usr/bin/env bash` to match `AGENTS.md` project standard, the script's own `bash scripts/...` usage docs, and to allow `shellcheck` to lint the file (previously blocked by SC1071). Stock Ubuntu lacks zsh, so direct invocation (`./scripts/update-coding-agents.sh`) now works on a default Linux host.
+- `update-coding-agents.sh`: help text now lists the default and opt-in tool sets separately and documents the `--with-grok` flag.
 
 ### Fixed
 - `update-coding-agents.sh`: replaced hardcoded `/tmp/claude_install.sh` install-script path with `mktemp` (portable across Linux and macOS) to remove a predictable-path symlink-race trap on shared hosts; installer is now cleaned up after run.
