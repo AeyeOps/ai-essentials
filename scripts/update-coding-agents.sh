@@ -14,7 +14,7 @@ Updates or installs a small set of agentic coding CLI tools on Linux and macOS h
 Tools managed (default)
 - Claude Code (Anthropic)
 - Crush (Charmbracelet, Go)
-- Gemini CLI (Google)
+- agy (Antigravity, Google) -- replaces Gemini CLI, retired 2026-06-18
 - Codex CLI (OpenAI)
 - pi (Earendil Works pi-coding-agent)
 
@@ -339,46 +339,89 @@ handle_crush() {
   fi
 }
 
-### ========== GEMINI CLI ==========
-handle_gemini() {
-  echo -e "\n${CYAN}=== Gemini CLI (Google, npm nightly) ===${NC}"
-  local local_version remote_version old_version
-  if ! command -v npm &>/dev/null; then
-    echo -e "${YELLOW}npm not found; skipping Gemini CLI update.${NC}"
-    record_summary "Gemini CLI" "Skipped: npm not available"
-    return
-  fi
-  if command -v gemini &>/dev/null; then
-    local_version=$(gemini --version 2>/dev/null | awk '{print $NF}' || true)
-    old_version="$local_version"
-    if [[ -n "$local_version" ]]; then
-      echo -e "${GREEN}Detected Gemini version: $local_version${NC}"
-    else
-      echo -e "${YELLOW}Gemini CLI found but version check failed (config issue?).${NC}"
+### ========== AGY (Antigravity, Google) ==========
+# Replaces Gemini CLI (retired 2026-06-18). The official installer is the
+# documented install AND upgrade path (self-updating, manifest-driven,
+# SHA512-verified), so it always runs without a pre-check. Auto-detects
+# Linux/macOS + amd64/arm64 -- no OS conditionals in this wrapper.
+# Also opportunistically uninstalls the deprecated @google/gemini-cli
+# npm package from the nvm-default node's global prefix.
+handle_agy() {
+  echo -e "\n${CYAN}=== agy (Antigravity, Google) ===${NC}"
+
+  # Best-effort cleanup of deprecated Gemini CLI. Stderr redirect on
+  # `npm ls` is required: on a clean machine it exits non-zero AND emits
+  # ELSPROBLEMS noise. Scope: nvm-default node's global prefix only;
+  # gemini installs under other nvm node versions persist (accepted --
+  # gemini service stops 2026-06-18 regardless).
+  if command -v npm &>/dev/null; then
+    if npm ls -g @google/gemini-cli &>/dev/null; then
+      echo -e "${BLUE}Removing deprecated @google/gemini-cli npm package ...${NC}"
+      if npm uninstall -g @google/gemini-cli &>/dev/null; then
+        record_summary "Gemini CLI" "Uninstalled (retired 2026-06-18; replaced by agy)"
+      else
+        record_summary "Gemini CLI" "Uninstall failed (manual cleanup needed)"
+      fi
     fi
-  else
-    echo -e "${YELLOW}Gemini CLI is not installed.${NC}"
-    local_version="none"
-    old_version="none"
   fi
-  if remote_version=$(npm view @google/gemini-cli dist-tags.nightly 2>/dev/null); then
-    echo -e "${BLUE}Latest Gemini nightly version: $remote_version${NC}"
-  else
-    echo -e "${YELLOW}Unable to determine Gemini nightly version.${NC}"
-    record_summary "Gemini CLI" "Skipped: unable to query remote version"
+
+  if ! command -v curl &>/dev/null; then
+    echo -e "${YELLOW}curl not found; skipping agy install/update.${NC}"
+    record_summary "agy (Antigravity)" "Skipped: curl not available"
     return
   fi
 
-  if [[ "$local_version" == "$remote_version" ]]; then
-    record_summary "Gemini CLI" "Already up to date ($local_version)"
+  local local_version
+  if [[ -x "$HOME/.local/bin/agy" ]]; then
+    local_version=$("$HOME/.local/bin/agy" --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || echo "unknown")
+    echo -e "${GREEN}Detected agy version: $local_version ($HOME/.local/bin/agy)${NC}"
+  elif command -v agy &>/dev/null; then
+    local_version=$(agy --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || echo "unknown")
+    echo -e "${GREEN}Detected agy version: $local_version ($(command -v agy))${NC}"
   else
-    if out=$(npm install -g @google/gemini-cli@nightly --verbose 2>&1); then
-      new_version=$(gemini --version 2>/dev/null | awk '{print $NF}' || true)
-      record_summary "Gemini CLI" "Updated from $old_version to ${new_version:-unknown}"
-    else
-      record_summary "Gemini CLI" "Update failed: $(echo "$out" | tail -20)"
-    fi
+    echo -e "${YELLOW}agy is not installed.${NC}"
+    local_version="none"
   fi
+
+  echo -e "${BLUE}Running official Antigravity installer (curl -fsSL https://antigravity.google/cli/install.sh | bash) ...${NC}"
+  local tmpfile installer new_version status
+  tmpfile=$(mktemp)
+  installer=$(mktemp -t agy_install.XXXXXX.sh 2>/dev/null || mktemp)
+  set +e
+  curl -fsSL https://antigravity.google/cli/install.sh -o "$installer"
+  status=$?
+  if [[ $status -ne 0 ]]; then
+    record_summary "agy (Antigravity)" "Installer download failed (curl exit $status)"
+    rm -f "$tmpfile" "$installer"
+    set -e
+    return
+  fi
+
+  bash "$installer" 2>&1 | tee "$tmpfile"
+  status=${PIPESTATUS[0]}
+  if [[ $status -ne 0 ]]; then
+    record_summary "agy (Antigravity)" "Installer failed (exit $status): $(tail -5 "$tmpfile")"
+    rm -f "$tmpfile" "$installer"
+    set -e
+    return
+  fi
+
+  if [[ -x "$HOME/.local/bin/agy" ]]; then
+    new_version=$("$HOME/.local/bin/agy" --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+  else
+    new_version=$(agy --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+  fi
+  if [[ -n "$new_version" ]]; then
+    if [[ "$local_version" == "$new_version" ]]; then
+      record_summary "agy (Antigravity)" "Installer ran (already at $new_version)"
+    else
+      record_summary "agy (Antigravity)" "Installer ran ($local_version -> $new_version)"
+    fi
+  else
+    record_summary "agy (Antigravity)" "Installer ran (version unknown)"
+  fi
+  rm -f "$tmpfile" "$installer"
+  set -e
 }
 
 ### ========== PI (Earendil Works) ==========
@@ -622,7 +665,7 @@ handle_grok() {
 main() {
   handle_claude_code
   handle_crush
-  handle_gemini
+  handle_agy
   handle_pi
   # DISABLED: handle_kiro
   handle_codex

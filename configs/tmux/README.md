@@ -19,6 +19,7 @@ Opinionated tmux configuration optimized for AI-assisted development workflows (
 | `T` | Set pane title |
 | `Tab` | Navigator popup — fzf-powered view/jump/move for all panes across sessions |
 | `M` | Merge all detached sessions into current session |
+| `P` | Merge all panes from detached sessions into current window |
 | `r` | Reload config |
 
 ### 3-Row Status Bar
@@ -73,6 +74,12 @@ Action keys (shown in fzf header):
 | `Ctrl-R` | Move current window to new session | Captures source window explicitly before move; opens new terminal tab |
 
 Selecting the current pane (`*`) with any action key (except Enter) shows "Already here".
+
+### `scripts/merge-panes.sh`
+
+Moves every pane from detached sessions into the current window. The command preserves panes already in the current window, skips the current session, restores focus to the pane where it was invoked, and retiles after each join so small windows can keep accepting panes.
+
+Triggered by `Prefix + P` (`merge-panes`).
 
 ### `scripts/terminal-tab.sh`
 
