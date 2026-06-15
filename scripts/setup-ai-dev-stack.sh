@@ -442,7 +442,7 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 2b. AEO GHOSTTY SESSION LAUNCHER (transparent tmux + tiling CSD fix)
+# 2b. AEO GHOSTTY SESSION LAUNCHER (transparent tmux + decoration fix)
 # ═══════════════════════════════════════════════════════════════════════════
 GHOSTTY_LAUNCHER_DEPLOYED=false
 GHOSTTY_SRC="$SCRIPT_DIR/../configs/ghostty"
@@ -465,22 +465,30 @@ _gt_md5_match() {
     [[ -n "$a" && "$a" == "$b" ]]
 }
 
-# Broad tiling-WM detection. Under a tiling WM, Ghostty's GTK client-side
-# decoration shadow margins (_GTK_FRAME_EXTENTS) desync the mouse->cell mapping
-# (selection drifts left ~1 cell per column), because the WM places the window by
-# its frame, not its content box. `window-decoration = none` zeroes the extents
-# and fixes it. KDE/KWin is verified; sway/Hyprland/i3 and friends are always
-# tiling. GNOME is floating by default, so it is intentionally NOT matched —
-# enabling the fix there would surprise users by removing the titlebar.
+# Desktop decoration detection. Plasma/KWin can avoid Ghostty's GTK CSD frame
+# offset with server-side decorations, preserving resize handles instead of
+# removing every border. Tiling WMs without usable server-side decoration support
+# keep the old borderless fallback.
+_gt_is_plasma_kwin() {
+    local hay
+    hay="${XDG_CURRENT_DESKTOP:-}:${XDG_SESSION_DESKTOP:-}:${DESKTOP_SESSION:-}"
+    case "${hay,,}" in
+        *kde*|*plasma*) return 0 ;;
+    esac
+    pgrep -x kwin_wayland >/dev/null 2>&1 && return 0
+    pgrep -x kwin_x11 >/dev/null 2>&1 && return 0
+    return 1
+}
+
 _gt_is_tiling_wm() {
     local hay p
     hay="${XDG_CURRENT_DESKTOP:-}:${XDG_SESSION_DESKTOP:-}:${DESKTOP_SESSION:-}"
     case "${hay,,}" in
-        *kde*|*plasma*|*sway*|*hyprland*|*i3*|*wayfire*|*river*|*bspwm*|*qtile*|*dwm*|*xmonad*)
+        *sway*|*hyprland*|*i3*|*wayfire*|*river*|*bspwm*|*qtile*|*dwm*|*xmonad*)
             return 0 ;;
     esac
     [[ -n "${SWAYSOCK:-}" || -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" || -n "${I3SOCK:-}" ]] && return 0
-    for p in kwin_wayland kwin_x11 sway Hyprland i3 bspwm river wayfire qtile dwm xmonad; do
+    for p in sway Hyprland i3 bspwm river wayfire qtile dwm xmonad; do
         pgrep -x "$p" >/dev/null 2>&1 && return 0
     done
     return 1
@@ -569,18 +577,22 @@ _gt_deploy_rc_all() {
     fi
 }
 
-# Deploy the launcher binary + aeo-launcher.conf, uncommenting the tiling CSD fix
-# only when a tiling WM is detected.
+# Deploy the launcher binary + aeo-launcher.conf, enabling the least-invasive
+# decoration fix for the detected desktop.
 _gt_deploy_assets() {
     mkdir -p "$GHOSTTY_DEST"
     cp "$GHOSTTY_LAUNCHER_SRC" "$GHOSTTY_DEST/ghostty-tmux-launch"
     chmod +x "$GHOSTTY_DEST/ghostty-tmux-launch"
     cp "$GHOSTTY_SRC/aeo-launcher.conf" "$GHOSTTY_DEST/aeo-launcher.conf"
-    if _gt_is_tiling_wm; then
-        sed -i 's|^# *window-decoration = none.*|window-decoration = none|' "$GHOSTTY_DEST/aeo-launcher.conf"
-        info "Tiling WM detected -> enabled window-decoration = none (CSD mouse-offset fix)"
+    if _gt_is_plasma_kwin; then
+        sed -i '0,/^# *window-decoration = server/s|^# *window-decoration = server.*|window-decoration = server|' "$GHOSTTY_DEST/aeo-launcher.conf"
+        sed -i '0,/^# *gtk-titlebar = false/s|^# *gtk-titlebar = false.*|gtk-titlebar = false|' "$GHOSTTY_DEST/aeo-launcher.conf"
+        info "Plasma/KWin detected -> enabled window-decoration = server and gtk-titlebar = false"
+    elif _gt_is_tiling_wm; then
+        sed -i '0,/^# *window-decoration = none/s|^# *window-decoration = none.*|window-decoration = none|' "$GHOSTTY_DEST/aeo-launcher.conf"
+        info "Tiling WM detected -> enabled borderless window-decoration = none fallback"
     else
-        info "No tiling WM detected -> tiling CSD fix left commented (it removes the titlebar; opt in by hand if needed)"
+        info "No decoration workaround needed -> Ghostty decoration settings left commented"
     fi
 }
 
@@ -624,7 +636,7 @@ _gt_install_integrate() {
     local cfg="$GHOSTTY_DEST/config"
     [[ -f "$cfg" ]] || { : > "$cfg"; info "Created minimal ~/.config/ghostty/config"; }
     if ! grep -qF 'config-file = aeo-launcher.conf' "$cfg"; then
-        printf '\n# AEO Ghostty session launcher (native-split keybinds + tiling CSD fix)\nconfig-file = aeo-launcher.conf\n' >> "$cfg"
+        printf '\n# AEO Ghostty session launcher (native-split keybinds + decoration fix)\nconfig-file = aeo-launcher.conf\n' >> "$cfg"
         info "Added 'config-file = aeo-launcher.conf' to your Ghostty config"
     fi
     _gt_append_tmux_lines
@@ -715,14 +727,17 @@ EOF
 
 # Pre-check: silently skip when the recorded mode is already fully deployed
 # (launcher md5 matches, conf present, Full's config matches, rc guards present).
-# aeo-launcher.conf is intentionally not md5-checked — the tiling fix toggles a
-# comment, so its hash legitimately differs from the repo source.
+# aeo-launcher.conf is version-checked instead of md5-checked — desktop-specific
+# decoration toggles legitimately change its hash after deployment.
 _gt_ready=false
 if [[ -f "$GHOSTTY_MODE_MARKER" ]]; then
     _gt_mode="$(cat "$GHOSTTY_MODE_MARKER" 2>/dev/null || true)"
     _gt_ready=true
     _gt_md5_match "$GHOSTTY_LAUNCHER_SRC" "$GHOSTTY_DEST/ghostty-tmux-launch" || _gt_ready=false
     [[ -f "$GHOSTTY_DEST/aeo-launcher.conf" ]] || _gt_ready=false
+    _gt_conf_version="$(grep -m1 '^# AEO_GHOSTTY_LAUNCHER_CONF_VERSION=' "$GHOSTTY_SRC/aeo-launcher.conf" 2>/dev/null || true)"
+    [[ -n "$_gt_conf_version" ]] || _gt_ready=false
+    grep -qF "$_gt_conf_version" "$GHOSTTY_DEST/aeo-launcher.conf" 2>/dev/null || _gt_ready=false
     if [[ "$_gt_mode" == "full" ]]; then
         _gt_md5_match "$GHOSTTY_SRC/config.full" "$GHOSTTY_DEST/config" || _gt_ready=false
     fi
@@ -742,7 +757,7 @@ else
     echo -e "${BLUE}AEO Ghostty Session Launcher${NC}"
     echo "  Transparent tmux under Ghostty: every window/tab/native split lands in"
     echo "  its own recoverable tmux session via one fzf screen (name it, Tab-pull"
-    echo "  detached sessions in as panes). Includes the tiling-WM CSD mouse fix."
+    echo "  detached sessions in as panes). Includes a desktop-specific decoration fix."
     if ! command_exists ghostty; then
         echo ""
         echo -e "${YELLOW}  NOTE: Ghostty is not installed — the launcher stays dormant until it is.${NC}"
@@ -750,8 +765,8 @@ else
     echo ""
     echo "  Install options:"
     echo "    1) Integrate  - additive; keeps your config, adds a config-file include"
-    echo "                    (overrides only alt+d, alt+shift+d, and — on a tiling"
-    echo "                    WM — window-decoration). Reversible by hand."
+    echo "                    (overrides only alt+d, alt+shift+d, and, when needed,"
+    echo "                    Ghostty decoration keys). Reversible by hand."
     echo "    2) Full AEO   - opinionated bundle; REPLACES your Ghostty + tmux configs"
     echo "                    (timestamped backups + one-command restore script)."
     echo "    s) Skip"
@@ -1665,7 +1680,7 @@ if $ZELLIJ_INSTALLED; then
     echo "  - Zellij terminal multiplexer (with AEO config)"
 fi
 if $GHOSTTY_LAUNCHER_DEPLOYED; then
-    echo "  - Ghostty session launcher (transparent tmux + tiling CSD fix)"
+    echo "  - Ghostty session launcher (transparent tmux + decoration fix)"
 fi
 echo "  - Bun JS runtime"
 echo "  - direnv"

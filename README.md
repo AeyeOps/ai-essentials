@@ -127,7 +127,7 @@ Located in `configs/` — copy what you need or use as reference.
 | Config | Highlights |
 |--------|------------|
 | **Kitty** | True black (#000000) for OLED, 4K grid sizing, 50k scrollback, low-latency GPU settings |
-| **Ghostty** | Transparent-tmux session launcher + tiling-WM CSD mouse-offset fix (see below) |
+| **Ghostty** | Transparent-tmux session launcher + desktop-specific Ghostty decoration fix (see below) |
 | **Zellij** | Modern theme matching Powerlevel10k classic darkest |
 | **Pop Shell** | 4px gaps, smart-gaps, active-hint, hidden window titles |
 
@@ -147,10 +147,10 @@ Every Ghostty surface — window, tab, or native split — lands in its own tmux
 
 Two install paths (the installer asks which):
 
-- **Integrate** — additive. Keeps your existing config; adds a `config-file` include plus the shell rc guard. Overrides only `alt+d`, `alt+shift+d`, and (on a tiling WM) `window-decoration`. Reversible by hand.
+- **Integrate** — additive. Keeps your existing config; adds a `config-file` include plus the shell rc guard. Overrides only `alt+d`, `alt+shift+d`, and, when needed, Ghostty decoration keys. Reversible by hand.
 - **Full AEO** — opinionated bundle (AEO tmux + Ghostty config + launcher). Replaces your Ghostty and tmux configs after a pre-confirm screen that names every file, makes timestamped backups, and generates a one-command `restore-<stamp>.sh`.
 
-**Tiling-WM mouse fix:** under a tiling window manager (KDE/KWin, sway, Hyprland, i3…), Ghostty's GTK client-side-decoration shadow margins desync the mouse→cell mapping, so text selection drifts several columns. The installer detects a tiling WM and enables `window-decoration = none` to zero the frame extents and correct it — left commented on floating desktops, where it would needlessly remove the titlebar. Diagnose by hand with `xprop _GTK_FRAME_EXTENTS`.
+**Decoration mouse fix:** on Plasma/KWin, Ghostty uses `window-decoration = server` plus `gtk-titlebar = false` so KWin provides resize handles without GTK CSD frame offsets. On tiling WMs without usable server-side decorations, the installer can still enable the borderless `window-decoration = none` fallback. Diagnose by hand with `xprop _GTK_FRAME_EXTENTS`.
 
 Requires Ghostty and fzf 0.45+ (the installer resolves or installs a new-enough fzf). See [`configs/ghostty/`](configs/ghostty/) for details.
 
@@ -186,7 +186,7 @@ ai-essentials/
 │   ├── google-chrome-wsl2.sh
 │   └── update-coding-agents.sh
 ├── configs/
-│   ├── ghostty/          # Session launcher + tiling CSD fix
+│   ├── ghostty/          # Session launcher + decoration fix
 │   ├── kitty/
 │   ├── tmux/
 │   ├── zellij/

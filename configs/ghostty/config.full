@@ -3,7 +3,7 @@
 # first). For a non-destructive install that keeps your own look/feel, use the
 # "Integrate" option instead — it only adds the `config-file` include below.
 
-# Launcher integration: native-split keybinds + the (WM-gated) tiling/CSD fix.
+# Launcher integration: native-split keybinds + the desktop-gated decoration fix.
 # Kept in one place so both install options share it.
 config-file = aeo-launcher.conf
 

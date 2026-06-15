@@ -28,7 +28,7 @@ sessions, and can pull selected detached sessions back in **as panes**.
 |------|------|
 | `ghostty-tmux-launch` | The launcher (zsh) — deployed to `~/.config/ghostty/` |
 | `ghostty-tmux-launch.bash` | Bash port (deployed instead when zsh is absent) |
-| `aeo-launcher.conf` | Split keybinds + the (WM-gated) tiling fix; included by the main config |
+| `aeo-launcher.conf` | Split keybinds + desktop-gated decoration fix; included by the main config |
 | `config.full` | Opinionated full config (Full option only) |
 | `rc-snippet.zsh` / `rc-snippet.bash` | The rc guard + integration-source blocks the installer appends |
 
@@ -48,8 +48,9 @@ Adds the launcher without rewriting your look/feel:
 
 Because a Ghostty `config-file` include **overrides the parent config on
 conflict**, this still changes these keys if you already set them:
-`keybind = alt+d`, `keybind = alt+shift+d`, and (on a tiling WM)
-`window-decoration`. Everything else — theme, font, colors — is untouched.
+`keybind = alt+d`, `keybind = alt+shift+d`, and, when needed, Ghostty
+decoration keys (`window-decoration`, plus `gtk-titlebar` on Plasma/KWin).
+Everything else — theme, font, colors — is untouched.
 
 **Revert:** delete the marker-fenced blocks from your rc files and remove the
 `config-file = aeo-launcher.conf` line from your Ghostty config. Nothing was
@@ -60,7 +61,7 @@ overwritten.
 Installs the curated AEO experience as a bundle (AEO tmux + AEO Ghostty config +
 launcher). This **replaces** `~/.config/tmux/tmux.conf` and overwrites the
 AEO-managed Ghostty config (theme TokyoNight Night, OLED-black background,
-font-size 9, scroll multiplier, the split keybinds, and the tiling fix).
+font-size 9, scroll multiplier, the split keybinds, and the decoration fix).
 
 Before any write, the installer prints exactly which files it will replace, makes
 a timestamped backup of each (`*.bak.<stamp>`), and generates a
@@ -70,19 +71,19 @@ one-command rollback whose path is shown before you confirm.
 **Revert:** run the `restore-<stamp>.sh` printed at install time. With more than
 one install, use the most recent one.
 
-## Tiling-WM mouse-offset fix
+## Decoration mouse-offset fix
 
-Under a tiling window manager (e.g. KDE Plasma / KWin), Ghostty's GTK
-client-side-decoration shadow margins desync the mouse→cell mapping, so text
-selection drifts several columns to the left — but only while the window is
-tiled. The fix is `window-decoration = none`, which zeroes the frame extents so
-the window box equals the content box.
+Ghostty's GTK client-side-decoration shadow margins can desync the mouse→cell
+mapping, so text selection drifts several columns to the left. On Plasma/KWin,
+the least-invasive fix is `window-decoration = server` plus `gtk-titlebar = false`:
+KWin owns the resize frame/titlebar and Ghostty does not add GTK CSD extents.
 
-This ships **commented** in `aeo-launcher.conf` and is enabled by the installer
-only when a tiling WM is detected — it also removes the titlebar, so it is not
-forced on non-tiling desktops. To diagnose by hand, run `xprop _GTK_FRAME_EXTENTS`
-and click the Ghostty window: a nonzero left value is the offset, in pixels
-(≈ one cell width per column of drift).
+For tiling WMs without usable server-side decorations, the installer can enable
+the borderless fallback `window-decoration = none`. That fallback zeroes frame
+extents, but it also removes all window decorations, so Plasma/KWin does not use
+it. To diagnose by hand, run `xprop _GTK_FRAME_EXTENTS` and click the Ghostty
+window: a nonzero left value is the offset, in pixels (≈ one cell width per
+column of drift).
 
 ## Requirements
 
