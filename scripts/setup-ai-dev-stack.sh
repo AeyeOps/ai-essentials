@@ -442,6 +442,329 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 2b. AEO GHOSTTY SESSION LAUNCHER (transparent tmux + tiling CSD fix)
+# ═══════════════════════════════════════════════════════════════════════════
+GHOSTTY_LAUNCHER_DEPLOYED=false
+GHOSTTY_SRC="$SCRIPT_DIR/../configs/ghostty"
+GHOSTTY_DEST="$HOME/.config/ghostty"
+GHOSTTY_MODE_MARKER="$GHOSTTY_DEST/.aeo-launcher-mode"
+
+# The launcher runs under its own shebang, so we deploy ONE binary named
+# ghostty-tmux-launch (the zsh variant if zsh is present, else the bash port);
+# both rc guards exec that path. The per-shell choice only affects the rc snippet.
+if command_exists zsh; then
+    GHOSTTY_LAUNCHER_SRC="$GHOSTTY_SRC/ghostty-tmux-launch"
+else
+    GHOSTTY_LAUNCHER_SRC="$GHOSTTY_SRC/ghostty-tmux-launch.bash"
+fi
+
+_gt_md5() { [[ -f "$1" ]] && md5sum "$1" | awk '{print $1}'; }
+_gt_md5_match() {
+    local a b
+    a="$(_gt_md5 "$1")"; b="$(_gt_md5 "$2")"
+    [[ -n "$a" && "$a" == "$b" ]]
+}
+
+# Broad tiling-WM detection. Under a tiling WM, Ghostty's GTK client-side
+# decoration shadow margins (_GTK_FRAME_EXTENTS) desync the mouse->cell mapping
+# (selection drifts left ~1 cell per column), because the WM places the window by
+# its frame, not its content box. `window-decoration = none` zeroes the extents
+# and fixes it. KDE/KWin is verified; sway/Hyprland/i3 and friends are always
+# tiling. GNOME is floating by default, so it is intentionally NOT matched —
+# enabling the fix there would surprise users by removing the titlebar.
+_gt_is_tiling_wm() {
+    local hay p
+    hay="${XDG_CURRENT_DESKTOP:-}:${XDG_SESSION_DESKTOP:-}:${DESKTOP_SESSION:-}"
+    case "${hay,,}" in
+        *kde*|*plasma*|*sway*|*hyprland*|*i3*|*wayfire*|*river*|*bspwm*|*qtile*|*dwm*|*xmonad*)
+            return 0 ;;
+    esac
+    [[ -n "${SWAYSOCK:-}" || -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" || -n "${I3SOCK:-}" ]] && return 0
+    for p in kwin_wayland kwin_x11 sway Hyprland i3 bspwm river wayfire qtile dwm xmonad; do
+        pgrep -x "$p" >/dev/null 2>&1 && return 0
+    done
+    return 1
+}
+
+# Resolve an fzf >= 0.45 (the launcher's conditional Tab needs fzf's `transform`
+# action, added in 0.45; apt ships 0.44.1). Sets GT_FZF_PATH. Installs the latest
+# release to /usr/local/bin only when no new-enough fzf is found.
+GT_FZF_PATH=""
+_gt_resolve_fzf() {
+    local cand ver maj min url
+    for cand in "$(command -v fzf 2>/dev/null || true)" /usr/local/bin/fzf; do
+        [[ -x "$cand" ]] || continue
+        ver="$("$cand" --version 2>/dev/null | grep -oE '^[0-9]+\.[0-9]+')"
+        maj="${ver%%.*}"; min="${ver#*.}"
+        if (( ${maj:-0} > 0 || ${min:-0} >= 45 )); then
+            GT_FZF_PATH="$cand"; return 0
+        fi
+    done
+    info "Installing fzf >= 0.45 from GitHub (apt's fzf is too old for the launcher's conditional Tab)..."
+    url="$(curl --max-time 30 https://api.github.com/repos/junegunn/fzf/releases/latest \
+        | grep -oP '"browser_download_url":\s*"\K[^"]+linux_'"$ARCH_DEB"'\.tar\.gz' | head -n1)"
+    if [[ -n "$url" ]]; then
+        curl -fSL "$url" -o /tmp/fzf.tar.gz
+        sudo tar -xzf /tmp/fzf.tar.gz -C /usr/local/bin/ fzf
+        rm -f /tmp/fzf.tar.gz
+        GT_FZF_PATH="/usr/local/bin/fzf"
+        success "fzf $("$GT_FZF_PATH" --version | awk '{print $1}') installed -> /usr/local/bin/fzf"
+        return 0
+    fi
+    warn "Could not fetch a newer fzf; conditional Tab degrades to plain Tab"
+    GT_FZF_PATH="fzf"
+}
+
+# Echo one marker-fenced block (guard|integration) from an rc snippet, with
+# @FZF_PATH@ substituted for the resolved fzf path.
+_gt_extract_block() {
+    local snip="$1" kind="$2" fzf="$3" s e
+    if [[ "$kind" == "guard" ]]; then
+        s='# >>> aeo ghostty session launcher (guard) >>>'
+        e='# <<< aeo ghostty session launcher (guard) <<<'
+    else
+        s='# >>> aeo ghostty shell integration >>>'
+        e='# <<< aeo ghostty shell integration <<<'
+    fi
+    awk -v s="$s" -v e="$e" 'index($0,s){f=1} f{print} index($0,e){f=0}' "$snip" \
+        | sed "s|@FZF_PATH@|$fzf|g"
+}
+
+# Prepend the guard block to the top of an rc file (it execs, so it must run
+# above the p10k instant-prompt block) and append the integration block to the
+# end. Both are idempotent on their marker comments.
+_gt_apply_rc() {
+    local rc="$1" snip="$2" fzf="$3" tmp
+    if ! grep -qF 'aeo ghostty session launcher (guard)' "$rc" 2>/dev/null; then
+        tmp="$(mktemp)"
+        { _gt_extract_block "$snip" guard "$fzf"; echo ""; cat "$rc" 2>/dev/null || true; } > "$tmp"
+        cat "$tmp" > "$rc"
+        rm -f "$tmp"
+        info "Added Ghostty launcher guard to $(basename "$rc")"
+    fi
+    if ! grep -qF 'aeo ghostty shell integration' "$rc" 2>/dev/null; then
+        { echo ""; _gt_extract_block "$snip" integration "$fzf"; } >> "$rc"
+        info "Added Ghostty shell integration to $(basename "$rc")"
+    fi
+}
+
+# Apply rc blocks to every detected rc file (.zshrc uses the zsh snippet, .bashrc
+# the bash snippet). If neither exists, create the one matching the user's shell.
+_gt_deploy_rc_all() {
+    local fzf="$1" did=false
+    if [[ -f "$HOME/.zshrc" ]]; then
+        _gt_apply_rc "$HOME/.zshrc" "$GHOSTTY_SRC/rc-snippet.zsh" "$fzf"; did=true
+    fi
+    if [[ -f "$HOME/.bashrc" ]]; then
+        _gt_apply_rc "$HOME/.bashrc" "$GHOSTTY_SRC/rc-snippet.bash" "$fzf"; did=true
+    fi
+    if ! $did; then
+        if command_exists zsh; then
+            touch "$HOME/.zshrc"
+            _gt_apply_rc "$HOME/.zshrc" "$GHOSTTY_SRC/rc-snippet.zsh" "$fzf"
+        else
+            touch "$HOME/.bashrc"
+            _gt_apply_rc "$HOME/.bashrc" "$GHOSTTY_SRC/rc-snippet.bash" "$fzf"
+        fi
+    fi
+}
+
+# Deploy the launcher binary + aeo-launcher.conf, uncommenting the tiling CSD fix
+# only when a tiling WM is detected.
+_gt_deploy_assets() {
+    mkdir -p "$GHOSTTY_DEST"
+    cp "$GHOSTTY_LAUNCHER_SRC" "$GHOSTTY_DEST/ghostty-tmux-launch"
+    chmod +x "$GHOSTTY_DEST/ghostty-tmux-launch"
+    cp "$GHOSTTY_SRC/aeo-launcher.conf" "$GHOSTTY_DEST/aeo-launcher.conf"
+    if _gt_is_tiling_wm; then
+        sed -i 's|^# *window-decoration = none.*|window-decoration = none|' "$GHOSTTY_DEST/aeo-launcher.conf"
+        info "Tiling WM detected -> enabled window-decoration = none (CSD mouse-offset fix)"
+    else
+        info "No tiling WM detected -> tiling CSD fix left commented (it removes the titlebar; opt in by hand if needed)"
+    fi
+}
+
+# Append the 3 Ghostty terminfo/title lines to the active user tmux config when
+# missing (Full deploys the AEO tmux.conf, which already carries them).
+_gt_append_tmux_lines() {
+    local tcfg=""
+    if [[ -f "$HOME/.config/tmux/tmux.conf" ]]; then tcfg="$HOME/.config/tmux/tmux.conf"
+    elif [[ -f "$HOME/.tmux.conf" ]]; then tcfg="$HOME/.tmux.conf"
+    else
+        mkdir -p "$HOME/.config/tmux"; tcfg="$HOME/.config/tmux/tmux.conf"; : > "$tcfg"
+    fi
+    if ! grep -qF 'terminal-features ",xterm-ghostty:RGB"' "$tcfg"; then
+        cat >> "$tcfg" << 'EOF'
+
+# Ghostty terminfo + title forwarding (for the Ghostty session launcher)
+set -as terminal-features ",xterm-ghostty:RGB"
+set -as terminal-features ",xterm-ghostty:hyperlinks"
+set -g  set-titles on
+EOF
+        info "Added Ghostty terminfo/title lines to $(basename "$tcfg")"
+    fi
+}
+
+# Guard against a silently-broken include (Ghostty fails config soft).
+_gt_validate() {
+    command_exists ghostty || return 0
+    if ghostty +validate-config >/tmp/gt-validate.out 2>&1; then
+        success "ghostty +validate-config: config is valid"
+    else
+        warn "ghostty +validate-config reported issues:"
+        sed 's/^/    /' /tmp/gt-validate.out || true
+    fi
+    rm -f /tmp/gt-validate.out
+}
+
+# Option A — additive: keep the user's config, add a `config-file` include.
+_gt_install_integrate() {
+    _gt_resolve_fzf
+    _gt_deploy_assets
+    local cfg="$GHOSTTY_DEST/config"
+    [[ -f "$cfg" ]] || { : > "$cfg"; info "Created minimal ~/.config/ghostty/config"; }
+    if ! grep -qF 'config-file = aeo-launcher.conf' "$cfg"; then
+        printf '\n# AEO Ghostty session launcher (native-split keybinds + tiling CSD fix)\nconfig-file = aeo-launcher.conf\n' >> "$cfg"
+        info "Added 'config-file = aeo-launcher.conf' to your Ghostty config"
+    fi
+    _gt_append_tmux_lines
+    _gt_deploy_rc_all "$GT_FZF_PATH"
+    echo "integrate" > "$GHOSTTY_MODE_MARKER"
+    _gt_validate
+    GHOSTTY_LAUNCHER_DEPLOYED=true
+    success "AEO Ghostty launcher installed (Integrate) -> ~/.config/ghostty/"
+}
+
+# Option B — opinionated: REPLACE the Ghostty + tmux configs. Pre-confirm screen
+# names every replaced file, its backup, and the one-command rollback BEFORE any
+# write; timestamped backups; a generated restore-<stamp>.sh undoes it all.
+_gt_install_full() {
+    STAMP="$(date +%Y%m%d%H%M%S)"
+    local cfg="$GHOSTTY_DEST/config"
+    local restore="$GHOSTTY_DEST/restore-$STAMP.sh"
+    mkdir -p "$GHOSTTY_DEST"
+
+    echo ""
+    echo -e "${YELLOW}  Full AEO will REPLACE these files (timestamped backup of each first):${NC}"
+    [[ -f "$cfg" ]]                         && echo "    ~/.config/ghostty/config     -> ~/.config/ghostty/config.bak.$STAMP"
+    [[ -f "$HOME/.config/tmux/tmux.conf" ]] && echo "    ~/.config/tmux/tmux.conf     -> ~/.config/tmux/tmux.conf.bak.$STAMP"
+    [[ -f "$HOME/.tmux.conf" ]]             && echo "    ~/.tmux.conf                 -> ~/.tmux.conf.bak.$STAMP"
+    echo "  Also deploys: ghostty-tmux-launch, aeo-launcher.conf, the AEO tmux"
+    echo "  scripts, and rc guard/integration blocks in ~/.zshrc and ~/.bashrc."
+    echo ""
+    echo -e "${YELLOW}  One-command rollback (generated at install time):${NC}"
+    echo "    bash ${restore/#$HOME/~}"
+    echo ""
+    read -r -p "  Proceed with Full AEO? [y/N] " gt_full || gt_full="n"
+    if [[ "${gt_full,,}" != "y" ]]; then
+        info "Skipped AEO Ghostty launcher (Full)"
+        return 0
+    fi
+
+    _gt_resolve_fzf
+
+    local _gt_restore_lines=""
+    _gt_backup() {
+        [[ -f "$1" ]] || return 0
+        cp "$1" "$1.bak.$STAMP"
+        _gt_restore_lines+="cp -f \"$1.bak.$STAMP\" \"$1\""$'\n'
+        info "Backed up $(basename "$1")"
+    }
+    _gt_backup "$cfg"
+    _gt_backup "$HOME/.config/tmux/tmux.conf"
+    _gt_backup "$HOME/.tmux.conf"
+
+    cp "$GHOSTTY_SRC/config.full" "$cfg"
+    _gt_deploy_assets
+
+    if [[ -f "$TMUX_CONFIG_SRC/tmux.conf" ]]; then
+        mkdir -p "$TMUX_DEST/scripts"
+        cp "$TMUX_CONFIG_SRC/tmux.conf" "$TMUX_DEST/tmux.conf"
+        if [[ -d "$TMUX_CONFIG_SRC/scripts" ]]; then
+            cp "$TMUX_CONFIG_SRC/scripts/"* "$TMUX_DEST/scripts/"
+            chmod +x "$TMUX_DEST/scripts/"*.sh 2>/dev/null || true
+        fi
+        info "Deployed AEO tmux config -> ~/.config/tmux/"
+    fi
+
+    _gt_deploy_rc_all "$GT_FZF_PATH"
+    echo "full" > "$GHOSTTY_MODE_MARKER"
+
+    cat > "$restore" <<EOF
+#!/usr/bin/env bash
+# AEO Ghostty 'Full' install rollback ($STAMP). Restores the replaced files and
+# strips the rc launcher blocks. Generated by setup-ai-dev-stack.sh.
+set -uo pipefail
+echo "Rolling back AEO Ghostty 'Full' install ($STAMP)..."
+$_gt_restore_lines
+for rc in "\$HOME/.zshrc" "\$HOME/.bashrc"; do
+  [[ -f "\$rc" ]] || continue
+  sed -i '/# >>> aeo ghostty session launcher (guard) >>>/,/# <<< aeo ghostty session launcher (guard) <<</d' "\$rc"
+  sed -i '/# >>> aeo ghostty shell integration >>>/,/# <<< aeo ghostty shell integration <<</d' "\$rc"
+done
+rm -f "$GHOSTTY_MODE_MARKER"
+echo "Rollback complete. Open a new shell (or 'exec \$SHELL') to apply."
+EOF
+    chmod +x "$restore"
+
+    _gt_validate
+    GHOSTTY_LAUNCHER_DEPLOYED=true
+    success "AEO Ghostty launcher installed (Full AEO) -> ~/.config/ghostty/"
+    info "Rollback any time: bash ${restore/#$HOME/~}"
+}
+
+# Pre-check: silently skip when the recorded mode is already fully deployed
+# (launcher md5 matches, conf present, Full's config matches, rc guards present).
+# aeo-launcher.conf is intentionally not md5-checked — the tiling fix toggles a
+# comment, so its hash legitimately differs from the repo source.
+_gt_ready=false
+if [[ -f "$GHOSTTY_MODE_MARKER" ]]; then
+    _gt_mode="$(cat "$GHOSTTY_MODE_MARKER" 2>/dev/null || true)"
+    _gt_ready=true
+    _gt_md5_match "$GHOSTTY_LAUNCHER_SRC" "$GHOSTTY_DEST/ghostty-tmux-launch" || _gt_ready=false
+    [[ -f "$GHOSTTY_DEST/aeo-launcher.conf" ]] || _gt_ready=false
+    if [[ "$_gt_mode" == "full" ]]; then
+        _gt_md5_match "$GHOSTTY_SRC/config.full" "$GHOSTTY_DEST/config" || _gt_ready=false
+    fi
+    if $_gt_ready; then
+        for _rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+            [[ -f "$_rc" ]] || continue
+            grep -qF 'aeo ghostty session launcher (guard)' "$_rc" || { _gt_ready=false; break; }
+        done
+    fi
+fi
+
+if $_gt_ready; then
+    warn "AEO Ghostty launcher already installed ($_gt_mode mode) and up to date"
+    GHOSTTY_LAUNCHER_DEPLOYED=true
+else
+    echo ""
+    echo -e "${BLUE}AEO Ghostty Session Launcher${NC}"
+    echo "  Transparent tmux under Ghostty: every window/tab/native split lands in"
+    echo "  its own recoverable tmux session via one fzf screen (name it, Tab-pull"
+    echo "  detached sessions in as panes). Includes the tiling-WM CSD mouse fix."
+    if ! command_exists ghostty; then
+        echo ""
+        echo -e "${YELLOW}  NOTE: Ghostty is not installed — the launcher stays dormant until it is.${NC}"
+    fi
+    echo ""
+    echo "  Install options:"
+    echo "    1) Integrate  - additive; keeps your config, adds a config-file include"
+    echo "                    (overrides only alt+d, alt+shift+d, and — on a tiling"
+    echo "                    WM — window-decoration). Reversible by hand."
+    echo "    2) Full AEO   - opinionated bundle; REPLACES your Ghostty + tmux configs"
+    echo "                    (timestamped backups + one-command restore script)."
+    echo "    s) Skip"
+    echo ""
+    read -r -p "  Choose [1/2/s]: " gt_choice || gt_choice="s"
+    case "${gt_choice,,}" in
+        1|integrate) _gt_install_integrate ;;
+        2|full)      _gt_install_full ;;
+        *)           info "Skipped AEO Ghostty launcher" ;;
+    esac
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 2. NVM + NODE.JS 22 LTS
 # ═══════════════════════════════════════════════════════════════════════════
 info "Checking NVM..."
@@ -1341,6 +1664,9 @@ fi
 if $ZELLIJ_INSTALLED; then
     echo "  - Zellij terminal multiplexer (with AEO config)"
 fi
+if $GHOSTTY_LAUNCHER_DEPLOYED; then
+    echo "  - Ghostty session launcher (transparent tmux + tiling CSD fix)"
+fi
 echo "  - Bun JS runtime"
 echo "  - direnv"
 echo "  - GitHub CLI (gh)"
@@ -1372,6 +1698,9 @@ if $TMUX_CONFIG_APPLIED; then
 fi
 if $ZELLIJ_CONFIG_APPLIED; then
     echo "  - AEO zellij config applied (p10k-aeo theme, Alt-key status row)"
+fi
+if $GHOSTTY_LAUNCHER_DEPLOYED; then
+    echo "  - Ghostty launcher fires via the rc guard under Ghostty; restart Ghostty to use it"
 fi
 echo "  - Set your terminal font to 'MesloLGS NF' for proper icons"
 echo ""

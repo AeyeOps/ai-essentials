@@ -1,0 +1,21 @@
+# AEO Ghostty config (full, opinionated) — deployed by the "Full AEO" install
+# option, which REPLACES ~/.config/ghostty/config (a timestamped backup is made
+# first). For a non-destructive install that keeps your own look/feel, use the
+# "Integrate" option instead — it only adds the `config-file` include below.
+
+# Launcher integration: native-split keybinds + the (WM-gated) tiling/CSD fix.
+# Kept in one place so both install options share it.
+config-file = aeo-launcher.conf
+
+# Theme: TokyoNight Night, background forced pure black for OLED contrast.
+theme = TokyoNight Night
+background = 000000
+
+# Denser layout than the default 12 pt.
+font-size = 9
+
+# Faster mouse wheel for full-screen TUIs.
+mouse-scroll-multiplier = 3
+
+# No `command =`: entry is the shell rc guard so the launcher also fires for
+# native splits, not just the initial surface.

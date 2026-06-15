@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.30] - 2026-06-15
+
+### Added
+- `configs/ghostty/`: Ghostty session launcher bundle — `ghostty-tmux-launch` (zsh) and `ghostty-tmux-launch.bash` (bash port), `aeo-launcher.conf` (native-split keybinds + the WM-gated tiling CSD fix), `config.full` (opinionated config), `rc-snippet.zsh`/`rc-snippet.bash`, and a README. Transparent tmux: every Ghostty surface (window, tab, native split) lands in its own recoverable tmux session via one fzf screen that names the session and pulls detached sessions in as panes.
+- `setup-ai-dev-stack.sh`: new optional "AEO Ghostty session launcher" component with two install paths — **Integrate** (additive; appends a `config-file = aeo-launcher.conf` include and the shell rc guard, overriding only `alt+d`, `alt+shift+d`, and—on a tiling WM—`window-decoration`) and **Full AEO** (replaces the Ghostty and tmux configs after a pre-confirm screen, with timestamped backups and a generated one-command `restore-<stamp>.sh`). A mode-marker-keyed idempotent pre-check silently skips when the recorded mode is already fully deployed.
+- `setup-ai-dev-stack.sh`: broad tiling-WM detection (`XDG_CURRENT_DESKTOP`/session-desktop signals, `$SWAYSOCK`/`$HYPRLAND_INSTANCE_SIGNATURE`/`$I3SOCK`, and a `pgrep` fallback for KWin/sway/Hyprland/i3/bspwm/river/wayfire/qtile/dwm/xmonad) auto-enables `window-decoration = none` to fix the GTK client-side-decoration `_GTK_FRAME_EXTENTS` mouse→cell offset; left commented on floating desktops so the titlebar is not removed.
+- `setup-ai-dev-stack.sh`: resolves an `fzf` ≥ 0.45 (the launcher's conditional `Tab` needs fzf's `transform` action, added in 0.45; apt ships 0.44.1), installing the latest release to `/usr/local/bin` when no new-enough fzf is present, and pins the resolved path in the rc guard so it is used even before the rc edits `PATH`.
+
+### Changed
+- `configs/tmux/tmux.conf`: added Ghostty terminfo + title forwarding for the session launcher (`terminal-features` for `xterm-ghostty` RGB and hyperlinks, `set-titles on`).
+
 ## [0.0.29] - 2026-06-12
 
 ### Changed

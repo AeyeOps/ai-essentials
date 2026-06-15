@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+# Ghostty session launcher (Linux, bash) — transparent tmux with crash recovery.
+#
+# Bash port of ghostty-tmux-launch (zsh). Behavior is identical; only the shell
+# idioms differ (0-indexed arrays, mapfile/IFS parsing, printf '%()T' for time).
+# Reached from the ~/.bashrc guard for every interactive Ghostty surface that is
+# not already inside tmux (new window, tab, or native split). One fzf screen does
+# everything: the editable input line holds a petname for your NEW session (type
+# to rename), and you Tab-mark detached sessions to PULL IN AS PANES — their panes
+# flatten, tiled, into your one window. Active sessions are shown dimmed for
+# context but cannot be pulled. Enter creates+opens; Esc closes the surface.
+#
+# Intentionally `set -u` only — NOT `set -euo pipefail`: `tmux list-sessions`
+# and friends legitimately exit non-zero (no server yet / no match) and the flow
+# relies on `|| true`. Do not "fix" this to pipefail; it will break the picker.
+set -u
+
+printf -v NOW '%(%s)T' -1   # current epoch once; no per-row `date` fork
+
+readonly SEP_DETACHED='──────────  Tab to pull these in as panes  ──────────'
+readonly SEP_NONE='──────────  no detached sessions to pull  ──────────'
+readonly SEP_ACTIVE='────────────  active sessions (view only)  ────────────'
+readonly TAB=$'\t'
+readonly DIM=$'\e[2m'
+readonly RST=$'\e[0m'
+
+# Petname default name generator. Writes $REPLY — NEVER call as $(gen_petname):
+# a command-substitution subshell re-seeds RANDOM, so the collision-retry loop
+# below would mint the same name forever.
+gen_petname() {
+  local -a adjs=(amused brave bright calm clever curious daring dazzling eager fierce
+                 gentle happy jolly keen lively lucky merry noble plucky quiet
+                 rapid royal silent smart stout swift vivid witty zealous golden
+                 silver crimson jade amber sunny frosty misty cosmic dreamy electric
+                 magic mighty peaceful quirky radiant serene sleek spry vibrant glossy)
+  local -a nouns=(otter badger falcon panda tiger dolphin raven beaver wolf fox
+                  eagle lynx hawk koala mouse owl panther robin sparrow swan
+                  whale yak zebra narwhal gecko ferret lemur lion mole newt
+                  octopus parrot quokka raccoon salmon toucan urchin viper walrus antelope
+                  bison capybara dingo elephant finch gorilla hare ibex jackal kestrel)
+  # Three words: adjective-adjective-noun, the two adjectives distinct.
+  # bash arrays are 0-indexed → RANDOM % n
+  local a1=$(( RANDOM % ${#adjs[@]} )) a2 n=$(( RANDOM % ${#nouns[@]} ))
+  a2=$(( RANDOM % ${#adjs[@]} ))
+  while (( a2 == a1 )); do a2=$(( RANDOM % ${#adjs[@]} )); done
+  REPLY="${adjs[a1]}-${adjs[a2]}-${nouns[n]}"
+}
+
+# Relative "x ago" from an epoch → $REPLY. tmux 3.4 has no relative-time format
+# modifier, so compute it here.
+rel_time() {
+  local delta=$(( NOW - $1 ))
+  if   (( delta < 60 ));    then REPLY="${delta}s ago"
+  elif (( delta < 3600 ));  then REPLY="$(( delta / 60 ))m ago"
+  elif (( delta < 86400 )); then REPLY="$(( delta / 3600 ))h ago"
+  else                           REPLY="$(( delta / 86400 ))d ago"
+  fi
+}
+
+# One display row from tab-separated tmux fields → $REPLY. Shows window + pane
+# counts so the user sees how much a pull will flatten into their window.
+# $1=name $2=windows $3=panes $4=cwd $5=last_epoch $6=when-override (optional).
+fmt_row() {
+  local name=$1 wins=$2 panes=$3 cwd=${4/#$HOME/\~} last=${5:-} when=${6:-}
+  if [[ -z $when ]]; then
+    if [[ -n $last && $last != 0 ]]; then
+      rel_time "$last"; local rel=$REPLY stamp
+      printf -v stamp '%(%b %d %H:%M)T' "$last"
+      when="${rel} · ${stamp}"
+    else when="never"; fi
+  fi
+  REPLY="${name}${TAB}${wins}w ${panes}p · ${cwd} · ${when}"
+}
+
+# Flatten every pane of session $1 into target window $2 (e.g. "=name:"), tiling
+# after each join. $1 self-destructs when its last pane leaves.
+pull_panes() {
+  local src=$1 dst=$2 p
+  while IFS= read -r p; do
+    [[ -z $p ]] && continue
+    tmux join-pane -d -s "$p" -t "$dst" 2>/dev/null || true
+    tmux select-layout -t "$dst" tiled >/dev/null 2>&1 || true
+  done < <(tmux list-panes -s -t "=$src" -F '#{pane_id}' 2>/dev/null)
+}
+
+# Exact membership in the detached set (bash has no index-of operator).
+is_detached() {
+  local target=$1 d
+  for d in "${detached_names[@]}"; do [[ $d == "$target" ]] && return 0; done
+  return 1
+}
+
+# --- Per-session pane counts (one server-wide call, tallied) ------------------
+declare -A pane_count
+while IFS= read -r s; do
+  [[ -z $s ]] && continue
+  pane_count[$s]=$(( ${pane_count[$s]:-0} + 1 ))
+done < <(tmux list-panes -a -F '#{session_name}' 2>/dev/null)
+
+# --- Build detached (selectable) and active (view-only) rows ------------------
+detached_names=()
+det_rows=()
+while IFS= read -r line; do
+  [[ -z $line ]] && continue
+  IFS=$'\t' read -r name wins cwd last <<< "$line"
+  fmt_row "$name" "$wins" "${pane_count[$name]:-?}" "$cwd" "$last"
+  det_rows+=( "$REPLY" )
+  detached_names+=( "$name" )
+done < <(tmux list-sessions \
+  -F "#{session_name}${TAB}#{session_windows}${TAB}#{pane_current_path}${TAB}#{session_last_attached}" \
+  -f '#{?session_attached,,1}' 2>/dev/null || true)
+
+act_rows=()
+while IFS= read -r line; do
+  [[ -z $line ]] && continue
+  IFS=$'\t' read -r name wins cwd <<< "$line"
+  fmt_row "$name" "$wins" "${pane_count[$name]:-?}" "$cwd" "" "attached"
+  act_rows+=( "${DIM}${REPLY}${RST}" )
+done < <(tmux list-sessions \
+  -F "#{session_name}${TAB}#{session_windows}${TAB}#{pane_current_path}" \
+  -f '#{session_attached}' 2>/dev/null || true)
+
+# Collision-free petname to pre-fill the name input.
+gen_petname; petname=$REPLY
+while tmux has-session -t "=$petname" 2>/dev/null; do gen_petname; petname=$REPLY; done
+
+# --- Compose the menu (first row is always a non-pullable separator, so the ----
+# cursor starts somewhere that Enter-without-marks pulls nothing) --------------
+if (( ${#det_rows[@]} )); then
+  menu="$SEP_DETACHED"
+  for r in "${det_rows[@]}"; do menu+=$'\n'"$r"; done
+else
+  menu="$SEP_NONE"
+fi
+if (( ${#act_rows[@]} )); then
+  menu+=$'\n'"$SEP_ACTIVE"
+  for r in "${act_rows[@]}"; do menu+=$'\n'"$r"; done
+fi
+
+if [[ -n ${GT_DRYRUN:-} ]]; then
+  printf 'name input pre-filled: [%s]\n' "$petname"; printf '%s\n' "$menu"; exit 0
+fi
+
+# Preview: enumerate the highlighted session's windows + panes so the user sees
+# exactly what would be pulled. {1} is the name field; assign first, then build
+# the "=name" target (fzf single-quotes {1}, so it cannot be inlined into "=…").
+# Single quotes are intentional: {1}/$n expand in fzf's subshell, not here.
+# shellcheck disable=SC2016
+preview_cmd='n={1}; tmux list-windows -t "=$n" -F "win #{window_index}: #{window_name}  (#{window_panes} panes)" 2>/dev/null && { echo; tmux list-panes -s -t "=$n" -F "  #{window_index}.#{pane_index}  [#{pane_current_command}]  #{pane_current_path}" 2>/dev/null; }'
+
+# fzf binary (PATH fzf by default; override via GT_FZF). Conditional Tab needs the
+# `transform` action, added in fzf 0.45 — gated by the version check below, so an
+# older fzf degrades to plain Tab (parsing still ignores non-detached rows).
+FZF="${GT_FZF:-fzf}"
+fzf_ver=$("$FZF" --version 2>/dev/null | grep -oE '^[0-9]+\.[0-9]+')
+fzf_maj=${fzf_ver%%.*}; fzf_min=${fzf_ver#*.}
+
+# Conditional Tab: toggle the mark ONLY on detached rows; on separators / active
+# rows, Tab (and Shift-Tab) just move the cursor. The transform looks the current
+# name up in GT_DETACHED (space-padded set). Needs a fzf that has the `transform`
+# action; older fzf simply omits the binds.
+export GT_DETACHED=" ${detached_names[*]} "
+tab_bind=()
+if (( ${fzf_maj:-0} > 0 || ${fzf_min:-0} >= 45 )); then
+  # Single quotes intentional: {1}/$n/$GT_DETACHED expand in fzf's subshell.
+  # shellcheck disable=SC2016
+  tab_bind=(
+    --bind 'tab:transform:n={1}; case "$GT_DETACHED" in *" $n "*) echo toggle+down ;; *) echo down ;; esac'
+    --bind 'btab:transform:n={1}; case "$GT_DETACHED" in *" $n "*) echo toggle+up ;; *) echo up ;; esac'
+  )
+fi
+
+# --- One screen: name (editable input) + Tab-mark sessions to pull ------------
+# --disabled: typing edits the input line WITHOUT filtering the list, so the name
+# field and the session list coexist. --print-query returns that name as line 1;
+# Tab-marked rows follow. Esc → 130 (close); Enter → 0 or 1 (no marks) → proceed.
+out=$(printf '%s\n' "$menu" | "$FZF" \
+  --ansi --multi --disabled --query="$petname" --print-query \
+  --prompt='new session › ' --height=80% --reverse --no-sort --no-info \
+  --delimiter="$TAB" --nth=1 "${tab_bind[@]}" \
+  --preview="$preview_cmd" --preview-window='down,45%,border-top,wrap' \
+  --header='type to rename · Tab: mark detached to pull in (panes) · active = view-only · Enter: open · Esc: close')
+rc=$?
+(( rc == 130 || rc == 2 )) && exit 0   # Esc / error → close surface
+
+mapfile -t lines <<< "$out"
+name=${lines[0]:-$petname}; [[ -z $name ]] && name=$petname
+
+pull=()
+for m in "${lines[@]:1}"; do
+  [[ -z $m ]] && continue
+  nm=${m%%"$TAB"*}
+  is_detached "$nm" && pull+=( "$nm" )   # detached only; separators/active ignored
+done
+
+# --- Land in the (new) session; pull marked detached sessions in as panes -----
+if tmux has-session -t "=$name" 2>/dev/null; then
+  target=$name                          # named an existing session → attach to it
+else
+  tmux new-session -d -s "$name"        # detached so we can join panes before attaching
+  target=$name
+fi
+for s in "${pull[@]}"; do
+  [[ $s == "$target" ]] && continue
+  pull_panes "$s" "=$target:"
+done
+exec tmux attach-session -t "=$target"

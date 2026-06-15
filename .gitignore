@@ -41,6 +41,7 @@ output/
 
 # oh-my-claudecode working state
 .omc/
+.omx/
 
 # Local-only roadmap drafts (committed entries are explicitly tracked)
 docs/roadmap/
