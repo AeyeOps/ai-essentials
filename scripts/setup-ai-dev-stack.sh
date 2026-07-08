@@ -274,11 +274,12 @@ EOF
                 success "Copied AEO p10k preset → ~/.p10k.zsh"
                 _p10k_mutated=true
             else
-                warn "~/.p10k.zsh already exists (keeping existing config)"
+                warn "$HOME/.p10k.zsh already exists (keeping existing config)"
             fi
 
             if ! grep -q 'Enable Powerlevel10k instant prompt' ~/.zshrc 2>/dev/null; then
                 info "Adding Powerlevel10k instant prompt to top of .zshrc..."
+                # shellcheck disable=SC2016
                 INSTANT_PROMPT_BLOCK='# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
@@ -596,6 +597,23 @@ _gt_deploy_assets() {
     fi
 }
 
+# The config file is version-checked, but desktop decoration needs are host-local:
+# reusing a home directory on a different Plasma/KWin instance must re-enable the
+# server-side decoration fix even when the launcher files are otherwise current.
+_gt_decoration_state_matches() {
+    local conf="$GHOSTTY_DEST/aeo-launcher.conf"
+    [[ -f "$conf" ]] || return 1
+    if _gt_is_plasma_kwin; then
+        grep -Eq '^[[:space:]]*window-decoration[[:space:]]*=[[:space:]]*server[[:space:]]*$' "$conf" \
+            && grep -Eq '^[[:space:]]*gtk-titlebar[[:space:]]*=[[:space:]]*false[[:space:]]*$' "$conf"
+    elif _gt_is_tiling_wm; then
+        grep -Eq '^[[:space:]]*window-decoration[[:space:]]*=[[:space:]]*none[[:space:]]*$' "$conf"
+    else
+        ! grep -Eq '^[[:space:]]*window-decoration[[:space:]]*=' "$conf" \
+            && ! grep -Eq '^[[:space:]]*gtk-titlebar[[:space:]]*=' "$conf"
+    fi
+}
+
 # Append the 3 Ghostty terminfo/title lines to the active user tmux config when
 # missing (Full deploys the AEO tmux.conf, which already carries them).
 _gt_append_tmux_lines() {
@@ -738,6 +756,7 @@ if [[ -f "$GHOSTTY_MODE_MARKER" ]]; then
     _gt_conf_version="$(grep -m1 '^# AEO_GHOSTTY_LAUNCHER_CONF_VERSION=' "$GHOSTTY_SRC/aeo-launcher.conf" 2>/dev/null || true)"
     [[ -n "$_gt_conf_version" ]] || _gt_ready=false
     grep -qF "$_gt_conf_version" "$GHOSTTY_DEST/aeo-launcher.conf" 2>/dev/null || _gt_ready=false
+    _gt_decoration_state_matches || _gt_ready=false
     if [[ "$_gt_mode" == "full" ]]; then
         _gt_md5_match "$GHOSTTY_SRC/config.full" "$GHOSTTY_DEST/config" || _gt_ready=false
     fi
@@ -793,6 +812,7 @@ else
 fi
 
 # Source NVM for current session
+# shellcheck source=/dev/null
 [[ -s "$NVM_DIR/nvm.sh" ]] && \. "$NVM_DIR/nvm.sh"
 
 info "Checking Node.js 22 LTS..."

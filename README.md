@@ -150,7 +150,7 @@ Two install paths (the installer asks which):
 - **Integrate** — additive. Keeps your existing config; adds a `config-file` include plus the shell rc guard. Overrides only `alt+d`, `alt+shift+d`, and, when needed, Ghostty decoration keys. Reversible by hand.
 - **Full AEO** — opinionated bundle (AEO tmux + Ghostty config + launcher). Replaces your Ghostty and tmux configs after a pre-confirm screen that names every file, makes timestamped backups, and generates a one-command `restore-<stamp>.sh`.
 
-**Decoration mouse fix:** on Plasma/KWin, Ghostty uses `window-decoration = server` plus `gtk-titlebar = false` so KWin provides resize handles without GTK CSD frame offsets. On tiling WMs without usable server-side decorations, the installer can still enable the borderless `window-decoration = none` fallback. Diagnose by hand with `xprop _GTK_FRAME_EXTENTS`.
+**Decoration mouse fix:** on Plasma/KWin, Ghostty uses `window-decoration = server` plus `gtk-titlebar = false` so KWin provides resize handles without GTK CSD frame offsets that can shift clicks by rows and columns. On tiling WMs without usable server-side decorations, the installer can still enable the borderless `window-decoration = none` fallback. Diagnose by hand with `xprop _GTK_FRAME_EXTENTS`.
 
 Requires Ghostty and fzf 0.45+ (the installer resolves or installs a new-enough fzf). See [`configs/ghostty/`](configs/ghostty/) for details.
 

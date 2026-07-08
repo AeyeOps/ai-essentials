@@ -74,16 +74,17 @@ one install, use the most recent one.
 ## Decoration mouse-offset fix
 
 Ghostty's GTK client-side-decoration shadow margins can desync the mouse→cell
-mapping, so text selection drifts several columns to the left. On Plasma/KWin,
-the least-invasive fix is `window-decoration = server` plus `gtk-titlebar = false`:
-KWin owns the resize frame/titlebar and Ghostty does not add GTK CSD extents.
+mapping, so clicks and text selection can drift by both columns and rows. On
+Plasma/KWin, the least-invasive fix is `window-decoration = server` plus
+`gtk-titlebar = false`: KWin owns the resize frame/titlebar and Ghostty does not
+add GTK CSD extents.
 
 For tiling WMs without usable server-side decorations, the installer can enable
 the borderless fallback `window-decoration = none`. That fallback zeroes frame
 extents, but it also removes all window decorations, so Plasma/KWin does not use
 it. To diagnose by hand, run `xprop _GTK_FRAME_EXTENTS` and click the Ghostty
-window: a nonzero left value is the offset, in pixels (≈ one cell width per
-column of drift).
+window: nonzero left/top values are the horizontal/vertical offsets, in pixels
+(roughly one cell per column/row of drift).
 
 ## Requirements
 
