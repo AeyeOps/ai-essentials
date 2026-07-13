@@ -46,6 +46,7 @@ graph TD
     subgraph Terminal
         K[Kitty<br/>GPU-accelerated]
         Z[Zellij<br/>Multiplexer]
+        H[herdr<br/>Agent Multiplexer]
     end
 
     subgraph Shell
@@ -73,7 +74,7 @@ graph TD
 
 | Category | Components |
 |----------|------------|
-| **Terminal** | Kitty (GPU-optimized), Zellij (multiplexer) |
+| **Terminal** | Kitty (GPU-optimized), Zellij (multiplexer), herdr (agent multiplexer) |
 | **Shell** | Zsh, Oh-My-Zsh, Powerlevel10k, MesloLGS Nerd Font |
 | **CLI Tools** | ripgrep, fd, fzf, bat, eza, delta, glow, btop, ncdu, duf, httpie, yq, shellcheck, p7zip |
 | **File Manager** | Yazi (Rust-based TUI with previews) |
@@ -129,6 +130,7 @@ Located in `configs/` — copy what you need or use as reference.
 | **Kitty** | True black (#000000) for OLED, 4K grid sizing, 50k scrollback, low-latency GPU settings |
 | **Ghostty** | Transparent-tmux session launcher + desktop-specific Ghostty decoration fix (see below) |
 | **Zellij** | Modern theme matching Powerlevel10k classic darkest |
+| **Herdr** | Agent multiplexer: ctrl+a prefix (tmux-safe), tokyo-night on pure black, session/pane persistence, agent integrations |
 | **Pop Shell** | 4px gaps, smart-gaps, active-hint, hidden window titles |
 
 ```bash
@@ -187,6 +189,7 @@ ai-essentials/
 │   └── update-coding-agents.sh
 ├── configs/
 │   ├── ghostty/          # Session launcher + decoration fix
+│   ├── herdr/            # Agent multiplexer config + integrations
 │   ├── kitty/
 │   ├── tmux/
 │   ├── zellij/
@@ -206,7 +209,8 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDU
 This stack intentionally tracks upstream releases at install time rather than pinning specific versions. The trade-offs are deliberate and documented here so consumers can decide if the policy fits their threat model.
 
 - **CLI tools fetched from GitHub `releases/latest`**: `eza`, `delta`, `glow`, `duf`, `yazi`, `zellij`, `zjstatus.wasm`. The installer queries each project's GitHub API for the latest tag at run time and downloads that release. No version constants are hard-coded; no checksum or signature verification is performed beyond what TLS provides during the curl download. Trade-off: stays current with upstream fixes vs. accepts upstream supply-chain drift on every run.
-- **Vendor install scripts piped to a shell**: `nvm` (pinned to `v0.40.1`), `bun` (`https://bun.sh/install`), Anthropic Claude Code installer (`https://claude.ai/install.sh`), and Homebrew (`https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh`). These follow each vendor's documented canonical install path. No checksum verification beyond TLS. Trade-off: parity with the install instructions each vendor publishes vs. trust delegated to the vendor's release pipeline.
+- **Vendor install scripts piped to a shell**: `nvm` (pinned to `v0.40.1`), `bun` (`https://bun.sh/install`), Anthropic Claude Code installer (`https://claude.ai/install.sh`), herdr (`https://herdr.dev/install.sh`), and Homebrew (`https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh`). These follow each vendor's documented canonical install path. No checksum verification beyond TLS. Trade-off: parity with the install instructions each vendor publishes vs. trust delegated to the vendor's release pipeline.
+- **herdr plugins via `herdr plugin install`**: `cloudmanic/herdr-plus`, `smarzban/herdr-file-viewer`, `yuk1ty/herdr-spreader` — community GitHub repos resolved at install time, not reviewed by herdr upstream; two build from source with a local Rust toolchain. Same latest-release trade-off as above.
 - **`apt-get install`**: invoked with `-y` and without `--no-install-recommends`. Behavior matches Ubuntu's default and pulls recommended dependencies (often relevant for desktop/media packages such as `mpv`, `ffmpeg`, `kitty`).
 - **Node devDependencies in `aeo-cc-sessions-vsix/`**: caret ranges are kept (e.g. `^1.110.0`, `^5.7.0`). The committed `package-lock.json` pins the actual installed tree, so reproducibility for the published VSIX is preserved at lockfile granularity.
 - **Python**: `pyproject.toml` declares no runtime dependencies; no lockfile is committed.

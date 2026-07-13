@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.31] - 2026-07-13
+
+### Added
+- `configs/herdr/`: herdr agent multiplexer bundle — `config.toml` (ctrl+a prefix clearing tmux ctrl+b and AEO tmux C-Space, tokyo-night on pure-black panels, system toasts, `resume_agents_on_restore` + `pane_history` persistence), `zshenv-display-snippet.zsh` (derives `DISPLAY` from the live X socket for GUI tools inside panes; inert when DISPLAY is already set), and a README with manual install steps and operational gotchas (never nest tmux/zellij inside a herdr pane; `pane_history` writes scrollback to disk; integration hooks embed machine-local absolute paths).
+- `setup-ai-dev-stack.sh`: new optional "AEO Herdr + Config" component (section 7b) — installs herdr via the official installer, deploys the config with timestamped backup and live server reload, installs agent integrations gated on the agent CLIs actually present (claude, pi, codex, opencode), the herdr agent skill (socket-API pane control, self-gated on `HERDR_ENV=1`), plugins (herdr-plus prebuilt; file-viewer and spreader gated on a Rust toolchain), zsh completions (fpath inserted before oh-my-zsh's compinit to avoid stale-dump clobbering) and bash completions, and the `.zshenv` DISPLAY fallback. An md5-keyed idempotent pre-check silently skips when everything is current.
+
 ## [0.0.30] - 2026-06-15
 
 ### Added

@@ -11,6 +11,7 @@
 #   - CLI tools: fd, fzf, bat, eza, delta, ripgrep, glow, btop, ncdu, duf, httpie, yq, shellcheck, p7zip
 #   - tmux (with optional AEO config: C-Space prefix, true color, keyboard reference bar)
 #   - Zellij terminal multiplexer
+#   - herdr agent multiplexer (with AEO config, agent integrations, plugins)
 #   - bun (JS runtime) + direnv
 #   - Zsh + Oh-My-Zsh + Powerlevel10k
 #   - Pop Shell (GNOME tiling extension)
@@ -1368,6 +1369,203 @@ PYEOF
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 7b. AEO HERDR + CONFIG (agent multiplexer + integrations + plugins)
+# ═══════════════════════════════════════════════════════════════════════════
+HERDR_INSTALLED=false
+HERDR_CONFIG_APPLIED=false
+HERDR_CONFIG_SRC="$SCRIPT_DIR/../configs/herdr"
+HERDR_DEST="$HOME/.config/herdr"
+HERDR_ZSH_COMPDIR="$HOME/.zsh/completions"
+
+_herdr_md5_match() {
+    local src="$1" dst="$2"
+    [[ -f "$src" && -f "$dst" ]] || return 1
+    [[ "$(md5sum "$src" | awk '{print $1}')" == "$(md5sum "$dst" | awk '{print $1}')" ]]
+}
+
+# Pre-check: silently skip when herdr is installed, config.toml md5-matches,
+# completions + zshenv DISPLAY block are deployed, the agent skill is present,
+# and the expected plugins are installed (Rust-built ones only when cargo exists).
+_herdr_bundle_ready=true
+command_exists herdr || _herdr_bundle_ready=false
+if $_herdr_bundle_ready && [[ -f "$HERDR_CONFIG_SRC/config.toml" ]]; then
+    _herdr_md5_match "$HERDR_CONFIG_SRC/config.toml" "$HERDR_DEST/config.toml" \
+        || _herdr_bundle_ready=false
+fi
+if $_herdr_bundle_ready && command_exists zsh; then
+    [[ -s "$HERDR_ZSH_COMPDIR/_herdr" ]] || _herdr_bundle_ready=false
+    if [[ -f "$HERDR_CONFIG_SRC/zshenv-display-snippet.zsh" ]]; then
+        grep -qF 'aeo herdr display' "$HOME/.zshenv" 2>/dev/null || _herdr_bundle_ready=false
+    fi
+fi
+if $_herdr_bundle_ready && command_exists npx; then
+    [[ -d "$HOME/.agents/skills/herdr" ]] || _herdr_bundle_ready=false
+fi
+if $_herdr_bundle_ready; then
+    [[ -d "$HERDR_DEST/plugins/config/cloudmanic.herdr-plus" ]] || _herdr_bundle_ready=false
+fi
+if $_herdr_bundle_ready && command_exists cargo; then
+    [[ -d "$HERDR_DEST/plugins/config/herdr-file-viewer" ]] || _herdr_bundle_ready=false
+    [[ -d "$HERDR_DEST/plugins/config/herdr-spreader" ]] || _herdr_bundle_ready=false
+fi
+
+if $_herdr_bundle_ready; then
+    warn "AEO herdr + config already installed and up to date"
+    HERDR_INSTALLED=true
+    HERDR_CONFIG_APPLIED=true
+else
+    echo ""
+    echo -e "${BLUE}AEO Herdr + Config${NC}"
+    echo "  Installs herdr (agent multiplexer, herdr.dev) plus the AEO config:"
+    echo "  ctrl+a prefix (clears tmux ctrl+b and AEO tmux C-Space), tokyo-night on"
+    echo "  pure-black panels, system toasts, session/pane persistence across"
+    echo "  restarts. Also: agent integrations (for agent CLIs present on this"
+    echo "  machine), the herdr agent skill, plugins (herdr-plus, file-viewer,"
+    echo "  spreader), zsh/bash completions, and a DISPLAY fallback for GUI tools"
+    echo "  inside panes. Never run tmux/zellij INSIDE a herdr pane (breaks agent"
+    echo "  state detection); herdr inside tmux is fine."
+    if [[ -f "$HERDR_DEST/config.toml" ]]; then
+        echo ""
+        echo -e "${YELLOW}  WARNING: This will REPLACE your existing herdr config (backup will be made).${NC}"
+    fi
+    echo ""
+    read -r -p "Install AEO herdr + config? [y/N] " herdr_answer || herdr_answer="n"
+    if [[ "${herdr_answer,,}" == "y" ]]; then
+        # Install herdr if missing (official installer detects OS/arch itself)
+        if ! command_exists herdr; then
+            info "Installing herdr..."
+            curl -fsSL https://herdr.dev/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
+            command_exists herdr || error "herdr installer finished but 'herdr' is not on PATH"
+            success "herdr installed: $(herdr --version)"
+        else
+            warn "herdr already installed: $(herdr --version)"
+        fi
+        HERDR_INSTALLED=true
+
+        # Deploy AEO config (timestamped backup on change)
+        if [[ -f "$HERDR_CONFIG_SRC/config.toml" ]]; then
+            mkdir -p "$HERDR_DEST"
+            if [[ -f "$HERDR_DEST/config.toml" ]] \
+                && ! _herdr_md5_match "$HERDR_CONFIG_SRC/config.toml" "$HERDR_DEST/config.toml"; then
+                cp "$HERDR_DEST/config.toml" "$HERDR_DEST/config.toml.bak.$(date +%Y%m%d%H%M%S)"
+                info "Backed up existing ~/.config/herdr/config.toml"
+            fi
+            cp "$HERDR_CONFIG_SRC/config.toml" "$HERDR_DEST/config.toml"
+            HERDR_CONFIG_APPLIED=true
+            success "AEO herdr config deployed -> ~/.config/herdr/"
+            if herdr status server 2>/dev/null | grep -q 'status: running'; then
+                herdr server reload-config >/dev/null 2>&1 || true
+                info "Reloaded config into the running herdr server"
+            fi
+        fi
+
+        # Agent integrations. Hooks embed absolute machine-local paths (e.g. in
+        # ~/.claude/settings.json), so integrations install per machine and only
+        # for agent CLIs actually present — never sync those files across hosts.
+        for _agent in claude pi codex opencode; do
+            if command_exists "$_agent"; then
+                if herdr integration install "$_agent" >/dev/null 2>&1; then
+                    success "herdr $_agent integration installed"
+                else
+                    warn "herdr $_agent integration failed (herdr integration install $_agent)"
+                fi
+            else
+                warn "herdr $_agent integration skipped ($_agent not installed)"
+            fi
+        done
+        unset _agent
+
+        # Herdr agent skill: lets agents drive herdr panes via its socket API.
+        # Self-gates on HERDR_ENV=1 (set by herdr in its panes) — inert elsewhere.
+        if command_exists npx; then
+            if [[ -d "$HOME/.agents/skills/herdr" ]]; then
+                warn "herdr agent skill already installed"
+            elif npx -y skills add ogulcancelik/herdr --skill herdr -g >/dev/null 2>&1; then
+                success "herdr agent skill installed -> ~/.agents/skills/herdr"
+            else
+                warn "herdr agent skill install failed (npx -y skills add ogulcancelik/herdr --skill herdr -g)"
+            fi
+        else
+            warn "herdr agent skill skipped (npx not available)"
+        fi
+
+        # Plugins: herdr-plus ships a prebuilt binary; file-viewer and spreader
+        # build from source and need a Rust toolchain (file-viewer: rustc >= 1.96).
+        _herdr_plugin_install() {
+            local repo="$1" id="$2"
+            if [[ -d "$HERDR_DEST/plugins/config/$id" ]]; then
+                warn "herdr plugin $id already installed"
+            elif herdr plugin install "$repo" --yes >/dev/null 2>&1; then
+                success "herdr plugin installed: $id"
+            else
+                warn "herdr plugin $id failed (herdr plugin install $repo --yes)"
+            fi
+        }
+        _herdr_plugin_install cloudmanic/herdr-plus cloudmanic.herdr-plus
+        if command_exists cargo; then
+            _herdr_plugin_install smarzban/herdr-file-viewer herdr-file-viewer
+            _herdr_plugin_install yuk1ty/herdr-spreader herdr-spreader
+        else
+            warn "herdr plugins file-viewer/spreader skipped (need a Rust toolchain: https://rustup.rs)"
+        fi
+
+        # Zsh completions. fpath must be extended BEFORE the shell's single
+        # compinit runs — a second compinit later in the rc re-reads a stale
+        # dump and silently clobbers every registration from the first.
+        if command_exists zsh; then
+            mkdir -p "$HERDR_ZSH_COMPDIR"
+            herdr completion zsh > "$HERDR_ZSH_COMPDIR/_herdr"
+            if [[ -f "$HOME/.zshrc" ]] && ! grep -q '\.zsh/completions' "$HOME/.zshrc"; then
+                if grep -q 'oh-my-zsh\.sh' "$HOME/.zshrc"; then
+                    # shellcheck disable=SC2016
+                    sed -i '0,/^[[:space:]]*source .*oh-my-zsh\.sh/s||fpath=(~/.zsh/completions $fpath)\n&|' "$HOME/.zshrc"
+                    info "Added ~/.zsh/completions to fpath (before oh-my-zsh's compinit)"
+                else
+                    cat >> "$HOME/.zshrc" << 'EOF'
+
+# ─── Completions (herdr) ───────────────────────────────────────────────────────
+fpath=(~/.zsh/completions $fpath)
+autoload -Uz compinit && compinit
+EOF
+                    info "Added fpath + compinit to .zshrc"
+                fi
+                find "$HOME" -maxdepth 1 -name '.zcompdump*' -type f -delete 2>/dev/null || true
+            fi
+            success "herdr zsh completions -> ~/.zsh/completions/_herdr"
+        fi
+
+        # Bash completions (auto-loaded by the bash-completion package)
+        mkdir -p "$HOME/.local/share/bash-completion/completions"
+        if herdr completion bash > "$HOME/.local/share/bash-completion/completions/herdr" 2>/dev/null; then
+            success "herdr bash completions -> ~/.local/share/bash-completion/completions/herdr"
+        else
+            rm -f "$HOME/.local/share/bash-completion/completions/herdr"
+            warn "herdr bash completions not available in this herdr version"
+        fi
+
+        # DISPLAY fallback for GUI tools inside herdr panes (zsh; the block
+        # self-guards at runtime: only fires when DISPLAY is unset and a local
+        # X socket exists, so SSH X-forwarding and desktops are unaffected)
+        if [[ -f "$HERDR_CONFIG_SRC/zshenv-display-snippet.zsh" ]] && command_exists zsh; then
+            if ! grep -qF 'aeo herdr display' "$HOME/.zshenv" 2>/dev/null; then
+                {
+                    echo ""
+                    echo "# >>> aeo herdr display >>>"
+                    cat "$HERDR_CONFIG_SRC/zshenv-display-snippet.zsh"
+                    echo "# <<< aeo herdr display <<<"
+                } >> "$HOME/.zshenv"
+                success "DISPLAY fallback appended to ~/.zshenv"
+            else
+                warn "DISPLAY fallback already in ~/.zshenv"
+            fi
+        fi
+    else
+        info "Skipped AEO herdr + config"
+    fi
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 8. BUN (FAST JS RUNTIME)
 # ═══════════════════════════════════════════════════════════════════════════
 info "Checking Bun..."
@@ -1699,6 +1897,9 @@ fi
 if $ZELLIJ_INSTALLED; then
     echo "  - Zellij terminal multiplexer (with AEO config)"
 fi
+if $HERDR_INSTALLED; then
+    echo "  - herdr agent multiplexer (with AEO config, integrations, plugins)"
+fi
 if $GHOSTTY_LAUNCHER_DEPLOYED; then
     echo "  - Ghostty session launcher (transparent tmux + decoration fix)"
 fi
@@ -1713,6 +1914,7 @@ echo "Quick start commands:"
 echo "  kitty          - Launch Kitty terminal"
 echo "  yazi / y       - File manager"
 echo "  zellij / zj    - Terminal multiplexer"
+echo "  herdr          - Agent multiplexer (ctrl+a prefix)"
 echo "  glow / mdv     - Render markdown in terminal"
 echo "  mpvk video.mp4  - Play video in Kitty terminal"
 echo "  mamba activate dev  - Activate AI dev environment"
@@ -1733,6 +1935,10 @@ if $TMUX_CONFIG_APPLIED; then
 fi
 if $ZELLIJ_CONFIG_APPLIED; then
     echo "  - AEO zellij config applied (p10k-aeo theme, Alt-key status row)"
+fi
+if $HERDR_CONFIG_APPLIED; then
+    echo "  - AEO herdr config applied (ctrl+a prefix, persistence on; pane_history"
+    echo "    writes scrollback to disk — set it false on shared/sensitive hosts)"
 fi
 if $GHOSTTY_LAUNCHER_DEPLOYED; then
     echo "  - Ghostty launcher fires via the rc guard under Ghostty; restart Ghostty to use it"
